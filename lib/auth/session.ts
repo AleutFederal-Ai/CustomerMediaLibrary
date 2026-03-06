@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { NextRequest, NextResponse } from "next/server";
 import { sessions, users } from "@/lib/azure/cosmos";
 import { getSecret } from "@/lib/azure/keyvault";
+import { getUserTenantIds } from "@/lib/auth/tenant";
 import { SessionRecord, SessionContext } from "@/types";
 
 const COOKIE_NAME = "mg_session";
@@ -57,6 +58,7 @@ async function verifySignedCookie(cookieValue: string): Promise<string | null> {
 
 /**
  * Create a new session after successful magic link verification.
+ * Resolves tenant memberships for the user and stores them on the session.
  * Sets the session cookie on the response.
  */
 export async function createSession(
@@ -74,6 +76,10 @@ export async function createSession(
   // TTL = absolute timeout + 1 hour buffer
   const ttl = ABSOLUTE_TIMEOUT_HOURS * 60 * 60 + 3600;
 
+  // Resolve all tenants the user belongs to
+  const tenantIds = await getUserTenantIds(email);
+  const activeTenantId = tenantIds[0] ?? undefined;
+
   const record: SessionRecord = {
     id: sessionId,
     type: "session",
@@ -84,6 +90,8 @@ export async function createSession(
     absoluteExpiresAt: absoluteExpiresAt.toISOString(),
     ipAddress,
     ttl,
+    activeTenantId,
+    tenantIds,
   };
 
   const container = await sessions();
@@ -170,9 +178,33 @@ export async function validateSession(
       sessionId,
       email: record.email,
       isAdmin: false, // Admin check done separately (cached per session)
+      activeTenantId: record.activeTenantId ?? null,
+      tenantIds: record.tenantIds ?? [],
     };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Switch the active tenant on a session.
+ * The new tenantId must be in the session's tenantIds list.
+ */
+export async function switchActiveTenant(
+  sessionId: string,
+  tenantId: string,
+  currentTenantIds: string[]
+): Promise<boolean> {
+  if (!currentTenantIds.includes(tenantId)) return false;
+
+  try {
+    const container = await sessions();
+    await container.item(sessionId, sessionId).patch([
+      { op: "replace", path: "/activeTenantId", value: tenantId },
+    ]);
+    return true;
+  } catch {
+    return false;
   }
 }
 

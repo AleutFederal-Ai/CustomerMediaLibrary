@@ -4,7 +4,7 @@ import sharp from "sharp";
 import { media, albums } from "@/lib/azure/cosmos";
 import { uploadBlob } from "@/lib/azure/blob";
 import { writeAuditLog } from "@/lib/audit/logger";
-import { isAdminGroupMember } from "@/lib/azure/graph";
+import { isTenantAdmin } from "@/lib/auth/permissions";
 import { MediaRecord, AuditAction } from "@/types";
 
 const ALLOWED_IMAGE_TYPES = new Set([
@@ -33,8 +33,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const email = request.headers.get("x-session-email");
   if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const isAdmin = await isAdminGroupMember(email);
-  if (!isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const tenantId =
+    request.nextUrl.searchParams.get("tenantId") ||
+    request.headers.get("x-active-tenant-id") ||
+    "";
+  if (!tenantId) return NextResponse.json({ error: "No active tenant" }, { status: 403 });
+
+  const canAdmin = await isTenantAdmin(email, tenantId);
+  if (!canAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
@@ -68,11 +74,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // Verify album exists
+  // Verify album exists and belongs to this tenant
   try {
     const albumsContainer = await albums();
     const { resource: album } = await albumsContainer.item(albumId, albumId).read();
-    if (!album || album.isDeleted) {
+    if (!album || album.isDeleted || album.tenantId !== tenantId) {
       return NextResponse.json({ error: "Album not found" }, { status: 404 });
     }
   } catch {
@@ -81,8 +87,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const mediaId = uuidv4();
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "bin";
-  const blobName = `${albumId}/${mediaId}.${ext}`;
-  const thumbnailBlobName = `${albumId}/${mediaId}_thumb.webp`;
+  const blobName = `${tenantId}/${albumId}/${mediaId}.${ext}`;
+  const thumbnailBlobName = `${tenantId}/${albumId}/${mediaId}_thumb.webp`;
 
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -126,6 +132,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const record: MediaRecord = {
       id: mediaId,
       albumId,
+      tenantId,
       fileName: file.name,
       fileType: isImage ? "image" : "video",
       mimeType,
@@ -144,6 +151,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     await writeAuditLog({
       userEmail: email,
       ipAddress: ip,
+      tenantId,
       action: AuditAction.MEDIA_UPLOADED,
       detail: {
         mediaId,

@@ -1,14 +1,20 @@
 import { domains } from "@/lib/azure/cosmos";
 import { DomainRecord } from "@/types";
 
+export interface DomainCheckResult {
+  allowed: boolean;
+  tenantIds: string[];
+}
+
 /**
  * Check if an email's domain is on the permitted domains list in Cosmos DB.
- * Returns false for any error — fail closed.
+ * Returns the list of tenant IDs the domain grants access to.
+ * Returns { allowed: false, tenantIds: [] } for any error — fail closed.
  */
-export async function isDomainAllowed(email: string): Promise<boolean> {
+export async function isDomainAllowed(email: string): Promise<DomainCheckResult> {
   try {
     const domain = email.split("@")[1]?.toLowerCase();
-    if (!domain) return false;
+    if (!domain) return { allowed: false, tenantIds: [] };
 
     const container = await domains();
     const { resources } = await container.items
@@ -19,8 +25,9 @@ export async function isDomainAllowed(email: string): Promise<boolean> {
       })
       .fetchAll();
 
-    return resources.length > 0;
+    if (resources.length === 0) return { allowed: false, tenantIds: [] };
+    return { allowed: true, tenantIds: resources.map((r) => r.tenantId) };
   } catch {
-    return false;
+    return { allowed: false, tenantIds: [] };
   }
 }

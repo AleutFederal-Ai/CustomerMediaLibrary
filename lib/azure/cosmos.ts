@@ -11,6 +11,8 @@ export const CONTAINERS = {
   MEDIA: "media",
   AUDIT_LOGS: "auditlogs",
   DOMAINS: "domains",
+  TENANTS: "tenants",
+  MEMBERSHIPS: "memberships",
 } as const;
 
 let _client: CosmosClient | null = null;
@@ -53,3 +55,5 @@ export const albums = () => getContainer(CONTAINERS.ALBUMS);
 export const media = () => getContainer(CONTAINERS.MEDIA);
 export const auditLogs = () => getContainer(CONTAINERS.AUDIT_LOGS);
 export const domains = () => getContainer(CONTAINERS.DOMAINS);
+export const tenants = () => getContainer(CONTAINERS.TENANTS);
+export const memberships = () => getContainer(CONTAINERS.MEMBERSHIPS);

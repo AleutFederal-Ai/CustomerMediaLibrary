@@ -15,6 +15,11 @@ import { MediaRecord, AuditAction } from "@/types";
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const email = request.headers.get("x-session-email") ?? "unknown";
   const ip = request.headers.get("x-client-ip") ?? "unknown";
+  const tenantId = request.headers.get("x-active-tenant-id") ?? "";
+
+  if (!tenantId) {
+    return NextResponse.json({ error: "No active tenant" }, { status: 403 });
+  }
 
   let body: { mediaIds?: string[]; albumId?: string };
   try {
@@ -55,7 +60,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
 
     const validRecords: MediaRecord[] = rawRecords.filter(
-      (r): r is MediaRecord => r !== undefined && !r.isDeleted
+      (r): r is MediaRecord => r !== undefined && !r.isDeleted && r.tenantId === tenantId
     );
 
     if (validRecords.length === 0) {
@@ -68,6 +73,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     await writeAuditLog({
       userEmail: email,
       ipAddress: ip,
+      tenantId,
       action: AuditAction.BULK_DOWNLOAD,
       detail: {
         albumId,

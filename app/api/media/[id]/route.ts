@@ -15,6 +15,11 @@ export async function GET(
   const { id } = await params;
   const email = request.headers.get("x-session-email") ?? "unknown";
   const ip = request.headers.get("x-client-ip") ?? "unknown";
+  const tenantId = request.headers.get("x-active-tenant-id") ?? "";
+
+  if (!tenantId) {
+    return NextResponse.json({ error: "No active tenant" }, { status: 403 });
+  }
 
   // Optional: caller can pass albumId for efficient Cosmos point-read
   const albumId = request.nextUrl.searchParams.get("albumId");
@@ -30,14 +35,17 @@ export async function GET(
       // Cross-partition query — less efficient but usable as fallback
       const { resources } = await container.items
         .query<MediaRecord>({
-          query: "SELECT * FROM c WHERE c.id = @id AND c.isDeleted = false",
-          parameters: [{ name: "@id", value: id }],
+          query: "SELECT * FROM c WHERE c.id = @id AND c.tenantId = @tenantId AND c.isDeleted = false",
+          parameters: [
+            { name: "@id", value: id },
+            { name: "@tenantId", value: tenantId },
+          ],
         })
         .fetchAll();
       record = resources[0];
     }
 
-    if (!record || record.isDeleted) {
+    if (!record || record.isDeleted || record.tenantId !== tenantId) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
@@ -50,6 +58,7 @@ export async function GET(
     await writeAuditLog({
       userEmail: email,
       ipAddress: ip,
+      tenantId,
       action: AuditAction.MEDIA_VIEWED,
       detail: { mediaId: id, albumId: record.albumId, fileName: record.fileName },
     });

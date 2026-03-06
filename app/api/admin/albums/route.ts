@@ -3,26 +3,36 @@ import { v4 as uuidv4 } from "uuid";
 import { albums, media } from "@/lib/azure/cosmos";
 import { deleteBlob } from "@/lib/azure/blob";
 import { writeAuditLog } from "@/lib/audit/logger";
-import { isAdminGroupMember } from "@/lib/azure/graph";
+import { isTenantAdmin } from "@/lib/auth/permissions";
 import { AlbumRecord, MediaRecord, AuditAction } from "@/types";
 
-async function requireAdmin(request: NextRequest): Promise<string | null> {
+/** Returns { email, tenantId } if the caller can manage the target tenant, null otherwise. */
+async function requireTenantAdmin(
+  request: NextRequest
+): Promise<{ email: string; tenantId: string } | null> {
   const email = request.headers.get("x-session-email");
   if (!email) return null;
-  const isAdmin = await isAdminGroupMember(email);
-  return isAdmin ? email : null;
+  // Super admins may pass ?tenantId= to target any tenant; others use their active tenant
+  const tenantId =
+    request.nextUrl.searchParams.get("tenantId") ||
+    request.headers.get("x-active-tenant-id") ||
+    "";
+  if (!tenantId) return null;
+  const ok = await isTenantAdmin(email, tenantId);
+  return ok ? { email, tenantId } : null;
 }
 
-// GET /api/admin/albums — list all albums including deleted
+// GET /api/admin/albums — list albums for the active (or specified) tenant
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const email = await requireAdmin(request);
-  if (!email) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const caller = await requireTenantAdmin(request);
+  if (!caller) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   try {
     const container = await albums();
     const { resources } = await container.items
       .query<AlbumRecord>({
-        query: "SELECT * FROM c ORDER BY c.order ASC",
+        query: "SELECT * FROM c WHERE c.tenantId = @tenantId ORDER BY c.order ASC",
+        parameters: [{ name: "@tenantId", value: caller.tenantId }],
       })
       .fetchAll();
 
@@ -35,8 +45,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
 // POST /api/admin/albums — create album
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const email = await requireAdmin(request);
-  if (!email) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const caller = await requireTenantAdmin(request);
+  if (!caller) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
@@ -55,6 +65,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const now = new Date().toISOString();
   const album: AlbumRecord = {
     id: uuidv4(),
+    tenantId: caller.tenantId,
     name,
     description: body.description?.trim(),
     order: body.order ?? 0,
@@ -68,8 +79,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const { resource: created } = await container.items.create(album);
 
     await writeAuditLog({
-      userEmail: email,
+      userEmail: caller.email,
       ipAddress: ip,
+      tenantId: caller.tenantId,
       action: AuditAction.ALBUM_CREATED,
       detail: { albumId: album.id, name },
     });
@@ -83,8 +95,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
 // PATCH /api/admin/albums?id=<id> — update album
 export async function PATCH(request: NextRequest): Promise<NextResponse> {
-  const email = await requireAdmin(request);
-  if (!email) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const caller = await requireTenantAdmin(request);
+  if (!caller) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
   const id = request.nextUrl.searchParams.get("id");
@@ -100,7 +112,9 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
   try {
     const container = await albums();
     const { resource: existing } = await container.item(id, id).read<AlbumRecord>();
-    if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!existing || existing.tenantId !== caller.tenantId) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
 
     const updated: AlbumRecord = {
       ...existing,
@@ -114,8 +128,9 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     const { resource: result } = await container.item(id, id).replace(updated);
 
     await writeAuditLog({
-      userEmail: email,
+      userEmail: caller.email,
       ipAddress: ip,
+      tenantId: caller.tenantId,
       action: AuditAction.ALBUM_UPDATED,
       detail: { albumId: id, changes: body },
     });
@@ -129,8 +144,8 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
 
 // DELETE /api/admin/albums?id=<id> — soft delete album and its media
 export async function DELETE(request: NextRequest): Promise<NextResponse> {
-  const email = await requireAdmin(request);
-  if (!email) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const caller = await requireTenantAdmin(request);
+  if (!caller) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
   const id = request.nextUrl.searchParams.get("id");
@@ -139,7 +154,9 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
   try {
     const albumsContainer = await albums();
     const { resource: existing } = await albumsContainer.item(id, id).read<AlbumRecord>();
-    if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!existing || existing.tenantId !== caller.tenantId) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
 
     const now = new Date().toISOString();
 
@@ -150,8 +167,11 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
     const mediaContainer = await media();
     const { resources: mediaItems } = await mediaContainer.items
       .query<MediaRecord>({
-        query: "SELECT * FROM c WHERE c.albumId = @albumId AND c.isDeleted = false",
-        parameters: [{ name: "@albumId", value: id }],
+        query: "SELECT * FROM c WHERE c.albumId = @albumId AND c.tenantId = @tenantId AND c.isDeleted = false",
+        parameters: [
+          { name: "@albumId", value: id },
+          { name: "@tenantId", value: caller.tenantId },
+        ],
       })
       .fetchAll();
 
@@ -161,14 +181,15 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
           ...item,
           isDeleted: true,
           deletedAt: now,
-          deletedBy: email,
+          deletedBy: caller.email,
         })
       )
     );
 
     await writeAuditLog({
-      userEmail: email,
+      userEmail: caller.email,
       ipAddress: ip,
+      tenantId: caller.tenantId,
       action: AuditAction.ALBUM_DELETED,
       detail: { albumId: id, mediaCount: mediaItems.length },
     });

@@ -1,4 +1,37 @@
 // ============================================================
+// Multi-tenant types
+// ============================================================
+
+export type MemberRole = "viewer" | "admin";
+export type MemberSource = "domain" | "explicit";
+
+export interface TenantRecord {
+  id: string;
+  name: string;
+  slug: string;           // URL-safe identifier, e.g. "aleutfederal"
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+}
+
+/**
+ * Grants a user access to a tenant.
+ * source="domain"   — automatically created when a matching domain record exists.
+ * source="explicit" — manually granted by an admin regardless of email domain.
+ */
+export interface MembershipRecord {
+  id: string;
+  tenantId: string;       // partition key
+  userEmail: string;
+  role: MemberRole;
+  source: MemberSource;
+  addedAt: string;
+  addedBy: string;
+  isActive: boolean;
+}
+
+// ============================================================
 // Cosmos DB document types
 // ============================================================
 
@@ -15,6 +48,9 @@ export interface SessionRecord {
   usedAt?: string;
   ipAddress: string;
   ttl: number;
+  // Multi-tenant: resolved at session creation, updated on tenant switch
+  activeTenantId?: string;
+  tenantIds?: string[];
 }
 
 export interface UserRecord {
@@ -30,6 +66,7 @@ export interface UserRecord {
 
 export interface AlbumRecord {
   id: string;
+  tenantId: string;       // which tenant owns this album
   name: string;
   description?: string;
   coverMediaId?: string;
@@ -44,12 +81,13 @@ export type FileType = "image" | "video";
 export interface MediaRecord {
   id: string;
   albumId: string;
+  tenantId: string;       // which tenant owns this media
   fileName: string;
   fileType: FileType;
   mimeType: string;
   sizeBytes: number;
-  blobName: string;
-  thumbnailBlobName: string;
+  blobName: string;        // {tenantId}/{albumId}/{mediaId}.{ext}
+  thumbnailBlobName: string; // {tenantId}/{albumId}/{mediaId}_thumb.webp
   tags: string[];
   uploadedAt: string;
   uploadedBy: string;
@@ -64,13 +102,15 @@ export interface AuditLogRecord {
   userEmail: string;
   ipAddress: string;
   action: AuditAction;
+  tenantId?: string;      // null for super-admin / cross-tenant actions
   detail: Record<string, unknown>;
   ttl: number;
 }
 
 export interface DomainRecord {
   id: string;
-  domain: string;
+  domain: string;         // partition key
+  tenantId: string;       // which tenant this domain grants access to
   addedAt: string;
   addedBy: string;
   isActive: boolean;
@@ -89,6 +129,7 @@ export enum AuditAction {
   SESSION_CREATED = "session_created",
   SESSION_EXPIRED = "session_expired",
   SESSION_REVOKED = "session_revoked",
+  TENANT_SWITCHED = "tenant_switched",
 
   // Media access
   MEDIA_VIEWED = "media_viewed",
@@ -110,6 +151,15 @@ export enum AuditAction {
   // Admin — domains
   DOMAIN_ADDED = "domain_added",
   DOMAIN_DEACTIVATED = "domain_deactivated",
+
+  // Admin — tenants
+  TENANT_CREATED = "tenant_created",
+  TENANT_UPDATED = "tenant_updated",
+  TENANT_DEACTIVATED = "tenant_deactivated",
+
+  // Admin — memberships
+  MEMBER_ADDED = "member_added",
+  MEMBER_REMOVED = "member_removed",
 }
 
 // ============================================================
@@ -120,6 +170,8 @@ export interface SessionContext {
   sessionId: string;
   email: string;
   isAdmin: boolean;
+  activeTenantId: string | null;
+  tenantIds: string[];
 }
 
 // ============================================================
@@ -135,8 +187,17 @@ export interface SasUrlResponse {
   expiresAt: string;
 }
 
+export interface TenantListItem {
+  id: string;
+  name: string;
+  slug: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface AlbumListItem {
   id: string;
+  tenantId: string;
   name: string;
   description?: string;
   coverThumbnailUrl?: string;
@@ -147,6 +208,7 @@ export interface AlbumListItem {
 export interface MediaListItem {
   id: string;
   albumId: string;
+  tenantId: string;
   fileName: string;
   fileType: FileType;
   mimeType: string;

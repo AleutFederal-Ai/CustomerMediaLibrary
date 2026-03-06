@@ -23,17 +23,31 @@ const DB_NAME = "mediagallery";
 
 // Container definitions — name + partition key path
 const COSMOS_CONTAINERS = [
-  { name: "sessions",   partitionKey: "/id" },
-  { name: "users",      partitionKey: "/email" },
-  { name: "albums",     partitionKey: "/id" },
-  { name: "media",      partitionKey: "/albumId" },
-  { name: "auditlogs",  partitionKey: "/id" },
-  { name: "domains",    partitionKey: "/domain" },
+  { name: "sessions",    partitionKey: "/id" },
+  { name: "users",       partitionKey: "/email" },
+  { name: "albums",      partitionKey: "/id" },
+  { name: "media",       partitionKey: "/albumId" },
+  { name: "auditlogs",   partitionKey: "/id" },
+  { name: "domains",     partitionKey: "/domain" },
+  { name: "tenants",     partitionKey: "/id" },
+  { name: "memberships", partitionKey: "/tenantId" },
 ];
 
 const BLOB_CONTAINERS = ["media", "thumbnails"];
 
-// Initial permitted domains (from build spec)
+// Default tenant seeded for dev
+const DEFAULT_TENANT_ID = "tenant-aleutfederal";
+const DEFAULT_TENANT = {
+  id: DEFAULT_TENANT_ID,
+  name: "Aleut Federal",
+  slug: "aleutfederal",
+  isActive: true,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  createdBy: "seed-script",
+};
+
+// Initial permitted domains — all map to the default tenant
 const SEED_DOMAINS = [
   "aleutfederal.com",
   "aleutfederal.us",
@@ -59,7 +73,19 @@ async function seedCosmos() {
     console.log(`   ✅ Container "${def.name}" ready`);
   }
 
-  // Seed domains
+  // Seed default tenant
+  const tenantsContainer = database.container("tenants");
+  const { resources: existingTenants } = await tenantsContainer.items
+    .query({ query: "SELECT c.id FROM c WHERE c.id = @id", parameters: [{ name: "@id", value: DEFAULT_TENANT_ID }] })
+    .fetchAll();
+  if (existingTenants.length === 0) {
+    await tenantsContainer.items.create(DEFAULT_TENANT);
+    console.log(`   ✅ Tenant "Aleut Federal" seeded (id: ${DEFAULT_TENANT_ID})`);
+  } else {
+    console.log(`   ⏭  Tenant already exists`);
+  }
+
+  // Seed domains — each mapped to the default tenant
   const domainsContainer = database.container("domains");
   for (const domain of SEED_DOMAINS) {
     const { resources } = await domainsContainer.items
@@ -73,11 +99,12 @@ async function seedCosmos() {
       await domainsContainer.items.create({
         id: uuidv4(),
         domain,
+        tenantId: DEFAULT_TENANT_ID,
         addedAt: new Date().toISOString(),
         addedBy: "seed-script",
         isActive: true,
       });
-      console.log(`   ✅ Domain "${domain}" seeded`);
+      console.log(`   ✅ Domain "${domain}" → tenant "${DEFAULT_TENANT_ID}" seeded`);
     } else {
       console.log(`   ⏭  Domain "${domain}" already exists`);
     }

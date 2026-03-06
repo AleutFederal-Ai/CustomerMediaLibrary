@@ -9,6 +9,7 @@ export interface AuditEntry {
   userEmail: string;
   ipAddress: string;
   action: AuditAction;
+  tenantId?: string;
   detail?: Record<string, unknown>;
 }
 
@@ -26,6 +27,7 @@ export async function writeAuditLog(entry: AuditEntry): Promise<void> {
       userEmail: entry.userEmail,
       ipAddress: entry.ipAddress,
       action: entry.action,
+      ...(entry.tenantId && { tenantId: entry.tenantId }),
       detail: entry.detail ?? {},
       ttl: AUDIT_TTL_SECONDS,
     };

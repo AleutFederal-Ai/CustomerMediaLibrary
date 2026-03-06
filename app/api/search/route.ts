@@ -13,14 +13,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const albumId = searchParams.get("albumId");
   const fileType = searchParams.get("type"); // "image" | "video"
   const continuationToken = searchParams.get("cursor") ?? undefined;
+  const tenantId = request.headers.get("x-active-tenant-id") ?? "";
+
+  if (!tenantId) {
+    return NextResponse.json({ error: "No active tenant" }, { status: 403 });
+  }
 
   const PAGE_SIZE = 48;
 
   try {
     const container = await media();
 
-    const conditions: string[] = ["c.isDeleted = false"];
-    const parameters: { name: string; value: string }[] = [];
+    const conditions: string[] = ["c.isDeleted = false", "c.tenantId = @tenantId"];
+    const parameters: { name: string; value: string }[] = [
+      { name: "@tenantId", value: tenantId },
+    ];
 
     if (albumId) {
       conditions.push("c.albumId = @albumId");
@@ -61,6 +68,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         return {
           id: record.id,
           albumId: record.albumId,
+          tenantId: record.tenantId,
           fileName: record.fileName,
           fileType: record.fileType,
           mimeType: record.mimeType,

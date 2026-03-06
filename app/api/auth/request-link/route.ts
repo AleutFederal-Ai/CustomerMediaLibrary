@@ -61,7 +61,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   });
 
   // Check domain allowlist — silently do nothing if not allowed
-  const allowed = await isDomainAllowed(email);
+  const { allowed } = await isDomainAllowed(email);
   if (!allowed) {
     return NextResponse.json(GENERIC_RESPONSE, { status: 200 });
   }

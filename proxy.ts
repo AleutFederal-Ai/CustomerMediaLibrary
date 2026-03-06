@@ -52,6 +52,8 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   response.headers.set("x-session-id", session.sessionId);
   response.headers.set("x-session-email", session.email);
   response.headers.set("x-client-ip", ip);
+  response.headers.set("x-active-tenant-id", session.activeTenantId ?? "");
+  response.headers.set("x-tenant-ids", session.tenantIds.join(","));
 
   return response;
 }

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
-import { domains } from "@/lib/azure/cosmos";
+import { memberships } from "@/lib/azure/cosmos";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { isTenantAdmin } from "@/lib/auth/permissions";
-import { DomainRecord, AuditAction } from "@/types";
+import { MembershipRecord, AuditAction, MemberRole } from "@/types";
 
-const DOMAIN_RE = /^[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?)+$/i;
+const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
 
 async function requireTenantAdmin(
   request: NextRequest
@@ -21,94 +21,95 @@ async function requireTenantAdmin(
   return ok ? { email, tenantId } : null;
 }
 
-// GET /api/admin/domains — list domains for the active tenant
+// GET /api/admin/members?tenantId=<id> — list members of a tenant
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const caller = await requireTenantAdmin(request);
   if (!caller) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   try {
-    const container = await domains();
+    const container = await memberships();
     const { resources } = await container.items
-      .query<DomainRecord>({
-        query: "SELECT * FROM c WHERE c.tenantId = @tenantId ORDER BY c.addedAt DESC",
+      .query<MembershipRecord>({
+        query:
+          "SELECT * FROM c WHERE c.tenantId = @tenantId ORDER BY c.addedAt DESC",
         parameters: [{ name: "@tenantId", value: caller.tenantId }],
       })
       .fetchAll();
 
     return NextResponse.json(resources);
   } catch (err) {
-    console.error("[admin/domains] GET error:", err);
-    return NextResponse.json({ error: "Failed to load domains" }, { status: 500 });
+    console.error("[admin/members] GET error:", err);
+    return NextResponse.json({ error: "Failed to load members" }, { status: 500 });
   }
 }
 
-// POST /api/admin/domains — add a domain to the active tenant
+// POST /api/admin/members — add an explicit member to a tenant
+// Body: { userEmail: string, role?: "viewer" | "admin" }
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const caller = await requireTenantAdmin(request);
   if (!caller) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
-  let body: { domain?: string };
+  let body: { userEmail?: string; role?: MemberRole };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
-  const domain = (body.domain ?? "").toLowerCase().trim();
+  const userEmail = (body.userEmail ?? "").toLowerCase().trim();
+  const role: MemberRole = body.role === "admin" ? "admin" : "viewer";
 
-  if (!domain || !DOMAIN_RE.test(domain)) {
-    return NextResponse.json(
-      { error: "Invalid domain format" },
-      { status: 400 }
-    );
+  if (!userEmail || !EMAIL_RE.test(userEmail)) {
+    return NextResponse.json({ error: "Valid userEmail is required" }, { status: 400 });
   }
 
   try {
-    const container = await domains();
+    const container = await memberships();
 
-    // Check for duplicate within this tenant
+    // Check for existing membership
     const { resources: existing } = await container.items
-      .query<DomainRecord>({
-        query: "SELECT * FROM c WHERE c.domain = @domain AND c.tenantId = @tenantId",
+      .query<MembershipRecord>({
+        query:
+          "SELECT * FROM c WHERE c.tenantId = @tenantId AND c.userEmail = @email",
         parameters: [
-          { name: "@domain", value: domain },
           { name: "@tenantId", value: caller.tenantId },
+          { name: "@email", value: userEmail },
         ],
       })
       .fetchAll();
 
     if (existing.length > 0) {
       const dup = existing[0];
-      if (dup.isActive) {
-        return NextResponse.json(
-          { error: "Domain already exists" },
-          { status: 409 }
-        );
+      if (dup.isActive && dup.role === role) {
+        return NextResponse.json({ error: "Member already exists with this role" }, { status: 409 });
       }
-      // Re-activate if it was previously deactivated
-      await container.item(dup.id, dup.domain).patch([
+      // Update role or re-activate
+      await container.item(dup.id, caller.tenantId).patch([
         { op: "replace", path: "/isActive", value: true },
-        { op: "replace", path: "/addedAt", value: new Date().toISOString() },
+        { op: "replace", path: "/role", value: role },
         { op: "replace", path: "/addedBy", value: caller.email },
+        { op: "replace", path: "/addedAt", value: new Date().toISOString() },
       ]);
 
       await writeAuditLog({
         userEmail: caller.email,
         ipAddress: ip,
         tenantId: caller.tenantId,
-        action: AuditAction.DOMAIN_ADDED,
-        detail: { domain, reactivated: true },
+        action: AuditAction.MEMBER_ADDED,
+        detail: { targetEmail: userEmail, role, updated: true },
       });
 
-      return NextResponse.json({ ...dup, isActive: true });
+      return NextResponse.json({ ...dup, isActive: true, role });
     }
 
-    const record: DomainRecord = {
+    const record: MembershipRecord = {
       id: uuidv4(),
-      domain,
       tenantId: caller.tenantId,
+      userEmail,
+      role,
+      source: "explicit",
       addedAt: new Date().toISOString(),
       addedBy: caller.email,
       isActive: true,
@@ -120,44 +121,47 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       userEmail: caller.email,
       ipAddress: ip,
       tenantId: caller.tenantId,
-      action: AuditAction.DOMAIN_ADDED,
-      detail: { domain },
+      action: AuditAction.MEMBER_ADDED,
+      detail: { targetEmail: userEmail, role },
     });
 
     return NextResponse.json(record, { status: 201 });
   } catch (err) {
-    console.error("[admin/domains] POST error:", err);
-    return NextResponse.json({ error: "Failed to add domain" }, { status: 500 });
+    console.error("[admin/members] POST error:", err);
+    return NextResponse.json({ error: "Failed to add member" }, { status: 500 });
   }
 }
 
-// DELETE /api/admin/domains?id=<id> — deactivate a domain
+// DELETE /api/admin/members?tenantId=<id>&email=<email> — remove a member
 export async function DELETE(request: NextRequest): Promise<NextResponse> {
   const caller = await requireTenantAdmin(request);
   if (!caller) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
-  const id = request.nextUrl.searchParams.get("id");
-  if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+  const targetEmail = (request.nextUrl.searchParams.get("email") ?? "").toLowerCase().trim();
+
+  if (!targetEmail) {
+    return NextResponse.json({ error: "email is required" }, { status: 400 });
+  }
 
   try {
-    const container = await domains();
+    const container = await memberships();
     const { resources } = await container.items
-      .query<DomainRecord>({
-        query: "SELECT * FROM c WHERE c.id = @id AND c.tenantId = @tenantId",
+      .query<MembershipRecord>({
+        query:
+          "SELECT * FROM c WHERE c.tenantId = @tenantId AND c.userEmail = @email AND c.isActive = true",
         parameters: [
-          { name: "@id", value: id },
           { name: "@tenantId", value: caller.tenantId },
+          { name: "@email", value: targetEmail },
         ],
       })
       .fetchAll();
 
     if (resources.length === 0) {
-      return NextResponse.json({ error: "Domain not found" }, { status: 404 });
+      return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
 
-    const record = resources[0];
-    await container.item(record.id, record.domain).patch([
+    await container.item(resources[0].id, caller.tenantId).patch([
       { op: "replace", path: "/isActive", value: false },
     ]);
 
@@ -165,13 +169,13 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
       userEmail: caller.email,
       ipAddress: ip,
       tenantId: caller.tenantId,
-      action: AuditAction.DOMAIN_DEACTIVATED,
-      detail: { domain: record.domain },
+      action: AuditAction.MEMBER_REMOVED,
+      detail: { targetEmail },
     });
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[admin/domains] DELETE error:", err);
-    return NextResponse.json({ error: "Failed to deactivate domain" }, { status: 500 });
+    console.error("[admin/members] DELETE error:", err);
+    return NextResponse.json({ error: "Failed to remove member" }, { status: 500 });
   }
 }
