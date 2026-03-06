@@ -1,0 +1,87 @@
+# Local development / Docker testing stack
+# Usage:
+#   docker compose --env-file .env.docker up --build
+#
+# First-time only (after containers are healthy):
+#   docker compose run --rm seed
+
+services:
+
+  # ----------------------------------------------------------------
+  # Next.js application
+  # ----------------------------------------------------------------
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file: .env.docker
+    depends_on:
+      cosmos:
+        condition: service_healthy
+      azurite:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------
+  # Azure Cosmos DB Emulator
+  # Docs: https://learn.microsoft.com/azure/cosmos-db/linux-emulator
+  # ----------------------------------------------------------------
+  cosmos:
+    image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
+    container_name: cosmos-emulator
+    ports:
+      - "8081:8081"   # Data plane
+      - "10251:10251" # Partition 1
+      - "10252:10252" # Partition 2
+      - "10253:10253" # Partition 3
+      - "10254:10254" # Partition 4
+    environment:
+      AZURE_COSMOS_EMULATOR_PARTITION_COUNT: 3
+      AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE: "true"
+      AZURE_COSMOS_EMULATOR_IP_ADDRESS_OVERRIDE: "cosmos"
+    volumes:
+      - cosmos-data:/tmp/cosmos/appdata
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost:8081/_explorer/emulator.pem"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
+  # ----------------------------------------------------------------
+  # Azurite — Azure Blob Storage emulator
+  # ----------------------------------------------------------------
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: azurite
+    ports:
+      - "10000:10000" # Blob service
+    command: azurite-blob --blobHost 0.0.0.0 --blobPort 10000
+    volumes:
+      - azurite-data:/data
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "10000"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ----------------------------------------------------------------
+  # One-shot seed job — creates DB, containers, blob containers,
+  # and seeds the domain allowlist. Run once after first `up`.
+  # ----------------------------------------------------------------
+  seed:
+    build:
+      context: .
+      dockerfile: Dockerfile.seed
+    env_file: .env.docker
+    depends_on:
+      cosmos:
+        condition: service_healthy
+      azurite:
+        condition: service_healthy
+    profiles:
+      - seed
+
+volumes:
+  cosmos-data:
+  azurite-data:

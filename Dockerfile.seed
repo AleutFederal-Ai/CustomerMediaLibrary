@@ -1,0 +1,9 @@
+# Lightweight seed runner — not used in production
+FROM node:20-alpine
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts
+COPY scripts/ ./scripts/
+COPY types/ ./types/
+COPY tsconfig.json ./
+CMD ["npx", "tsx", "scripts/seed-dev.ts"]

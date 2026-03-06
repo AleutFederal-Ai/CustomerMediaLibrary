@@ -1,0 +1,40 @@
+{
+  "name": "customer-media-library",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "type-check": "tsc --noEmit",
+    "seed": "tsx scripts/seed-dev.ts",
+    "docker:up": "docker compose --env-file .env.docker up --build",
+    "docker:seed": "docker compose --env-file .env.docker run --rm seed"
+  },
+  "dependencies": {
+    "@azure/cosmos": "^4.9.1",
+    "@azure/identity": "^4.13.0",
+    "@azure/keyvault-certificates": "^4.10.0",
+    "@azure/keyvault-secrets": "^4.10.0",
+    "@azure/storage-blob": "^12.31.0",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "archiver": "^7.0.1",
+    "iron-session": "^8.0.4",
+    "next": "16.1.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "sharp": "^0.34.5",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/archiver": "^7.0.0",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/uuid": "^10.0.0",
+    "tailwindcss": "^4",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}
