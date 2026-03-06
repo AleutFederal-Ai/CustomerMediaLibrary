@@ -1,5 +1,4 @@
-export const runtime = "nodejs";
-
+// Next.js 16: proxy.ts always runs on Node.js runtime — no runtime export needed
 import { NextRequest, NextResponse } from "next/server";
 import { validateSession, SESSION_COOKIE_NAME } from "@/lib/auth/session";
 
@@ -16,7 +15,7 @@ function isPublicPath(pathname: string): boolean {
   );
 }
 
-export async function middleware(request: NextRequest): Promise<NextResponse> {
+export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
 
   // Allow static files, Next.js internals

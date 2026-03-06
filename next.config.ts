@@ -22,13 +22,8 @@ const securityHeaders = [
   },
 ];
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const nextConfig: any = {
+const nextConfig: NextConfig = {
   output: "standalone",
-  experimental: {
-    // Allow Node.js APIs in middleware (needed for Cosmos DB session validation)
-    nodeMiddleware: true,
-  },
   async headers() {
     return [
       {

@@ -49,8 +49,9 @@ async function seedCosmos() {
   const { database } = await client.databases.createIfNotExists({ id: DB_NAME });
   console.log(`✅ Database "${DB_NAME}" ready`);
 
-  // Create containers
+  // Create containers — small delay between each to avoid 503s from emulator
   for (const def of COSMOS_CONTAINERS) {
+    await new Promise((r) => setTimeout(r, 500));
     await database.containers.createIfNotExists({
       id: def.name,
       partitionKey: { paths: [def.partitionKey] },
