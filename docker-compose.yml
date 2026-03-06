@@ -36,12 +36,12 @@ services:
       - "10253:10253" # Partition 3
       - "10254:10254" # Partition 4
     environment:
-      AZURE_COSMOS_EMULATOR_PARTITION_COUNT: 10
+      AZURE_COSMOS_EMULATOR_PARTITION_COUNT: 8
       AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE: "true"
     volumes:
       - cosmos-data:/tmp/cosmos/appdata
     healthcheck:
-      test: ["CMD", "curl", "-f", "-k", "https://localhost:8081/_explorer/emulator.pem"]
+      test: ["CMD", "curl", "-k", "--silent", "--output", "/dev/null", "https://localhost:8081/"]
       interval: 15s
       timeout: 10s
       retries: 40
@@ -55,7 +55,7 @@ services:
     container_name: azurite
     ports:
       - "10000:10000" # Blob service
-    command: azurite-blob --blobHost 0.0.0.0 --blobPort 10000
+    command: azurite-blob --blobHost 0.0.0.0 --blobPort 10000 --skipApiVersionCheck
     volumes:
       - azurite-data:/data
     healthcheck:

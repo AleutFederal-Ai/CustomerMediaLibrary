@@ -7,9 +7,11 @@ interface Props {
   selected?: boolean;
   onSelect?: (id: string, selected: boolean) => void;
   onClick?: (item: MediaListItem) => void;
+  canContribute?: boolean;
+  onDelete?: (item: MediaListItem) => void;
 }
 
-export default function MediaThumbnail({ item, selected, onSelect, onClick }: Props) {
+export default function MediaThumbnail({ item, selected, onSelect, onClick, canContribute, onDelete }: Props) {
   return (
     <div
       className={`relative group aspect-square rounded overflow-hidden bg-slate-800 cursor-pointer
@@ -62,6 +64,23 @@ export default function MediaThumbnail({ item, selected, onSelect, onClick }: Pr
             )}
           </div>
         </div>
+      )}
+
+      {/* Delete button — contributors and admins only */}
+      {canContribute && onDelete && (
+        <button
+          type="button"
+          aria-label="Delete media"
+          className="absolute top-2 right-2 w-7 h-7 rounded bg-red-600/80 hover:bg-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(item);
+          }}
+        >
+          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       )}
 
       {/* Filename on hover */}

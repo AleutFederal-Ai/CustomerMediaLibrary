@@ -4,7 +4,7 @@ import sharp from "sharp";
 import { media, albums } from "@/lib/azure/cosmos";
 import { uploadBlob } from "@/lib/azure/blob";
 import { writeAuditLog } from "@/lib/audit/logger";
-import { isTenantAdmin } from "@/lib/auth/permissions";
+import { isMediaContributor } from "@/lib/auth/permissions";
 import { MediaRecord, AuditAction } from "@/types";
 
 const ALLOWED_IMAGE_TYPES = new Set([
@@ -39,8 +39,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     "";
   if (!tenantId) return NextResponse.json({ error: "No active tenant" }, { status: 403 });
 
-  const canAdmin = await isTenantAdmin(email, tenantId);
-  if (!canAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const canContribute = await isMediaContributor(email, tenantId);
+  if (!canContribute) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 

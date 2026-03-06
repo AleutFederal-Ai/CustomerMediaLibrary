@@ -30,13 +30,13 @@ async function getGraphClient(): Promise<Client> {
 
 /**
  * Send a magic link email via Microsoft Graph.
- * In development (NODE_ENV !== "production"), logs to console instead.
+ * In Docker dev mode (DOCKER_DEV=true), logs to console instead.
  */
 export async function sendMagicLinkEmail(
   toEmail: string,
   magicLinkUrl: string
 ): Promise<void> {
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.DOCKER_DEV === "true") {
     console.log(`[DEV] Magic link for ${toEmail}: ${magicLinkUrl}`);
     return;
   }
@@ -65,8 +65,13 @@ export async function sendMagicLinkEmail(
 
 /**
  * Check if a user's email is a member of the admin Entra ID group.
+ * In Docker dev mode, the dev bypass user is always treated as admin.
  */
 export async function isAdminGroupMember(email: string): Promise<boolean> {
+  if (process.env.DOCKER_DEV === "true" && email === "dev@aleutfederal.com") {
+    return true;
+  }
+
   try {
     const adminGroupId = await getSecret("AdminGroupObjectId");
     const graphClient = await getGraphClient();

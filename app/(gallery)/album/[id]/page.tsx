@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import CuiBanner from "@/components/ui/CuiBanner";
@@ -30,6 +30,20 @@ export default function AlbumPage() {
   const [lightboxItem, setLightboxItem] = useState<MediaDetail | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [bulkDownloading, setBulkDownloading] = useState(false);
+
+  // Contributor state
+  const [canContribute, setCanContribute] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch current user's permissions once on mount
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.canContribute) setCanContribute(true); })
+      .catch(() => {});
+  }, []);
 
   const fetchItems = useCallback(
     async (reset = false) => {
@@ -63,10 +77,7 @@ export default function AlbumPage() {
     const idx = items.findIndex((i) => i.id === item.id);
     setLightboxIndex(idx);
 
-    // Fetch full SAS URL for full-res / video
-    const res = await fetch(
-      `/api/media/${item.id}?albumId=${item.albumId}`
-    );
+    const res = await fetch(`/api/media/${item.id}?albumId=${item.albumId}`);
     if (!res.ok) return;
     const data = await res.json();
     setLightboxItem(data);
@@ -109,6 +120,47 @@ export default function AlbumPage() {
     }
   }
 
+  async function handleDelete(item: MediaListItem) {
+    if (!confirm(`Delete "${item.fileName}"? This cannot be undone.`)) return;
+
+    const res = await fetch(`/api/media/${item.id}?albumId=${item.albumId}`, {
+      method: "DELETE",
+    });
+
+    if (!res.ok) {
+      alert("Delete failed. Please try again.");
+      return;
+    }
+
+    setItems((prev) => prev.filter((i) => i.id !== item.id));
+  }
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    setUploadError(null);
+
+    let failed = 0;
+    for (const file of Array.from(files)) {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("albumId", albumId);
+
+      const res = await fetch("/api/admin/upload", { method: "POST", body: form });
+      if (!res.ok) failed++;
+    }
+
+    if (failed > 0) {
+      setUploadError(`${failed} file(s) failed to upload.`);
+    }
+
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    await fetchItems(true);
+    setUploading(false);
+  }
+
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col">
       <CuiBanner />
@@ -125,10 +177,34 @@ export default function AlbumPage() {
           Albums
         </Link>
         <h1 className="text-white font-semibold flex-1 truncate">Album</h1>
+
+        {/* Upload button — contributors and admins only */}
+        {canContribute && (
+          <div className="flex items-center gap-2">
+            {uploading && (
+              <span className="text-slate-400 text-sm">Uploading…</span>
+            )}
+            <label className="cursor-pointer px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded transition-colors flex items-center gap-1.5">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Upload Media
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*,video/*"
+                className="sr-only"
+                onChange={handleUpload}
+                disabled={uploading}
+              />
+            </label>
+          </div>
+        )}
       </header>
 
       {/* Filters */}
-      <div className="bg-slate-800/50 border-b border-slate-700 px-6 py-3 flex flex-wrap gap-3">
+      <div className="bg-slate-800/50 border-b border-slate-700 px-6 py-3 flex flex-wrap gap-3 items-center">
         <input
           type="search"
           placeholder="Search files or tags…"
@@ -147,7 +223,10 @@ export default function AlbumPage() {
           <option value="video">Videos</option>
         </select>
         {bulkDownloading && (
-          <span className="text-slate-400 text-sm self-center">Preparing download…</span>
+          <span className="text-slate-400 text-sm">Preparing download…</span>
+        )}
+        {uploadError && (
+          <span className="text-red-400 text-sm">{uploadError}</span>
         )}
       </div>
 
@@ -160,6 +239,8 @@ export default function AlbumPage() {
               items={items}
               onItemClick={openLightbox}
               onBulkDownload={handleBulkDownload}
+              canContribute={canContribute}
+              onDelete={handleDelete}
             />
 
             {cursor && !loading && (

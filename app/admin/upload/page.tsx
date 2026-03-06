@@ -11,7 +11,7 @@ async function getActiveAlbums(): Promise<{ id: string; name: string }[]> {
   const { resources } = await container.items
     .query<AlbumRecord>({
       query:
-        "SELECT c.id, c.name FROM c WHERE c.isDeleted = false ORDER BY c.order ASC",
+        "SELECT c.id, c.name FROM c WHERE c.isDeleted = false ORDER BY c['order'] ASC",
     })
     .fetchAll();
   return resources;

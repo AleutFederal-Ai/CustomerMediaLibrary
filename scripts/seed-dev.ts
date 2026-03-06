@@ -47,6 +47,13 @@ const DEFAULT_TENANT = {
   createdBy: "seed-script",
 };
 
+// Sample albums for dev UI testing
+const SEED_ALBUMS = [
+  { name: "2024 Annual Conference", description: "Photos and video from the Anchorage leadership summit.", order: 1 },
+  { name: "Arctic Operations — Q1 2025", description: "Field documentation from northern deployment.", order: 2 },
+  { name: "Training & Readiness", description: "Exercises, certifications, and team building events.", order: 3 },
+];
+
 // Initial permitted domains — all map to the default tenant
 const SEED_DOMAINS = [
   "aleutfederal.com",
@@ -55,21 +62,43 @@ const SEED_DOMAINS = [
   "ussf.mil",
 ];
 
+async function withRetry<T>(fn: () => Promise<T>, label: string, maxAttempts = 20): Promise<T> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      if (err?.code === 503 && attempt < maxAttempts) {
+        const wait = Math.min(attempt * 3000, 30000);
+        console.log(`   ⏳ ${label} — emulator busy (503), retrying in ${wait / 1000}s (attempt ${attempt}/${maxAttempts})…`);
+        await new Promise((r) => setTimeout(r, wait));
+      } else {
+        throw err;
+      }
+    }
+  }
+  throw new Error(`${label} failed after ${maxAttempts} attempts`);
+}
+
 async function seedCosmos() {
   console.log("⏳ Connecting to Cosmos DB emulator…");
   const client = new CosmosClient(COSMOS_CS);
 
-  // Create database
-  const { database } = await client.databases.createIfNotExists({ id: DB_NAME });
+  // Create database — retry until emulator is fully ready
+  const { database } = await withRetry(
+    () => client.databases.createIfNotExists({ id: DB_NAME }),
+    `database "${DB_NAME}"`
+  );
   console.log(`✅ Database "${DB_NAME}" ready`);
 
-  // Create containers — small delay between each to avoid 503s from emulator
+  // Create containers — retry each one individually
   for (const def of COSMOS_CONTAINERS) {
-    await new Promise((r) => setTimeout(r, 500));
-    await database.containers.createIfNotExists({
-      id: def.name,
-      partitionKey: { paths: [def.partitionKey] },
-    });
+    await withRetry(
+      () => database.containers.createIfNotExists({
+        id: def.name,
+        partitionKey: { paths: [def.partitionKey] },
+      }),
+      `container "${def.name}"`
+    );
     console.log(`   ✅ Container "${def.name}" ready`);
   }
 
@@ -83,6 +112,31 @@ async function seedCosmos() {
     console.log(`   ✅ Tenant "Aleut Federal" seeded (id: ${DEFAULT_TENANT_ID})`);
   } else {
     console.log(`   ⏭  Tenant already exists`);
+  }
+
+  // Seed sample albums
+  const albumsContainer = database.container("albums");
+  for (const album of SEED_ALBUMS) {
+    const { resources: existing } = await albumsContainer.items
+      .query({ query: "SELECT c.id FROM c WHERE c.name = @name AND c.tenantId = @tenantId",
+        parameters: [{ name: "@name", value: album.name }, { name: "@tenantId", value: DEFAULT_TENANT_ID }] })
+      .fetchAll();
+    if (existing.length === 0) {
+      const now = new Date().toISOString();
+      await albumsContainer.items.create({
+        id: uuidv4(),
+        tenantId: DEFAULT_TENANT_ID,
+        name: album.name,
+        description: album.description,
+        order: album.order,
+        isDeleted: false,
+        createdAt: now,
+        updatedAt: now,
+      });
+      console.log(`   ✅ Album "${album.name}" seeded`);
+    } else {
+      console.log(`   ⏭  Album "${album.name}" already exists`);
+    }
   }
 
   // Seed domains — each mapped to the default tenant

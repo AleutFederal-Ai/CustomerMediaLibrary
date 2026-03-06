@@ -8,9 +8,11 @@ interface Props {
   items: MediaListItem[];
   onItemClick: (item: MediaListItem) => void;
   onBulkDownload?: (ids: string[]) => void;
+  canContribute?: boolean;
+  onDelete?: (item: MediaListItem) => void;
 }
 
-export default function MediaGrid({ items, onItemClick, onBulkDownload }: Props) {
+export default function MediaGrid({ items, onItemClick, onBulkDownload, canContribute, onDelete }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const handleSelect = useCallback((id: string, isSelected: boolean) => {
@@ -93,6 +95,8 @@ export default function MediaGrid({ items, onItemClick, onBulkDownload }: Props)
             selected={selected.has(item.id)}
             onSelect={onBulkDownload ? handleSelect : undefined}
             onClick={onItemClick}
+            canContribute={canContribute}
+            onDelete={onDelete}
           />
         ))}
       </div>

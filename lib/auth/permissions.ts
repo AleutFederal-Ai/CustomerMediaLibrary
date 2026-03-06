@@ -43,7 +43,7 @@ export async function isTenantAdmin(
 
 /**
  * Returns true if the user has any active membership in the given tenant
- * (viewer or admin). Use this for gallery access checks.
+ * (viewer, contributor, or admin). Use this for gallery access checks.
  */
 export async function isTenantMember(
   email: string,
@@ -51,4 +51,36 @@ export async function isTenantMember(
   tenantIds: string[]
 ): Promise<boolean> {
   return tenantIds.includes(tenantId);
+}
+
+/**
+ * Returns true if the user can upload, edit, or delete media in the given tenant.
+ * Passes for:
+ *   - Global super admins (Entra group)
+ *   - Tenant admins (role="admin")
+ *   - Media contributors (role="contributor")
+ */
+export async function isMediaContributor(
+  email: string,
+  tenantId: string
+): Promise<boolean> {
+  // Admins can also contribute
+  if (await isTenantAdmin(email, tenantId)) return true;
+
+  try {
+    const container = await memberships();
+    const { resources } = await container.items
+      .query<MembershipRecord>({
+        query:
+          "SELECT * FROM c WHERE c.tenantId = @tenantId AND c.userEmail = @email AND c.role = 'contributor' AND c.isActive = true",
+        parameters: [
+          { name: "@tenantId", value: tenantId },
+          { name: "@email", value: email.toLowerCase() },
+        ],
+      })
+      .fetchAll();
+    return resources.length > 0;
+  } catch {
+    return false;
+  }
 }

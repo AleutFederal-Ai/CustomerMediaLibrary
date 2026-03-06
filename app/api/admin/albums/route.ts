@@ -31,7 +31,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const container = await albums();
     const { resources } = await container.items
       .query<AlbumRecord>({
-        query: "SELECT * FROM c WHERE c.tenantId = @tenantId ORDER BY c.order ASC",
+        query: "SELECT * FROM c WHERE c.tenantId = @tenantId ORDER BY c['order'] ASC",
         parameters: [{ name: "@tenantId", value: caller.tenantId }],
       })
       .fetchAll();

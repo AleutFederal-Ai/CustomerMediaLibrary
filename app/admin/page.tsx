@@ -15,6 +15,7 @@ export default async function AdminDashboard() {
   const sections = [
     { href: "/admin/upload", label: "Upload Media", description: "Add photos and videos to albums" },
     { href: "/admin/albums", label: "Manage Albums", description: "Create, edit, and delete albums" },
+    { href: "/admin/members", label: "Manage Members", description: "Assign viewer, contributor, or admin roles" },
     { href: "/admin/users", label: "Manage Users", description: "View users, block or unblock access" },
     { href: "/admin/audit-logs", label: "Audit Logs", description: "Review all system activity" },
   ];

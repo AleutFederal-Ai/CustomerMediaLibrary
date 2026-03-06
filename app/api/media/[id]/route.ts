@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { media } from "@/lib/azure/cosmos";
 import { generateSasUrl } from "@/lib/azure/blob";
 import { writeAuditLog } from "@/lib/audit/logger";
+import { isMediaContributor } from "@/lib/auth/permissions";
 import { MediaRecord, AuditAction } from "@/types";
 
 interface Params {
@@ -78,5 +79,69 @@ export async function GET(
   } catch (err) {
     console.error("[media/id] GET error:", err);
     return NextResponse.json({ error: "Failed to load media" }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: Params
+): Promise<NextResponse> {
+  const { id } = await params;
+  const email = request.headers.get("x-session-email");
+  if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const tenantId = request.headers.get("x-active-tenant-id") ?? "";
+  if (!tenantId) return NextResponse.json({ error: "No active tenant" }, { status: 403 });
+
+  const ip = request.headers.get("x-client-ip") ?? "unknown";
+  const albumId = request.nextUrl.searchParams.get("albumId");
+
+  const canContribute = await isMediaContributor(email, tenantId);
+  if (!canContribute) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  try {
+    const container = await media();
+    let record: MediaRecord | undefined;
+
+    if (albumId) {
+      const { resource } = await container.item(id, albumId).read<MediaRecord>();
+      record = resource;
+    } else {
+      const { resources } = await container.items
+        .query<MediaRecord>({
+          query:
+            "SELECT * FROM c WHERE c.id = @id AND c.tenantId = @tenantId AND c.isDeleted = false",
+          parameters: [
+            { name: "@id", value: id },
+            { name: "@tenantId", value: tenantId },
+          ],
+        })
+        .fetchAll();
+      record = resources[0];
+    }
+
+    if (!record || record.isDeleted || record.tenantId !== tenantId) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    const now = new Date().toISOString();
+    await container.item(id, record.albumId).patch([
+      { op: "replace", path: "/isDeleted", value: true },
+      { op: "add", path: "/deletedAt", value: now },
+      { op: "add", path: "/deletedBy", value: email },
+    ]);
+
+    await writeAuditLog({
+      userEmail: email,
+      ipAddress: ip,
+      tenantId,
+      action: AuditAction.MEDIA_DELETED,
+      detail: { mediaId: id, albumId: record.albumId, fileName: record.fileName },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("[media/id] DELETE error:", err);
+    return NextResponse.json({ error: "Failed to delete media" }, { status: 500 });
   }
 }

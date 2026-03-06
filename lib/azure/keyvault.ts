@@ -11,10 +11,13 @@ import { SecretClient } from "@azure/keyvault-secrets";
 const KV_URI = process.env.AZURE_KEY_VAULT_URI;
 const IS_DEV_MODE = !KV_URI;
 
-if (IS_DEV_MODE && process.env.NODE_ENV === "production") {
+// Guard against accidentally running without Key Vault in a real deployment.
+// We check DOCKER_DEV rather than NODE_ENV because Next.js inlines NODE_ENV
+// at build time, making the runtime value invisible to server bundles.
+if (IS_DEV_MODE && process.env.DOCKER_DEV !== "true") {
   throw new Error(
-    "AZURE_KEY_VAULT_URI must be set in production. " +
-      "Dev secret fallback is not permitted in NODE_ENV=production."
+    "AZURE_KEY_VAULT_URI must be set. " +
+      "For local Docker testing, add DOCKER_DEV=true to your .env.docker file."
   );
 }
 

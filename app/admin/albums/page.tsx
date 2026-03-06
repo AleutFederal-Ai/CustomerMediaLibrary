@@ -10,7 +10,7 @@ async function getAllAlbums(): Promise<AlbumRecord[]> {
   const container = await albums();
   const { resources } = await container.items
     .query<AlbumRecord>({
-      query: "SELECT * FROM c WHERE c.isDeleted = false ORDER BY c.order ASC",
+      query: "SELECT * FROM c WHERE c.isDeleted = false ORDER BY c['order'] ASC",
     })
     .fetchAll();
   return resources;

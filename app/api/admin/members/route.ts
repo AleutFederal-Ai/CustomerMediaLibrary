@@ -59,7 +59,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const userEmail = (body.userEmail ?? "").toLowerCase().trim();
-  const role: MemberRole = body.role === "admin" ? "admin" : "viewer";
+  const role: MemberRole =
+    body.role === "admin" ? "admin" :
+    body.role === "contributor" ? "contributor" :
+    "viewer";
 
   if (!userEmail || !EMAIL_RE.test(userEmail)) {
     return NextResponse.json({ error: "Valid userEmail is required" }, { status: 400 });

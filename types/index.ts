@@ -2,7 +2,7 @@
 // Multi-tenant types
 // ============================================================
 
-export type MemberRole = "viewer" | "admin";
+export type MemberRole = "viewer" | "contributor" | "admin";
 export type MemberSource = "domain" | "explicit";
 
 export interface TenantRecord {
