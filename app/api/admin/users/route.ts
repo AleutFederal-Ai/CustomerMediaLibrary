@@ -113,7 +113,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }),
     };
 
-    await container.item(user.id, targetEmail).replace(updated);
+    await container.item(user.id, user.id).replace(updated);
 
     // If blocking, revoke all active sessions immediately
     if (action === "block") {

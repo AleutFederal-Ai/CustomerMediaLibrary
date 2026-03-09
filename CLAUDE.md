@@ -263,7 +263,7 @@ Maintain this structure exactly. Do not reorganize without updating this file.
 }
 ```
 
-### `users` container — partition key: `/email`
+### `users` container — partition key: `/id`
 ```typescript
 {
   id: string;
@@ -290,7 +290,7 @@ Maintain this structure exactly. Do not reorganize without updating this file.
 }
 ```
 
-### `media` container — partition key: `/albumId`
+### `media` container — partition key: `/id`
 ```typescript
 {
   id: string;
@@ -323,7 +323,7 @@ Maintain this structure exactly. Do not reorganize without updating this file.
 }
 ```
 
-### `domains` container — partition key: `/domain`
+### `domains` container — partition key: `/id`
 ```typescript
 {
   id: string;

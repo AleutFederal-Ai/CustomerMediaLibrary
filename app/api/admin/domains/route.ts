@@ -88,7 +88,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         );
       }
       // Re-activate if it was previously deactivated
-      await container.item(dup.id, dup.domain).patch([
+      await container.item(dup.id, dup.id).patch([
         { op: "replace", path: "/isActive", value: true },
         { op: "replace", path: "/addedAt", value: new Date().toISOString() },
         { op: "replace", path: "/addedBy", value: caller.email },
@@ -157,7 +157,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
     }
 
     const record = resources[0];
-    await container.item(record.id, record.domain).patch([
+    await container.item(record.id, record.id).patch([
       { op: "replace", path: "/isActive", value: false },
     ]);
 

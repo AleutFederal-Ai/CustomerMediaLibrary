@@ -24,13 +24,13 @@ const DB_NAME = "mediagallery";
 // Container definitions — name + partition key path
 const COSMOS_CONTAINERS = [
   { name: "sessions",    partitionKey: "/id" },
-  { name: "users",       partitionKey: "/email" },
+  { name: "users",       partitionKey: "/id" },
   { name: "albums",      partitionKey: "/id" },
-  { name: "media",       partitionKey: "/albumId" },
+  { name: "media",       partitionKey: "/id" },
   { name: "auditlogs",   partitionKey: "/id" },
-  { name: "domains",     partitionKey: "/domain" },
+  { name: "domains",     partitionKey: "/id" },
   { name: "tenants",     partitionKey: "/id" },
-  { name: "memberships", partitionKey: "/tenantId" },
+  { name: "memberships", partitionKey: "/id" },
 ];
 
 const BLOB_CONTAINERS = ["media", "thumbnails"];

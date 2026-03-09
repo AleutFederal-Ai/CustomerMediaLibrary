@@ -256,7 +256,7 @@ async function updateUserRecord(email: string, loginAt: Date): Promise<void> {
 
     if (existing.length > 0) {
       const user = existing[0];
-      await container.item(user.id, emailLower).patch([
+      await container.item(user.id, user.id).patch([
         { op: "replace", path: "/lastLoginAt", value: loginAt.toISOString() },
         { op: "incr", path: "/loginCount", value: 1 },
       ]);

@@ -177,7 +177,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
 
     await Promise.all(
       mediaItems.map((item) =>
-        mediaContainer.item(item.id, item.albumId).replace({
+        mediaContainer.item(item.id, item.id).replace({
           ...item,
           isDeleted: true,
           deletedAt: now,

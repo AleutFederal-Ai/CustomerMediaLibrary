@@ -54,7 +54,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Fetch all requested media records
     const rawRecords = await Promise.all(
       mediaIds.map(async (id) => {
-        const { resource } = await container.item(id, albumId).read<MediaRecord>();
+        const { resource } = await container.item(id, id).read<MediaRecord>();
         return resource as MediaRecord | undefined;
       })
     );

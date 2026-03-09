@@ -89,7 +89,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ error: "Member already exists with this role" }, { status: 409 });
       }
       // Update role or re-activate
-      await container.item(dup.id, caller.tenantId).patch([
+      await container.item(dup.id, dup.id).patch([
         { op: "replace", path: "/isActive", value: true },
         { op: "replace", path: "/role", value: role },
         { op: "replace", path: "/addedBy", value: caller.email },
@@ -164,7 +164,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
 
-    await container.item(resources[0].id, caller.tenantId).patch([
+    await container.item(resources[0].id, resources[0].id).patch([
       { op: "replace", path: "/isActive", value: false },
     ]);
 

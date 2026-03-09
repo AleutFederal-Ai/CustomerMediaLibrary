@@ -22,29 +22,11 @@ export async function GET(
     return NextResponse.json({ error: "No active tenant" }, { status: 403 });
   }
 
-  // Optional: caller can pass albumId for efficient Cosmos point-read
-  const albumId = request.nextUrl.searchParams.get("albumId");
-
   try {
     const container = await media();
-    let record: MediaRecord | undefined;
 
-    if (albumId) {
-      const { resource } = await container.item(id, albumId).read<MediaRecord>();
-      record = resource;
-    } else {
-      // Cross-partition query — less efficient but usable as fallback
-      const { resources } = await container.items
-        .query<MediaRecord>({
-          query: "SELECT * FROM c WHERE c.id = @id AND c.tenantId = @tenantId AND c.isDeleted = false",
-          parameters: [
-            { name: "@id", value: id },
-            { name: "@tenantId", value: tenantId },
-          ],
-        })
-        .fetchAll();
-      record = resources[0];
-    }
+    // Point-read by id (partition key is /id)
+    const { resource: record } = await container.item(id, id).read<MediaRecord>();
 
     if (!record || record.isDeleted || record.tenantId !== tenantId) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -94,38 +76,22 @@ export async function DELETE(
   if (!tenantId) return NextResponse.json({ error: "No active tenant" }, { status: 403 });
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
-  const albumId = request.nextUrl.searchParams.get("albumId");
 
   const canContribute = await isMediaContributor(email, tenantId);
   if (!canContribute) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   try {
     const container = await media();
-    let record: MediaRecord | undefined;
 
-    if (albumId) {
-      const { resource } = await container.item(id, albumId).read<MediaRecord>();
-      record = resource;
-    } else {
-      const { resources } = await container.items
-        .query<MediaRecord>({
-          query:
-            "SELECT * FROM c WHERE c.id = @id AND c.tenantId = @tenantId AND c.isDeleted = false",
-          parameters: [
-            { name: "@id", value: id },
-            { name: "@tenantId", value: tenantId },
-          ],
-        })
-        .fetchAll();
-      record = resources[0];
-    }
+    // Point-read by id (partition key is /id)
+    const { resource: record } = await container.item(id, id).read<MediaRecord>();
 
     if (!record || record.isDeleted || record.tenantId !== tenantId) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
     const now = new Date().toISOString();
-    await container.item(id, record.albumId).patch([
+    await container.item(id, id).patch([
       { op: "replace", path: "/isDeleted", value: true },
       { op: "add", path: "/deletedAt", value: now },
       { op: "add", path: "/deletedBy", value: email },

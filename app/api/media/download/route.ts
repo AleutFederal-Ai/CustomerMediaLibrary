@@ -25,7 +25,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const container = await media();
     const { resource: record } = await container
-      .item(id, albumId)
+      .item(id, id)
       .read<MediaRecord>();
 
     if (!record || record.isDeleted) {
