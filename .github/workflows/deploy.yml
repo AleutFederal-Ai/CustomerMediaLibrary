@@ -55,7 +55,9 @@ jobs:
       - name: Set startup command
         uses: azure/cli@v2
         with:
+          azcliversion: latest
           inlineScript: |
+            az cloud set --name AzureUSGovernment
             az webapp config set \
               --resource-group rg-mymedia-prod \
               --name mymedia-app \
