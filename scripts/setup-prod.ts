@@ -15,6 +15,15 @@ import {
   DefaultAzureCredential,
   AzureAuthorityHosts,
 } from "@azure/identity";
+import type { TokenCredential, GetTokenOptions, AccessToken } from "@azure/core-auth";
+
+// GCCH Cosmos DB requires tokens scoped to https://cosmos.azure.us (not .com)
+class GcchCosmosCredential implements TokenCredential {
+  constructor(private readonly inner: TokenCredential) {}
+  getToken(_scopes: string | string[], options?: GetTokenOptions): Promise<AccessToken | null> {
+    return this.inner.getToken("https://cosmos.azure.us/.default", options);
+  }
+}
 import { v4 as uuidv4 } from "uuid";
 
 // ---- Configuration ----
@@ -58,7 +67,7 @@ async function main() {
   console.log("Connecting to Cosmos DB (GCCH)…");
   const client = new CosmosClient({
     endpoint: COSMOS_ENDPOINT,
-    aadCredentials: credential,
+    aadCredentials: new GcchCosmosCredential(credential),
   });
 
   const { database } = await client.databases.createIfNotExists({

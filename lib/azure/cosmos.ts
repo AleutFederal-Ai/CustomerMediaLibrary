@@ -1,6 +1,16 @@
 import { CosmosClient, Container, Database } from "@azure/cosmos";
 import { DefaultAzureCredential, AzureAuthorityHosts } from "@azure/identity";
+import type { TokenCredential, GetTokenOptions, AccessToken } from "@azure/core-auth";
 import { getSecret } from "./keyvault";
+
+// The @azure/cosmos SDK hardcodes https://cosmos.azure.com as the token audience.
+// GCCH Cosmos DB requires https://cosmos.azure.us — wrap the credential to fix this.
+class GcchCosmosCredential implements TokenCredential {
+  constructor(private readonly inner: TokenCredential) {}
+  getToken(_scopes: string | string[], options?: GetTokenOptions): Promise<AccessToken | null> {
+    return this.inner.getToken("https://cosmos.azure.us/.default", options);
+  }
+}
 
 const DB_NAME = "mediagallery";
 
@@ -33,7 +43,7 @@ async function getClient(): Promise<CosmosClient> {
   const credential = new DefaultAzureCredential({
     authorityHost: AzureAuthorityHosts.AzureGovernment,
   });
-  _client = new CosmosClient({ endpoint, aadCredentials: credential });
+  _client = new CosmosClient({ endpoint, aadCredentials: new GcchCosmosCredential(credential) });
   return _client;
 }
 
