@@ -3,12 +3,13 @@ import { DefaultAzureCredential, AzureAuthorityHosts } from "@azure/identity";
 import type { TokenCredential, GetTokenOptions, AccessToken } from "@azure/core-auth";
 import { getSecret } from "./keyvault";
 
-// The @azure/cosmos SDK hardcodes https://cosmos.azure.com as the token audience.
-// GCCH Cosmos DB requires https://cosmos.azure.us — wrap the credential to fix this.
+// The @azure/cosmos SDK requests tokens with scope https://cosmos.azure.com/.default.
+// This is the correct resource URI for Cosmos DB across all Azure clouds including GCCH.
+// This wrapper makes the scope explicit to ensure the correct token is requested.
 class GcchCosmosCredential implements TokenCredential {
   constructor(private readonly inner: TokenCredential) {}
   getToken(_scopes: string | string[], options?: GetTokenOptions): Promise<AccessToken | null> {
-    return this.inner.getToken("https://cosmos.azure.us/.default", options);
+    return this.inner.getToken("https://cosmos.azure.com/.default", options);
   }
 }
 

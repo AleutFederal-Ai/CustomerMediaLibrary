@@ -17,11 +17,11 @@ import {
 } from "@azure/identity";
 import type { TokenCredential, GetTokenOptions, AccessToken } from "@azure/core-auth";
 
-// GCCH Cosmos DB requires tokens scoped to https://cosmos.azure.us (not .com)
+// Cosmos DB resource URI is https://cosmos.azure.com across all Azure clouds including GCCH.
 class GcchCosmosCredential implements TokenCredential {
   constructor(private readonly inner: TokenCredential) {}
   getToken(_scopes: string | string[], options?: GetTokenOptions): Promise<AccessToken | null> {
-    return this.inner.getToken("https://cosmos.azure.us/.default", options);
+    return this.inner.getToken("https://cosmos.azure.com/.default", options);
   }
 }
 import { v4 as uuidv4 } from "uuid";

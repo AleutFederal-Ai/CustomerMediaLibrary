@@ -69,6 +69,9 @@ jobs:
       - name: Run production setup script
         run: npx tsx scripts/setup-prod.ts
         env:
-          # AzureCLICredential (part of DefaultAzureCredential) picks up the
-          # az login session established by azure/login above.
+          # Explicit credentials so EnvironmentCredential fires (more reliable than AzureCLICredential)
+          AZURE_CLIENT_ID: ${{ fromJSON(secrets.AZURE_CREDENTIALS).clientId }}
+          AZURE_CLIENT_SECRET: ${{ fromJSON(secrets.AZURE_CREDENTIALS).clientSecret }}
+          AZURE_TENANT_ID: ${{ fromJSON(secrets.AZURE_CREDENTIALS).tenantId }}
+          AZURE_AUTHORITY_HOST: https://login.microsoftonline.us/
           AZURE_CLOUD: AzureUSGovernment
