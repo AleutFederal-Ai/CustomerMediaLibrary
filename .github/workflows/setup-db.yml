@@ -26,6 +26,27 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
           environment: AzureUSGovernment
 
+      - name: Grant Cosmos DB data plane role to service principal
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            az cloud set --name AzureUSGovernment
+
+            # Get the object ID of the logged-in service principal
+            SP_OBJECT_ID=$(az ad sp show --id $(az account show --query user.name -o tsv) --query id -o tsv)
+            echo "Service principal object ID: $SP_OBJECT_ID"
+
+            # Assign Cosmos DB Built-in Data Contributor (data plane role — not visible in portal IAM)
+            # Role definition ID 00000000-0000-0000-0000-000000000002 is the built-in data contributor
+            az cosmosdb sql role assignment create \
+              --account-name mymedia-cosmos \
+              --resource-group rg-mymedia-prod \
+              --role-definition-id /subscriptions/b2fba6de-c97e-42f2-b4f4-86cfa84a6de0/resourceGroups/rg-mymedia-prod/providers/Microsoft.DocumentDB/databaseAccounts/mymedia-cosmos/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002 \
+              --principal-id $SP_OBJECT_ID \
+              --scope /subscriptions/b2fba6de-c97e-42f2-b4f4-86cfa84a6de0/resourceGroups/rg-mymedia-prod/providers/Microsoft.DocumentDB/databaseAccounts/mymedia-cosmos \
+              2>&1 | grep -v "already exists" || true
+
       - name: Run production setup script
         run: npx tsx scripts/setup-prod.ts
         env:
