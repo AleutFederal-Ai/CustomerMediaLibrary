@@ -33,19 +33,38 @@ jobs:
           inlineScript: |
             az cloud set --name AzureUSGovernment
 
-            # Get the object ID of the logged-in service principal
-            SP_OBJECT_ID=$(az ad sp show --id $(az account show --query user.name -o tsv) --query id -o tsv)
+            # Get the client ID (app ID) of the logged-in service principal
+            APP_ID=$(az account show --query user.name -o tsv)
+            echo "App ID: $APP_ID"
+
+            # Get the object ID from the app ID
+            SP_OBJECT_ID=$(az ad sp show --id "$APP_ID" --query id -o tsv)
+            if [ -z "$SP_OBJECT_ID" ]; then
+              echo "ERROR: Could not resolve service principal object ID for app $APP_ID"
+              exit 1
+            fi
             echo "Service principal object ID: $SP_OBJECT_ID"
 
-            # Assign Cosmos DB Built-in Data Contributor (data plane role — not visible in portal IAM)
-            # Role definition ID 00000000-0000-0000-0000-000000000002 is the built-in data contributor
-            az cosmosdb sql role assignment create \
+            # Check if role assignment already exists
+            EXISTING=$(az cosmosdb sql role assignment list \
               --account-name mymedia-cosmos \
               --resource-group rg-mymedia-prod \
-              --role-definition-id "00000000-0000-0000-0000-000000000002" \
-              --principal-id "$SP_OBJECT_ID" \
-              --scope "/subscriptions/b2fba6de-c97e-42f2-b4f4-86cfa84a6de0/resourceGroups/rg-mymedia-prod/providers/Microsoft.DocumentDB/databaseAccounts/mymedia-cosmos" \
-              && echo "Role assigned." || echo "Role assignment skipped (may already exist)."
+              --query "[?principalId=='$SP_OBJECT_ID'] | length(@)" -o tsv)
+            echo "Existing Cosmos DB role assignments for this principal: $EXISTING"
+
+            if [ "$EXISTING" -gt "0" ]; then
+              echo "Role already assigned — skipping."
+            else
+              echo "Assigning Cosmos DB Built-in Data Contributor role..."
+              az cosmosdb sql role assignment create \
+                --account-name mymedia-cosmos \
+                --resource-group rg-mymedia-prod \
+                --role-definition-id "00000000-0000-0000-0000-000000000002" \
+                --principal-id "$SP_OBJECT_ID" \
+                --scope "/subscriptions/b2fba6de-c97e-42f2-b4f4-86cfa84a6de0/resourceGroups/rg-mymedia-prod/providers/Microsoft.DocumentDB/databaseAccounts/mymedia-cosmos"
+              echo "Role assigned. Waiting 30s for propagation..."
+              sleep 30
+            fi
 
       - name: Run production setup script
         run: npx tsx scripts/setup-prod.ts
