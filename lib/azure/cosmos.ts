@@ -13,7 +13,7 @@ class GcchCosmosCredential implements TokenCredential {
   }
 }
 
-const DB_NAME = "mediagallery";
+const DB_NAME = "mymedia";
 
 export const CONTAINERS = {
   SESSIONS: "sessions",
