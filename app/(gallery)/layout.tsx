@@ -1,3 +1,10 @@
+import CuiBanner from "@/components/ui/CuiBanner";
+
 export default function GalleryLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return (
+    <>
+      <CuiBanner />
+      {children}
+    </>
+  );
 }

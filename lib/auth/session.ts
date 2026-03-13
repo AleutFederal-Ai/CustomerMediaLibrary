@@ -15,41 +15,57 @@ const ABSOLUTE_TIMEOUT_HOURS = 8;
 // ============================================================
 
 /**
- * Sign a session ID for the cookie value.
- * Format: <sessionId>.<hmac-signature>
+ * Cookie format: base64url(sessionId:email).<hmac-sha256-hex>
+ * The HMAC covers the entire base64url payload so middleware can
+ * verify the signature and extract the email without a Cosmos lookup.
  */
-async function signSessionId(sessionId: string): Promise<string> {
+async function signCookiePayload(sessionId: string, email: string): Promise<string> {
+  const payload = Buffer.from(`${sessionId}:${email}`).toString("base64url");
   const secret = await getSecret("SessionSigningSecret");
   const sig = crypto
     .createHmac("sha256", secret)
-    .update(sessionId)
+    .update(payload)
     .digest("hex");
-  return `${sessionId}.${sig}`;
+  return `${payload}.${sig}`;
 }
 
 /**
- * Verify and extract the session ID from a signed cookie value.
- * Returns null if the signature is invalid.
+ * Verify the signed cookie and extract sessionId + email.
+ * Returns null if the signature is invalid or the payload is malformed.
  */
-async function verifySignedCookie(cookieValue: string): Promise<string | null> {
+async function verifySignedCookie(
+  cookieValue: string
+): Promise<{ sessionId: string; email: string } | null> {
   const lastDot = cookieValue.lastIndexOf(".");
   if (lastDot === -1) return null;
 
-  const sessionId = cookieValue.slice(0, lastDot);
+  const payload = cookieValue.slice(0, lastDot);
   const providedSig = cookieValue.slice(lastDot + 1);
 
   const secret = await getSecret("SessionSigningSecret");
   const expectedSig = crypto
     .createHmac("sha256", secret)
-    .update(sessionId)
+    .update(payload)
     .digest("hex");
+
+  if (providedSig.length !== expectedSig.length) return null;
 
   // Constant-time comparison to prevent timing attacks
   if (!crypto.timingSafeEqual(Buffer.from(providedSig, "hex"), Buffer.from(expectedSig, "hex"))) {
     return null;
   }
 
-  return sessionId;
+  try {
+    const decoded = Buffer.from(payload, "base64url").toString("utf8");
+    const colonIdx = decoded.indexOf(":");
+    if (colonIdx === -1) return null;
+    return {
+      sessionId: decoded.slice(0, colonIdx),
+      email: decoded.slice(colonIdx + 1),
+    };
+  } catch {
+    return null;
+  }
 }
 
 // ============================================================
@@ -100,7 +116,7 @@ export async function createSession(
   // Update user record (upsert)
   await updateUserRecord(email, now);
 
-  const signedCookie = await signSessionId(sessionId);
+  const signedCookie = await signCookiePayload(sessionId, email.toLowerCase());
 
   response.cookies.set(COOKIE_NAME, signedCookie, {
     httpOnly: true,
@@ -125,8 +141,9 @@ export async function validateSession(
     const cookieValue = request.cookies.get(COOKIE_NAME)?.value;
     if (!cookieValue) return null;
 
-    const sessionId = await verifySignedCookie(cookieValue);
-    if (!sessionId) return null;
+    const parsed = await verifySignedCookie(cookieValue);
+    if (!parsed) return null;
+    const { sessionId } = parsed;
 
     const container = await sessions();
     const { resource: record } = await container
