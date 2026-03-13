@@ -26,8 +26,13 @@ function buildCsp(nonce: string): string {
   ].join("; ");
 }
 
-function withCsp(response: NextResponse, nonce: string): NextResponse {
+function withSecurityHeaders(response: NextResponse, nonce: string): NextResponse {
   response.headers.set("Content-Security-Policy", buildCsp(nonce));
+  response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   return response;
 }
 
@@ -53,6 +58,7 @@ const PUBLIC_PATHS = [
   "/login",
   "/api/auth/request-link",
   "/api/auth/verify",
+  "/api/auth/signout",
 ];
 
 function isPublicPath(pathname: string): boolean {
@@ -79,7 +85,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     const hasBypassCookie = request.cookies.get("dev_bypass")?.value === "1";
     const hasBypassHeader = request.headers.get("x-dev-bypass") === "1";
     if (hasBypassCookie || hasBypassHeader) {
-      return withCsp(injectDevSession(nextWithNonce()), nonce);
+      return withSecurityHeaders(injectDevSession(nextWithNonce()), nonce);
     }
   }
 
@@ -95,7 +101,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   // Allow public paths without authentication
   if (isPublicPath(pathname)) {
-    return withCsp(nextWithNonce(), nonce);
+    return withSecurityHeaders(nextWithNonce(), nonce);
   }
 
   const ip =
@@ -120,7 +126,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   response.headers.set("x-active-tenant-id", session.activeTenantId ?? "");
   response.headers.set("x-tenant-ids", session.tenantIds.join(","));
 
-  return withCsp(response, nonce);
+  return withSecurityHeaders(response, nonce);
 }
 
 export const config = {
