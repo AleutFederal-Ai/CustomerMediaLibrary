@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(az --version)",
+      "Bash(az account:*)",
+      "Bash(cmd.exe /c \"az --version 2>&1\")",
+      "Bash(cmd.exe /c \"az --version\")",
+      "Bash(cmd.exe /c \"az account show\")",
+      "Bash(cmd.exe /c \"where az\")",
+      "Bash(powershell.exe -Command \"az --version\")",
+      "Bash(powershell.exe -Command \"Get-Command az -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source\")",
+      "Bash(npm run:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(set AZURE_KEY_VAULT_URI=https://mymedia-kv.vault.usgovcloudapi.net/)",
+      "Bash(set AZURE_CLOUD=AzureUSGovernment)",
+      "Bash(set NODE_ENV=production)",
+      "Bash(AZURE_KEY_VAULT_URI=\"https://mymedia-kv.vault.usgovcloudapi.net/\" AZURE_CLOUD=\"AzureUSGovernment\" NODE_ENV=\"production\" npm run build)",
+      "Bash(gh run:*)",
+      "Bash(powershell.exe -Command \"gh run list --repo AleutFederal-Ai/CustomerMediaLibrary --limit 5\")"
+    ]
+  }
+}

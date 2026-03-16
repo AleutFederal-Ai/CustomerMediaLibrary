@@ -62,6 +62,8 @@ export interface UserRecord {
   isBlocked: boolean;
   blockedAt?: string;
   blockedBy?: string;
+  /** PBKDF2-SHA256 hash — only set when an admin assigns a password */
+  passwordHash?: string;
 }
 
 export interface AlbumRecord {
@@ -126,6 +128,9 @@ export enum AuditAction {
   MAGIC_LINK_VERIFIED = "magic_link_verified",
   MAGIC_LINK_FAILED = "magic_link_failed",
   MAGIC_LINK_RATE_LIMITED = "magic_link_rate_limited",
+  PASSWORD_LOGIN_SUCCESS = "password_login_success",
+  PASSWORD_LOGIN_FAILED = "password_login_failed",
+  PASSWORD_SET = "password_set",
   SESSION_CREATED = "session_created",
   SESSION_EXPIRED = "session_expired",
   SESSION_REVOKED = "session_revoked",
