@@ -51,7 +51,10 @@ async function checkBlobStorage(): Promise<CheckResult> {
       return { ok: null, message: "not configured (dev mode)" };
     }
 
-    await client.getAccountInfo();
+    // Use a data-plane operation covered by Storage Blob Data Contributor.
+    // getAccountInfo() requires Storage Account Contributor (management plane).
+    const containerClient = client.getContainerClient("media");
+    await containerClient.exists();
     return { ok: true, message: "connected", latencyMs: Date.now() - start };
   } catch (err) {
     return {
