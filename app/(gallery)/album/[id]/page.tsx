@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import CuiBanner from "@/components/ui/CuiBanner";
 import MediaGrid from "@/components/gallery/MediaGrid";
 import Lightbox from "@/components/lightbox/Lightbox";
 import { MediaListItem } from "@/types";
@@ -163,8 +162,6 @@ export default function AlbumPage() {
 
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col">
-      <CuiBanner />
-
       {/* Nav */}
       <header className="bg-slate-800 border-b border-slate-700 px-6 py-3 flex items-center gap-4">
         <Link

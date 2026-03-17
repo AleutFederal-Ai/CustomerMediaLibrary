@@ -1,6 +1,5 @@
 import { headers } from "next/headers";
 import Link from "next/link";
-import CuiBanner from "@/components/ui/CuiBanner";
 import AlbumGrid from "@/components/gallery/AlbumGrid";
 import { isAdminGroupMember } from "@/lib/azure/graph";
 import { AlbumListItem } from "@/types";
@@ -27,8 +26,6 @@ export default async function GalleryHomePage() {
 
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col">
-      <CuiBanner />
-
       {/* Nav */}
       <header className="bg-slate-800 border-b border-slate-700 px-6 py-3 flex items-center justify-between">
         <h1 className="text-white font-semibold text-lg">Media Gallery</h1>
