@@ -1,19 +1,35 @@
 import { Client } from "@microsoft/microsoft-graph-client";
 import { TokenCredentialAuthenticationProvider } from "@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials";
-import { DefaultAzureCredential, AzureAuthorityHosts } from "@azure/identity";
+import {
+  ClientSecretCredential,
+  AzureAuthorityHosts,
+} from "@azure/identity";
 import { getSecret } from "./keyvault";
 
 // GCCH Graph endpoint
 const GRAPH_BASE_URL = process.env.GRAPH_ENDPOINT ?? "https://graph.microsoft.us";
 const GRAPH_SCOPE = `${GRAPH_BASE_URL}/.default`;
 
+// Token endpoint for GCCH Entra ID
+const GRAPH_TOKEN_ENDPOINT =
+  process.env.GRAPH_TOKEN_ENDPOINT ?? "https://login.microsoftonline.us";
+
 let _graphClient: Client | null = null;
 
 async function getGraphClient(): Promise<Client> {
   if (_graphClient) return _graphClient;
 
-  const credential = new DefaultAzureCredential({
-    authorityHost: AzureAuthorityHosts.AzureGovernment,
+  // Authenticate as the myMedia-mailSender app registration.
+  // Mail.Send and group-read permissions are granted to this app registration,
+  // not to the managed identity, so we must use its client credentials.
+  const [tenantId, clientId, clientSecret] = await Promise.all([
+    getSecret("GraphTenantId"),
+    getSecret("GraphClientId"),
+    getSecret("GraphClientSecret"),
+  ]);
+
+  const credential = new ClientSecretCredential(tenantId, clientId, clientSecret, {
+    authorityHost: `${GRAPH_TOKEN_ENDPOINT}/`,
   });
 
   const authProvider = new TokenCredentialAuthenticationProvider(credential, {

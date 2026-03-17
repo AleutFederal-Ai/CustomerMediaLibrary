@@ -70,6 +70,7 @@ export async function warmSecrets(): Promise<void> {
     getSecret("AdminGroupObjectId"),
     getSecret("GraphTenantId"),
     getSecret("GraphClientId"),
+    getSecret("GraphClientSecret"),
     getSecret("MailSenderAddress"),
   ]);
 }
