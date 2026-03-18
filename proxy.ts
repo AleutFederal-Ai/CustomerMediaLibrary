@@ -1,6 +1,7 @@
 // Next.js 16: proxy.ts always runs on Node.js runtime — no runtime export needed
 import { NextRequest, NextResponse } from "next/server";
 import { validateSession, SESSION_COOKIE_NAME } from "@/lib/auth/session";
+import { getPublicBaseUrl } from "@/lib/auth/base-url";
 import crypto from "crypto";
 
 // In Docker dev mode, Next.js App Router does not automatically apply the
@@ -119,7 +120,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   if (!session) {
     // Clear potentially stale cookie
-    const response = NextResponse.redirect(new URL("/login", request.url));
+    const response = NextResponse.redirect(new URL("/login", getPublicBaseUrl(request)));
     response.cookies.set(SESSION_COOKIE_NAME, "", { maxAge: 0, path: "/" });
     return response;
   }

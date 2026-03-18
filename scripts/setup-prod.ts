@@ -167,10 +167,10 @@ async function main() {
   console.log("\n=== Setup complete ===");
   console.log("\nRemaining manual steps:");
   console.log(
-    "  1. Set NEXT_PUBLIC_BASE_URL in App Service config (Azure Portal > mymedia-app > Configuration)"
+    "  1. Set APP_BASE_URL in App Service config (Azure Portal > mymedia-app > Configuration > Environment variables)"
   );
   console.log(
-    '     Value: "https://mymedia-app.azurewebsites.us" (or custom domain once configured)'
+    '     Value: "https://mymedia.aleutfederal.us" (must match the public custom domain)'
   );
   console.log(
     "  2. Verify Graph auth — does managed identity have Mail.Send, or do you need MailSenderCert?"

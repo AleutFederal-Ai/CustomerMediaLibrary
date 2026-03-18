@@ -7,7 +7,7 @@ import { TenantPublicItem } from "@/types";
 export default async function AdminDashboard() {
   const headerStore = await headers();
   const email = headerStore.get("x-session-email");
-  const host = headerStore.get("host") ?? "localhost:3000";
+  const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host") ?? "localhost:3000";
   const proto = headerStore.get("x-forwarded-proto") ?? "http";
   const tenantIds = (headerStore.get("x-tenant-ids") ?? "").split(",").filter(Boolean);
 

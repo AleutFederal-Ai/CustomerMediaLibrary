@@ -1,12 +1,13 @@
-import { isAdminGroupMember } from "@/lib/azure/graph";
+import { canAccessAdmin } from "@/lib/auth/admin";
 import { memberships } from "@/lib/azure/cosmos";
 import { MembershipRecord } from "@/types";
 
 /**
- * Returns true if the user is a global super admin (Entra ID group member).
+ * Returns true if the user is a global super admin.
+ * Checks Cosmos DB isPlatformAdmin flag first, then Entra ID group membership.
  */
 export async function isSuperAdmin(email: string): Promise<boolean> {
-  return isAdminGroupMember(email);
+  return canAccessAdmin(email);
 }
 
 /**

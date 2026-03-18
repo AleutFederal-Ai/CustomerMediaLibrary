@@ -445,6 +445,7 @@ export default function LoginPage() {
 
   function handlePlatformAdmin() {
     setSelectedTenant(PLATFORM_ADMIN_TENANT);
+    setTab("password");
     setStep("sign-in");
   }
 
