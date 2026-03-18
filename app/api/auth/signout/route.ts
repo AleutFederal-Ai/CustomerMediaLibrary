@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revokeSession, SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import { writeAuditLog } from "@/lib/audit/logger";
+import { getPublicBaseUrl } from "@/lib/auth/base-url";
 import { AuditAction } from "@/types";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -8,7 +9,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const email = request.headers.get("x-session-email") ?? "unknown";
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
-  const response = NextResponse.redirect(new URL("/login", request.url));
+  const response = NextResponse.redirect(new URL("/login", getPublicBaseUrl(request)));
 
   if (sessionId) {
     await revokeSession(sessionId, response);

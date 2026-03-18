@@ -68,6 +68,8 @@ export interface UserRecord {
   blockedBy?: string;
   /** PBKDF2-SHA256 hash — only set when an admin assigns a password */
   passwordHash?: string;
+  /** True for platform super-admins who can access /admin without Entra ID group membership */
+  isPlatformAdmin?: boolean;
 }
 
 export interface AlbumRecord {

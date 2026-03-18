@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import Link from "next/link";
 import AlbumGrid from "@/components/gallery/AlbumGrid";
-import { isAdminGroupMember } from "@/lib/azure/graph";
+import { canAccessAdmin } from "@/lib/auth/admin";
 import { AlbumListItem, TenantPublicItem } from "@/types";
 
 export default async function GalleryHomePage() {
@@ -43,7 +43,7 @@ export default async function GalleryHomePage() {
 
   const [albums, isAdmin, activeTenant, userTenants] = await Promise.all([
     getAlbums(),
-    isAdminGroupMember(email),
+    canAccessAdmin(email),
     getActiveTenant(),
     getUserTenants(),
   ]);

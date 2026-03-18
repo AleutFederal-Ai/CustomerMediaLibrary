@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { isAdminGroupMember } from "@/lib/azure/graph";
+import { canAccessAdmin } from "@/lib/auth/admin";
 import { TenantPublicItem } from "@/types";
 
 export default async function AdminDashboard() {
@@ -14,7 +14,7 @@ export default async function AdminDashboard() {
   if (!email) redirect("/login");
 
   const [isAdmin, activeTenant] = await Promise.all([
-    isAdminGroupMember(email),
+    canAccessAdmin(email),
     fetch(`${proto}://${host}/api/tenants/current`, {
       headers: { cookie: headerStore.get("cookie") ?? "" },
       cache: "no-store",

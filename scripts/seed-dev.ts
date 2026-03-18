@@ -252,12 +252,14 @@ async function seedCosmos() {
       lastLoginAt: now,
       loginCount: 0,
       isBlocked: false,
+      isPlatformAdmin: true,
       passwordHash,
     });
     console.log(`   ✅ User "${ADMIN_EMAIL}" created`);
   } else {
     await usersContainer.item(existingAdmin[0].id, existingAdmin[0].id).patch([
       { op: "replace", path: "/passwordHash", value: passwordHash },
+      { op: "add", path: "/isPlatformAdmin", value: true },
     ]);
     console.log(`   ✅ User "${ADMIN_EMAIL}" password reset`);
   }
