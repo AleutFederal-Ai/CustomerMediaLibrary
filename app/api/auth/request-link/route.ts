@@ -26,10 +26,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const ip = getIp(request);
 
   let email = "";
+  let tenantSlug = "";
 
   try {
     const body = await request.json();
     email = (body?.email ?? "").toString().trim().toLowerCase();
+    tenantSlug = (body?.tenantSlug ?? "").toString().trim().toLowerCase();
   } catch {
     return NextResponse.json(GENERIC_RESPONSE, { status: 200 });
   }
@@ -71,7 +73,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const baseUrl =
       process.env.NEXT_PUBLIC_BASE_URL ??
       (request.headers.get("origin") || "http://localhost:3000");
-    const magicLinkUrl = `${baseUrl}/api/auth/verify?token=${rawToken}`;
+    const tenantParam = tenantSlug ? `&tenant=${encodeURIComponent(tenantSlug)}` : "";
+    const magicLinkUrl = `${baseUrl}/api/auth/verify?token=${rawToken}${tenantParam}`;
 
     await sendMagicLinkEmail(email, magicLinkUrl);
   } catch (err) {

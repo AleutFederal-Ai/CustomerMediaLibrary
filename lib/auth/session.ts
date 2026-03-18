@@ -73,15 +73,22 @@ async function verifySignedCookie(
 // ============================================================
 
 /**
- * Create a new session after successful magic link verification.
+ * Create a new session after successful authentication.
  * Resolves tenant memberships for the user and stores them on the session.
  * Sets the session cookie on the response.
+ *
+ * @param preferredTenantId - If provided and the user is a member, this tenant
+ *   becomes the active tenant. Falls back to tenantIds[0] otherwise.
+ *
+ * @returns Object with sessionId and resolved tenantIds so the caller can
+ *   decide where to redirect (e.g. /select-tenant if multiple and no preferred).
  */
 export async function createSession(
   email: string,
   ipAddress: string,
-  response: NextResponse
-): Promise<string> {
+  response: NextResponse,
+  preferredTenantId?: string
+): Promise<{ sessionId: string; tenantIds: string[]; activeTenantId: string | undefined }> {
   const sessionId = uuidv4();
   const now = new Date();
   const idleExpiresAt = new Date(now.getTime() + IDLE_TIMEOUT_MINUTES * 60 * 1000);
@@ -94,7 +101,12 @@ export async function createSession(
 
   // Resolve all tenants the user belongs to
   const tenantIds = await getUserTenantIds(email);
-  const activeTenantId = tenantIds[0] ?? undefined;
+
+  // Use the preferred tenant if the user is a member of it; otherwise first in list
+  const activeTenantId =
+    preferredTenantId && tenantIds.includes(preferredTenantId)
+      ? preferredTenantId
+      : tenantIds[0] ?? undefined;
 
   const record: SessionRecord = {
     id: sessionId,
@@ -126,7 +138,7 @@ export async function createSession(
     maxAge: ABSOLUTE_TIMEOUT_HOURS * 60 * 60,
   });
 
-  return sessionId;
+  return { sessionId, tenantIds, activeTenantId };
 }
 
 /**

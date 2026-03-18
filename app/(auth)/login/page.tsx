@@ -1,14 +1,187 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import HealthStatus from "@/components/ui/HealthStatus";
+import { TenantPublicItem } from "@/types";
 
-// ─── Magic Link form ──────────────────────────────────────────────────────────
+// ─── Tenant selection step ─────────────────────────────────────────────────
+
+type TenantPickState = "loading" | "idle" | "checking" | "error";
+
+function TenantSelector({
+  onSelect,
+}: {
+  onSelect: (tenant: TenantPublicItem) => void;
+}) {
+  const [publicTenants, setPublicTenants] = useState<TenantPublicItem[]>([]);
+  const [state, setState] = useState<TenantPickState>("loading");
+  const [privateSlug, setPrivateSlug] = useState("");
+  const [slugError, setSlugError] = useState("");
+  const [showPrivateInput, setShowPrivateInput] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/tenants/public")
+      .then((r) => r.json())
+      .then((data) => {
+        setPublicTenants(Array.isArray(data) ? data : []);
+        setState("idle");
+      })
+      .catch(() => setState("idle"));
+  }, []);
+
+  async function handlePrivateSlug(e: React.BaseSyntheticEvent) {
+    e.preventDefault();
+    if (!privateSlug.trim()) return;
+    setState("checking");
+    setSlugError("");
+    try {
+      const res = await fetch("/api/tenants/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: privateSlug.trim().toLowerCase() }),
+      });
+      if (res.ok) {
+        const tenant: TenantPublicItem = await res.json();
+        onSelect(tenant);
+      } else {
+        setSlugError("Organization not found. Check the code and try again.");
+        setState("idle");
+      }
+    } catch {
+      setSlugError("Something went wrong. Please try again.");
+      setState("idle");
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-slate-400 text-sm mb-4">
+        Select your organization to continue.
+      </p>
+
+      {state === "loading" ? (
+        <div className="flex items-center justify-center py-8">
+          <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <>
+          {/* Public tenant cards */}
+          {publicTenants.length > 0 && (
+            <div className="space-y-2">
+              {publicTenants.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => onSelect(t)}
+                  className="w-full flex items-center gap-3 p-4 bg-slate-700 hover:bg-slate-600 border border-slate-600 hover:border-slate-500 rounded-lg transition-colors text-left group"
+                >
+                  {t.logoUrl ? (
+                    <img
+                      src={t.logoUrl}
+                      alt={t.name}
+                      className="w-8 h-8 rounded object-contain flex-shrink-0"
+                    />
+                  ) : (
+                    <div
+                      className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0 text-white font-semibold text-sm"
+                      style={{ backgroundColor: t.brandColor ?? "#1e3a5f" }}
+                    >
+                      {t.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="text-white font-medium group-hover:text-blue-300 transition-colors truncate">
+                      {t.name}
+                    </div>
+                    {t.description && (
+                      <div className="text-slate-400 text-xs truncate">{t.description}</div>
+                    )}
+                  </div>
+                  <svg
+                    className="w-4 h-4 text-slate-500 group-hover:text-slate-300 ml-auto flex-shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Divider when both public and private */}
+          {publicTenants.length > 0 && (
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-600" />
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="bg-slate-800 px-2 text-slate-500">or</span>
+              </div>
+            </div>
+          )}
+
+          {/* Private org code */}
+          {!showPrivateInput ? (
+            <button
+              type="button"
+              onClick={() => setShowPrivateInput(true)}
+              className="w-full py-2.5 px-4 bg-slate-700 hover:bg-slate-600 border border-slate-600 hover:border-slate-500 text-slate-300 hover:text-white text-sm rounded-lg transition-colors"
+            >
+              Enter a private organization code
+            </button>
+          ) : (
+            <form onSubmit={handlePrivateSlug} className="space-y-2">
+              <label htmlFor="private-slug" className="block text-sm font-medium text-slate-300">
+                Organization code
+              </label>
+              <input
+                id="private-slug"
+                type="text"
+                value={privateSlug}
+                onChange={(e) => setPrivateSlug(e.target.value)}
+                placeholder="e.g. my-organization"
+                disabled={state === "checking"}
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+              />
+              {slugError && <p className="text-red-400 text-sm">{slugError}</p>}
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={state === "checking" || !privateSlug.trim()}
+                  className="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:opacity-50 text-white text-sm font-medium rounded transition-colors"
+                >
+                  {state === "checking" ? "Checking…" : "Continue"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowPrivateInput(false); setPrivateSlug(""); setSlugError(""); setState("idle"); }}
+                  className="py-2 px-4 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm rounded transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Magic Link form ───────────────────────────────────────────────────────
 
 type MagicState = "idle" | "submitting" | "sent" | "error";
 
-function MagicLinkForm({ hasError }: { hasError: boolean }) {
+function MagicLinkForm({
+  tenant,
+  hasError,
+}: {
+  tenant: TenantPublicItem;
+  hasError: boolean;
+}) {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<MagicState>("idle");
 
@@ -19,7 +192,7 @@ function MagicLinkForm({ hasError }: { hasError: boolean }) {
       const res = await fetch("/api/auth/request-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, tenantSlug: tenant.slug }),
       });
       setState(res.ok ? "sent" : "error");
     } catch {
@@ -76,7 +249,7 @@ function MagicLinkForm({ hasError }: { hasError: boolean }) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={state === "submitting"}
-            placeholder="you@aleutfederal.com"
+            placeholder="you@example.com"
             className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
           />
         </div>
@@ -97,11 +270,11 @@ function MagicLinkForm({ hasError }: { hasError: boolean }) {
   );
 }
 
-// ─── Password form ────────────────────────────────────────────────────────────
+// ─── Password form ─────────────────────────────────────────────────────────
 
 type PasswordState = "idle" | "submitting" | "error";
 
-function PasswordForm() {
+function PasswordForm({ tenant }: { tenant: TenantPublicItem }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -116,11 +289,12 @@ function PasswordForm() {
       const res = await fetch("/api/auth/password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, tenantSlug: tenant.slug }),
       });
 
       if (res.ok) {
-        router.push("/");
+        const data = await res.json().catch(() => ({}));
+        router.push((data as { redirectTo?: string }).redirectTo ?? "/");
         return;
       }
 
@@ -156,7 +330,7 @@ function PasswordForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={state === "submitting"}
-            placeholder="you@aleutfederal.com"
+            placeholder="you@example.com"
             className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
           />
         </div>
@@ -193,18 +367,59 @@ function PasswordForm() {
   );
 }
 
-// ─── Login page ───────────────────────────────────────────────────────────────
+// ─── Login page ────────────────────────────────────────────────────────────
 
 type Tab = "magic" | "password";
+type Step = "select-tenant" | "sign-in";
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
+  const hasError = searchParams.get("error") === "invalid";
+  const noAccess = searchParams.get("error") === "no-access";
+  const tenantSlugParam = searchParams.get("tenant") ?? "";
+
+  const [step, setStep] = useState<Step>(tenantSlugParam ? "sign-in" : "select-tenant");
+  const [selectedTenant, setSelectedTenant] = useState<TenantPublicItem | null>(null);
   const [tab, setTab] = useState<Tab>("magic");
 
-  const searchParams =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search)
-      : null;
-  const hasError = searchParams?.get("error") === "invalid";
+  // If a slug was passed via URL, resolve it immediately
+  const resolveSlugFromUrl = useCallback(async (slug: string) => {
+    try {
+      const res = await fetch("/api/tenants/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug }),
+      });
+      if (res.ok) {
+        const tenant: TenantPublicItem = await res.json();
+        setSelectedTenant(tenant);
+        setStep("sign-in");
+      } else {
+        // Slug invalid — fall back to selection
+        setStep("select-tenant");
+      }
+    } catch {
+      setStep("select-tenant");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tenantSlugParam) {
+      resolveSlugFromUrl(tenantSlugParam);
+    }
+  }, [tenantSlugParam, resolveSlugFromUrl]);
+
+  function handleTenantSelected(tenant: TenantPublicItem) {
+    setSelectedTenant(tenant);
+    setStep("sign-in");
+  }
+
+  const cardTitle =
+    step === "select-tenant"
+      ? "Select your organization"
+      : tab === "magic"
+      ? "Sign in with email link"
+      : "Sign in with password";
 
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center px-4">
@@ -225,62 +440,108 @@ export default function LoginPage() {
             />
           </svg>
         </div>
-        <h1 className="text-2xl font-semibold text-white">
-          Aleut Federal Media Gallery
-        </h1>
-        <p className="text-slate-400 mt-1 text-sm">Secure Media Library</p>
+        <h1 className="text-2xl font-semibold text-white">Secure Media Gallery</h1>
+        <p className="text-slate-400 mt-1 text-sm">Controlled Unclassified Information</p>
       </div>
 
       {/* Card */}
       <div className="w-full max-w-md bg-slate-800 rounded-lg shadow-xl border border-slate-700">
-        {/* Tabs */}
-        <div className="flex border-b border-slate-700">
-          <button
-            type="button"
-            onClick={() => setTab("magic")}
-            className={`flex-1 py-3 text-sm font-medium rounded-tl-lg transition-colors focus:outline-none ${
-              tab === "magic"
-                ? "bg-slate-800 text-white border-b-2 border-blue-500"
-                : "bg-slate-900/40 text-slate-400 hover:text-slate-300"
-            }`}
-          >
-            Magic Link
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("password")}
-            className={`flex-1 py-3 text-sm font-medium rounded-tr-lg transition-colors focus:outline-none ${
-              tab === "password"
-                ? "bg-slate-800 text-white border-b-2 border-blue-500"
-                : "bg-slate-900/40 text-slate-400 hover:text-slate-300"
-            }`}
-          >
-            Password
-          </button>
-        </div>
 
-        {/* Tab content */}
+        {/* Selected tenant badge (sign-in step) */}
+        {step === "sign-in" && selectedTenant && (
+          <div
+            className="flex items-center gap-3 px-6 py-3 border-b border-slate-700 rounded-t-lg"
+            style={{ borderTopColor: selectedTenant.brandColor ?? undefined }}
+          >
+            {selectedTenant.logoUrl ? (
+              <img src={selectedTenant.logoUrl} alt={selectedTenant.name} className="w-6 h-6 rounded object-contain" />
+            ) : (
+              <div
+                className="w-6 h-6 rounded flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                style={{ backgroundColor: selectedTenant.brandColor ?? "#1e3a5f" }}
+              >
+                {selectedTenant.name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <span className="text-white text-sm font-medium truncate">{selectedTenant.name}</span>
+            {!tenantSlugParam && (
+              <button
+                type="button"
+                onClick={() => { setStep("select-tenant"); setSelectedTenant(null); }}
+                className="ml-auto text-slate-400 hover:text-slate-200 text-xs underline flex-shrink-0"
+              >
+                Change
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Tabs (sign-in step only) */}
+        {step === "sign-in" && (
+          <div className="flex border-b border-slate-700">
+            <button
+              type="button"
+              onClick={() => setTab("magic")}
+              className={`flex-1 py-3 text-sm font-medium transition-colors focus:outline-none ${
+                tab === "magic"
+                  ? "bg-slate-800 text-white border-b-2 border-blue-500"
+                  : "bg-slate-900/40 text-slate-400 hover:text-slate-300"
+              }`}
+            >
+              Magic Link
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("password")}
+              className={`flex-1 py-3 text-sm font-medium transition-colors focus:outline-none ${
+                tab === "password"
+                  ? "bg-slate-800 text-white border-b-2 border-blue-500"
+                  : "bg-slate-900/40 text-slate-400 hover:text-slate-300"
+              }`}
+            >
+              Password
+            </button>
+          </div>
+        )}
+
+        {/* Content */}
         <div className="p-8">
-          <h2 className="text-white font-medium text-lg mb-1">
-            {tab === "magic" ? "Sign in with email link" : "Sign in with password"}
-          </h2>
+          <h2 className="text-white font-medium text-lg mb-1">{cardTitle}</h2>
 
-          {tab === "magic" ? (
-            <MagicLinkForm hasError={hasError} />
-          ) : (
-            <PasswordForm />
+          {noAccess && (
+            <div className="mb-4 p-3 bg-red-900/40 border border-red-700 rounded text-red-300 text-sm">
+              Your account is not authorized for any organization. Contact your administrator.
+            </div>
+          )}
+
+          {step === "select-tenant" && (
+            <TenantSelector onSelect={handleTenantSelected} />
+          )}
+
+          {step === "sign-in" && selectedTenant && (
+            <>
+              {tab === "magic" ? (
+                <MagicLinkForm tenant={selectedTenant} hasError={hasError} />
+              ) : (
+                <PasswordForm tenant={selectedTenant} />
+              )}
+            </>
+          )}
+
+          {/* Resolving slug from URL param — show spinner */}
+          {step === "sign-in" && !selectedTenant && (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            </div>
           )}
         </div>
       </div>
 
-      {/* Health status panel */}
       <HealthStatus />
 
-      {/* Classification notice */}
       <p className="mt-6 text-slate-600 text-xs text-center max-w-sm">
         Access to this system is restricted to authorized personnel only.
-        Unauthorized access is prohibited and may be subject to criminal
-        prosecution.
+        Unauthorized access is prohibited and may be subject to criminal prosecution.
       </p>
     </div>
   );

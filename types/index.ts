@@ -10,6 +10,10 @@ export interface TenantRecord {
   name: string;
   slug: string;           // URL-safe identifier, e.g. "aleutfederal"
   isActive: boolean;
+  isPublic: boolean;      // true = appears in public tenant selection list
+  description?: string;   // short blurb shown on the selection card
+  logoUrl?: string;       // URL to tenant logo image
+  brandColor?: string;    // hex color, e.g. "#1e3a5f"
   createdAt: string;
   updatedAt: string;
   createdBy: string;
@@ -196,8 +200,22 @@ export interface TenantListItem {
   id: string;
   name: string;
   slug: string;
+  isPublic: boolean;
   isActive: boolean;
+  description?: string;
+  logoUrl?: string;
+  brandColor?: string;
   createdAt: string;
+}
+
+/** Minimal public info returned to unauthenticated users */
+export interface TenantPublicItem {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  logoUrl?: string;
+  brandColor?: string;
 }
 
 export interface AlbumListItem {

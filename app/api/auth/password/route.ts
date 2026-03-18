@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { users } from "@/lib/azure/cosmos";
 import { verifyPassword } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
+import { getTenantBySlug } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { AuditAction, UserRecord } from "@/types";
 
@@ -30,6 +31,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const email =
     typeof b.email === "string" ? b.email.toLowerCase().trim() : "";
   const password = typeof b.password === "string" ? b.password : "";
+  const tenantSlug =
+    typeof b.tenantSlug === "string" ? b.tenantSlug.toLowerCase().trim() : "";
 
   if (!email || !password) {
     return NextResponse.json(
@@ -89,8 +92,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       detail: {},
     });
 
+    // Resolve preferred tenant from slug (if provided)
+    let preferredTenantId: string | undefined;
+    if (tenantSlug) {
+      const tenant = await getTenantBySlug(tenantSlug);
+      if (tenant) preferredTenantId = tenant.id;
+    }
+
     const response = NextResponse.json({ ok: true });
-    await createSession(email, ip, response);
+    const { tenantIds, activeTenantId } = await createSession(email, ip, response, preferredTenantId);
 
     await writeAuditLog({
       userEmail: email,
@@ -99,7 +109,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       detail: { email, method: "password" },
     });
 
-    return response;
+    // Tell the client where to redirect
+    if (tenantIds.length === 0) {
+      // No tenant access — clear the cookie and return error
+      response.cookies.set("mg_session", "", { maxAge: 0, path: "/" });
+      return NextResponse.json({ error: "No authorized organization found for this account." }, { status: 403 });
+    }
+
+    const redirectTo = !activeTenantId && tenantIds.length > 1 ? "/select-tenant" : "/";
+    return NextResponse.json({ ok: true, redirectTo });
   } catch (err) {
     console.error("[auth/password] error:", err);
     return NextResponse.json(

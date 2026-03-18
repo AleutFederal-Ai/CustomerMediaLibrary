@@ -56,11 +56,15 @@ function injectDevSession(response: NextResponse): NextResponse {
 // Routes that do NOT require authentication
 const PUBLIC_PATHS = [
   "/login",
+  "/select-tenant",
+  "/t/",                         // /t/[slug] — direct tenant landing pages
   "/api/auth/request-link",
   "/api/auth/verify",
   "/api/auth/password",
   "/api/auth/signout",
   "/api/health",
+  "/api/tenants/public",         // public tenant list (pre-login)
+  "/api/tenants/lookup",         // private slug validation (pre-login)
 ];
 
 function isPublicPath(pathname: string): boolean {

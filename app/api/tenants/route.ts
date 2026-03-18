@@ -33,7 +33,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       id: t.id,
       name: t.name,
       slug: t.slug,
+      isPublic: t.isPublic ?? false,
       isActive: t.isActive,
+      ...(t.description && { description: t.description }),
+      ...(t.logoUrl && { logoUrl: t.logoUrl }),
+      ...(t.brandColor && { brandColor: t.brandColor }),
       createdAt: t.createdAt,
     }));
 

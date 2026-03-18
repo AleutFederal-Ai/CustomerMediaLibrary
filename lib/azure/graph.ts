@@ -38,7 +38,7 @@ async function getGraphClient(): Promise<Client> {
 
   _graphClient = Client.initWithMiddleware({
     authProvider,
-    baseUrl: `${GRAPH_BASE_URL}/v1.0`,
+    baseUrl: GRAPH_BASE_URL,  // SDK appends /v1.0 itself — do NOT include it here
   });
 
   return _graphClient;

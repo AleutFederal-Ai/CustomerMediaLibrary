@@ -40,7 +40,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
-  let body: { name?: string; slug?: string };
+  let body: {
+    name?: string;
+    slug?: string;
+    isPublic?: boolean;
+    description?: string;
+    logoUrl?: string;
+    brandColor?: string;
+  };
   try {
     body = await request.json();
   } catch {
@@ -76,6 +83,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       name,
       slug,
       isActive: true,
+      isPublic: body.isPublic ?? false,
+      ...(body.description && { description: body.description.trim() }),
+      ...(body.logoUrl && { logoUrl: body.logoUrl.trim() }),
+      ...(body.brandColor && { brandColor: body.brandColor.trim() }),
       createdAt: now,
       updatedAt: now,
       createdBy: email,
@@ -106,7 +117,13 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
   const id = request.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
-  let body: { name?: string };
+  let body: {
+    name?: string;
+    isPublic?: boolean;
+    description?: string;
+    logoUrl?: string;
+    brandColor?: string;
+  };
   try {
     body = await request.json();
   } catch {
@@ -121,6 +138,10 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     const updated: TenantRecord = {
       ...existing,
       ...(body.name && { name: body.name.trim() }),
+      ...(typeof body.isPublic === "boolean" && { isPublic: body.isPublic }),
+      ...(body.description !== undefined && { description: body.description.trim() }),
+      ...(body.logoUrl !== undefined && { logoUrl: body.logoUrl.trim() }),
+      ...(body.brandColor !== undefined && { brandColor: body.brandColor.trim() }),
       updatedAt: new Date().toISOString(),
     };
 
