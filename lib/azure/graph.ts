@@ -137,22 +137,21 @@ function buildEmailBody(magicLinkUrl: string): string {
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f1f5f9; padding: 40px 16px;">
     <tr>
       <td align="center">
-        <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 16px rgba(0,0,0,0.08);">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
 
-          <!-- Branded header -->
+          <!-- Branded header — no images, pure HTML/CSS -->
           <tr>
             <td style="background-color: #1e3a5f; padding: 20px 28px;">
-              <table cellpadding="0" cellspacing="0">
+              <table cellpadding="0" cellspacing="0" width="100%">
                 <tr>
-                  <td style="padding-right: 14px; vertical-align: middle;">
-                    <!-- Lock icon (inline SVG as a table cell for email client compat) -->
-                    <div style="width: 40px; height: 40px; background-color: rgba(255,255,255,0.15); border-radius: 8px; text-align: center; line-height: 40px;">
-                      <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' fill='none' stroke='white' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Crect x='3' y='11' width='18' height='11' rx='2' ry='2'%3E%3C/rect%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'%3E%3C/path%3E%3C/svg%3E"
-                           width="20" height="20" alt="" style="margin-top: 10px; display: inline-block;">
+                  <td style="padding-right: 14px; vertical-align: middle; width: 44px;">
+                    <!-- Lock icon: text-based, no external image -->
+                    <div style="width: 40px; height: 40px; background-color: rgba(255,255,255,0.15); border-radius: 8px; text-align: center; vertical-align: middle; font-size: 18px; line-height: 40px; color: #ffffff;">
+                      &#128274;
                     </div>
                   </td>
                   <td style="vertical-align: middle;">
-                    <div style="color: #ffffff; font-size: 17px; font-weight: bold; line-height: 1.2;">Aleut Federal Media Gallery</div>
+                    <div style="color: #ffffff; font-size: 17px; font-weight: bold; line-height: 1.2; margin: 0;">Aleut Federal Media Gallery</div>
                     <div style="color: #bfdbfe; font-size: 11px; margin-top: 3px;">Controlled Unclassified Information</div>
                   </td>
                 </tr>
@@ -162,26 +161,34 @@ function buildEmailBody(magicLinkUrl: string): string {
 
           <!-- Body -->
           <tr>
-            <td style="padding: 32px 28px 24px;">
+            <td style="padding: 32px 28px 8px;">
               <p style="margin: 0 0 8px; font-size: 20px; font-weight: bold; color: #1e293b;">Sign in to Media Gallery</p>
-              <p style="margin: 0 0 24px; font-size: 14px; color: #64748b; line-height: 1.6;">
+              <p style="margin: 0 0 28px; font-size: 14px; color: #64748b; line-height: 1.6;">
                 You requested a one-time login link. Click the button below to sign in.
                 This link expires in <strong style="color: #1e293b;">10 minutes</strong> and can only be used once.
               </p>
 
-              <!-- CTA button -->
-              <table cellpadding="0" cellspacing="0" style="margin: 0 0 28px;">
+              <!-- CTA button — table-based for Outlook compatibility -->
+              <table cellpadding="0" cellspacing="0" style="margin-bottom: 28px;">
                 <tr>
-                  <td style="border-radius: 8px; background-color: #1e3a5f;">
-                    <a href="${magicLinkUrl}"
-                       style="display: inline-block; padding: 13px 28px; color: #ffffff; font-size: 15px; font-weight: bold; text-decoration: none; border-radius: 8px; letter-spacing: 0.01em;">
-                      Sign In to Media Gallery
+                  <td align="center" bgcolor="#1e3a5f" style="border-radius: 8px; background-color: #1e3a5f;">
+                    <a href="${magicLinkUrl}" target="_blank"
+                       style="display: inline-block; padding: 14px 32px; color: #ffffff; font-size: 15px; font-weight: bold; text-decoration: none; border-radius: 8px; mso-padding-alt: 14px 32px;">
+                      &#9654;&nbsp; Sign In to Media Gallery
                     </a>
                   </td>
                 </tr>
               </table>
 
-              <p style="margin: 0 0 4px; font-size: 12px; color: #94a3b8; line-height: 1.6;">
+              <!-- Copy/paste fallback -->
+              <p style="margin: 0 0 6px; font-size: 12px; color: #64748b; line-height: 1.5;">
+                If the button above does not work, copy and paste this link into your browser:
+              </p>
+              <p style="margin: 0 0 24px; font-size: 11px; word-break: break-all; line-height: 1.6;">
+                <a href="${magicLinkUrl}" style="color: #1e3a5f; text-decoration: underline;">${magicLinkUrl}</a>
+              </p>
+
+              <p style="margin: 0 0 28px; font-size: 12px; color: #94a3b8; line-height: 1.6;">
                 If you did not request this link, you can safely ignore this email.
                 Do not share this link with anyone.
               </p>
