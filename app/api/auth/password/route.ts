@@ -100,8 +100,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (tenant) preferredTenantId = tenant.id;
     }
 
-    const response = NextResponse.json({ ok: true });
-    const { tenantIds, activeTenantId } = await createSession(email, ip, response, preferredTenantId);
+    // Use a temp response so createSession can set the cookie, then copy it
+    // to the final JSON response. Returning a new response would drop the cookie.
+    const tempResponse = new NextResponse();
+    const { tenantIds, activeTenantId } = await createSession(email, ip, tempResponse, preferredTenantId);
 
     await writeAuditLog({
       userEmail: email,
@@ -122,7 +124,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       redirectTo = "/";
     }
 
-    return NextResponse.json({ ok: true, redirectTo });
+    const response = NextResponse.json({ ok: true, redirectTo });
+    tempResponse.cookies.getAll().forEach((cookie) => response.cookies.set(cookie));
+    return response;
   } catch (err) {
     console.error("[auth/password] error:", err);
     return NextResponse.json(
