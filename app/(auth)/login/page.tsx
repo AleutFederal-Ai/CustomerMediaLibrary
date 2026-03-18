@@ -5,14 +5,23 @@ import { useRouter, useSearchParams } from "next/navigation";
 import HealthStatus from "@/components/ui/HealthStatus";
 import { TenantPublicItem } from "@/types";
 
+// Sentinel used when signing in as a platform admin (no org context)
+const PLATFORM_ADMIN_TENANT: TenantPublicItem = {
+  id: "__platform_admin__",
+  name: "Platform Administration",
+  slug: "",
+};
+
 // ─── Tenant selection step ─────────────────────────────────────────────────
 
 type TenantPickState = "loading" | "idle" | "checking" | "error";
 
 function TenantSelector({
   onSelect,
+  onPlatformAdmin,
 }: {
   onSelect: (tenant: TenantPublicItem) => void;
+  onPlatformAdmin: () => void;
 }) {
   const [publicTenants, setPublicTenants] = useState<TenantPublicItem[]>([]);
   const [state, setState] = useState<TenantPickState>("loading");
@@ -165,6 +174,16 @@ function TenantSelector({
               </div>
             </form>
           )}
+          {/* Platform admin sign-in link */}
+          <div className="mt-6 pt-4 border-t border-slate-700 text-center">
+            <button
+              type="button"
+              onClick={onPlatformAdmin}
+              className="text-slate-500 hover:text-slate-400 text-xs transition-colors"
+            >
+              Platform administrator sign-in
+            </button>
+          </div>
         </>
       )}
     </div>
@@ -192,7 +211,11 @@ function MagicLinkForm({
       const res = await fetch("/api/auth/request-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, tenantSlug: tenant.slug }),
+        body: JSON.stringify({
+          email,
+          tenantSlug: tenant.slug,
+          ...(tenant.id === PLATFORM_ADMIN_TENANT.id && { mode: "platform-admin" }),
+        }),
       });
       setState(res.ok ? "sent" : "error");
     } catch {
@@ -289,7 +312,12 @@ function PasswordForm({ tenant }: { tenant: TenantPublicItem }) {
       const res = await fetch("/api/auth/password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, tenantSlug: tenant.slug }),
+        body: JSON.stringify({
+          email,
+          password,
+          tenantSlug: tenant.slug,
+          ...(tenant.id === PLATFORM_ADMIN_TENANT.id && { mode: "platform-admin" }),
+        }),
       });
 
       if (res.ok) {
@@ -375,7 +403,6 @@ type Step = "select-tenant" | "sign-in";
 export default function LoginPage() {
   const searchParams = useSearchParams();
   const hasError = searchParams.get("error") === "invalid";
-  const noAccess = searchParams.get("error") === "no-access";
   const tenantSlugParam = searchParams.get("tenant") ?? "";
 
   const [step, setStep] = useState<Step>(tenantSlugParam ? "sign-in" : "select-tenant");
@@ -414,9 +441,18 @@ export default function LoginPage() {
     setStep("sign-in");
   }
 
+  function handlePlatformAdmin() {
+    setSelectedTenant(PLATFORM_ADMIN_TENANT);
+    setStep("sign-in");
+  }
+
+  const isPlatformAdmin = selectedTenant?.id === PLATFORM_ADMIN_TENANT.id;
+
   const cardTitle =
     step === "select-tenant"
       ? "Select your organization"
+      : isPlatformAdmin
+      ? tab === "magic" ? "Platform administrator — email link" : "Platform administrator — password"
       : tab === "magic"
       ? "Sign in with email link"
       : "Sign in with password";
@@ -447,13 +483,19 @@ export default function LoginPage() {
       {/* Card */}
       <div className="w-full max-w-md bg-slate-800 rounded-lg shadow-xl border border-slate-700">
 
-        {/* Selected tenant badge (sign-in step) */}
+        {/* Selected tenant / platform-admin badge (sign-in step) */}
         {step === "sign-in" && selectedTenant && (
           <div
             className="flex items-center gap-3 px-6 py-3 border-b border-slate-700 rounded-t-lg"
-            style={{ borderTopColor: selectedTenant.brandColor ?? undefined }}
+            style={!isPlatformAdmin ? { borderTopColor: selectedTenant.brandColor ?? undefined } : undefined}
           >
-            {selectedTenant.logoUrl ? (
+            {isPlatformAdmin ? (
+              <div className="w-6 h-6 rounded bg-amber-900/60 flex items-center justify-center flex-shrink-0">
+                <svg className="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </div>
+            ) : selectedTenant.logoUrl ? (
               <img src={selectedTenant.logoUrl} alt={selectedTenant.name} className="w-6 h-6 rounded object-contain" />
             ) : (
               <div
@@ -463,7 +505,9 @@ export default function LoginPage() {
                 {selectedTenant.name.charAt(0).toUpperCase()}
               </div>
             )}
-            <span className="text-white text-sm font-medium truncate">{selectedTenant.name}</span>
+            <span className={`text-sm font-medium truncate ${isPlatformAdmin ? "text-amber-300" : "text-white"}`}>
+              {selectedTenant.name}
+            </span>
             {!tenantSlugParam && (
               <button
                 type="button"
@@ -508,14 +552,8 @@ export default function LoginPage() {
         <div className="p-8">
           <h2 className="text-white font-medium text-lg mb-1">{cardTitle}</h2>
 
-          {noAccess && (
-            <div className="mb-4 p-3 bg-red-900/40 border border-red-700 rounded text-red-300 text-sm">
-              Your account is not authorized for any organization. Contact your administrator.
-            </div>
-          )}
-
           {step === "select-tenant" && (
-            <TenantSelector onSelect={handleTenantSelected} />
+            <TenantSelector onSelect={handleTenantSelected} onPlatformAdmin={handlePlatformAdmin} />
           )}
 
           {step === "sign-in" && selectedTenant && (

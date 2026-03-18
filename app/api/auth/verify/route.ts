@@ -17,6 +17,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const ip = getIp(request);
   const token = request.nextUrl.searchParams.get("token") ?? "";
   const tenantSlug = request.nextUrl.searchParams.get("tenant") ?? "";
+  const isPlatformAdminMode = request.nextUrl.searchParams.get("mode") === "platform-admin";
 
   if (!token) {
     return NextResponse.redirect(new URL("/login?error=invalid", request.url));
@@ -48,10 +49,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (tenant) preferredTenantId = tenant.id;
   }
 
-  // Create session
-  const redirectTarget = resolvePostLoginRedirect("/", request.url);
-  const response = NextResponse.redirect(redirectTarget);
-  const { tenantIds, activeTenantId } = await createSession(email, ip, response, preferredTenantId);
+  // Create session — returns tenant membership info needed for redirect logic
+  const tempResponse = new NextResponse();
+  const { tenantIds, activeTenantId } = await createSession(email, ip, tempResponse, preferredTenantId);
 
   await writeAuditLog({
     userEmail: email,
@@ -60,23 +60,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     detail: { email, method: "magic-link" },
   });
 
-  // If the user has no tenant access at all, redirect to login with an error
-  if (tenantIds.length === 0) {
-    const noAccessUrl = new URL("/login?error=no-access", request.url);
-    const noAccessResponse = NextResponse.redirect(noAccessUrl);
-    // Clear the cookie that was just set
-    noAccessResponse.cookies.set("mg_session", "", { maxAge: 0, path: "/" });
-    return noAccessResponse;
+  // Determine redirect destination now that we know tenant membership
+  let redirectPath: string;
+  if (isPlatformAdminMode || tenantIds.length === 0) {
+    // Platform admin intent, or no tenant memberships — go to admin console
+    redirectPath = "/admin";
+  } else if (!activeTenantId && tenantIds.length > 1) {
+    redirectPath = "/select-tenant";
+  } else {
+    redirectPath = "/";
   }
 
-  // If multiple tenants and no preferred active one was pre-selected, send to picker
-  if (!activeTenantId && tenantIds.length > 1) {
-    return NextResponse.redirect(new URL("/select-tenant", request.url));
-  }
+  // Build final redirect response and copy the session cookie set by createSession
+  const response = NextResponse.redirect(new URL(redirectPath, request.url));
+  tempResponse.cookies.getAll().forEach((cookie) => {
+    response.cookies.set(cookie);
+  });
 
   return response;
-}
-
-function resolvePostLoginRedirect(defaultPath: string, requestUrl: string): URL {
-  return new URL(defaultPath, requestUrl);
 }

@@ -58,7 +58,8 @@ export async function getTenantById(tenantId: string): Promise<TenantRecord | nu
     const { resource } = await container
       .item(tenantId, tenantId)
       .read<TenantRecord>();
-    return resource ?? null;
+    if (!resource || !resource.isActive) { return null; }
+    return resource;
   } catch {
     return null;
   }

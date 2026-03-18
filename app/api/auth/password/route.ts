@@ -33,6 +33,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const password = typeof b.password === "string" ? b.password : "";
   const tenantSlug =
     typeof b.tenantSlug === "string" ? b.tenantSlug.toLowerCase().trim() : "";
+  const isPlatformAdminMode = b.mode === "platform-admin";
 
   if (!email || !password) {
     return NextResponse.json(
@@ -109,14 +110,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       detail: { email, method: "password" },
     });
 
-    // Tell the client where to redirect
-    if (tenantIds.length === 0) {
-      // No tenant access — clear the cookie and return error
-      response.cookies.set("mg_session", "", { maxAge: 0, path: "/" });
-      return NextResponse.json({ error: "No authorized organization found for this account." }, { status: 403 });
+    // Determine where to redirect after login
+    let redirectTo: string;
+    if (isPlatformAdminMode || tenantIds.length === 0) {
+      // Platform admin intent, or no tenant memberships at all — go to admin console.
+      // /admin will redirect non-admins back to / gracefully.
+      redirectTo = "/admin";
+    } else if (!activeTenantId && tenantIds.length > 1) {
+      redirectTo = "/select-tenant";
+    } else {
+      redirectTo = "/";
     }
 
-    const redirectTo = !activeTenantId && tenantIds.length > 1 ? "/select-tenant" : "/";
     return NextResponse.json({ ok: true, redirectTo });
   } catch (err) {
     console.error("[auth/password] error:", err);

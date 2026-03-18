@@ -27,11 +27,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   let email = "";
   let tenantSlug = "";
+  let mode = "";
 
   try {
     const body = await request.json();
     email = (body?.email ?? "").toString().trim().toLowerCase();
     tenantSlug = (body?.tenantSlug ?? "").toString().trim().toLowerCase();
+    mode = (body?.mode ?? "").toString().trim();
   } catch {
     return NextResponse.json(GENERIC_RESPONSE, { status: 200 });
   }
@@ -74,7 +76,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       process.env.NEXT_PUBLIC_BASE_URL ??
       (request.headers.get("origin") || "http://localhost:3000");
     const tenantParam = tenantSlug ? `&tenant=${encodeURIComponent(tenantSlug)}` : "";
-    const magicLinkUrl = `${baseUrl}/api/auth/verify?token=${rawToken}${tenantParam}`;
+    const modeParam = mode === "platform-admin" ? "&mode=platform-admin" : "";
+    const magicLinkUrl = `${baseUrl}/api/auth/verify?token=${rawToken}${tenantParam}${modeParam}`;
 
     await sendMagicLinkEmail(email, magicLinkUrl);
   } catch (err) {

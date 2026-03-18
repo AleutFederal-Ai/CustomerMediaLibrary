@@ -79,12 +79,22 @@ export async function sendMagicLinkEmail(
     .post({ message, saveToSentItems: false });
 }
 
+// Comma-separated list of emails treated as super-admins in DOCKER_DEV mode.
+// Defaults include the standard dev bypass account and the seeded admin account.
+// Override with DEV_ADMIN_EMAILS=email1,email2 in your .env.docker if needed.
+const DEV_ADMIN_EMAILS = (
+  process.env.DEV_ADMIN_EMAILS ?? "dev@aleutfederal.com,admin@admin.com"
+)
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
 /**
  * Check if a user's email is a member of the admin Entra ID group.
- * In Docker dev mode, the dev bypass user is always treated as admin.
+ * In Docker dev mode, emails in DEV_ADMIN_EMAILS are always treated as admin.
  */
 export async function isAdminGroupMember(email: string): Promise<boolean> {
-  if (process.env.DOCKER_DEV === "true" && email === "dev@aleutfederal.com") {
+  if (process.env.DOCKER_DEV === "true" && DEV_ADMIN_EMAILS.includes(email.toLowerCase())) {
     return true;
   }
 
