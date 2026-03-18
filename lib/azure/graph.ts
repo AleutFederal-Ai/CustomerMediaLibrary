@@ -127,31 +127,82 @@ export async function isAdminGroupMember(email: string): Promise<boolean> {
 function buildEmailBody(magicLinkUrl: string): string {
   return `
 <!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: #1e3a5f; color: white; padding: 16px 24px; border-radius: 4px 4px 0 0;">
-    <h1 style="margin: 0; font-size: 20px;">Aleut Federal Media Gallery</h1>
-  </div>
-  <div style="background: #f8f9fa; padding: 24px; border: 1px solid #dee2e6; border-top: none; border-radius: 0 0 4px 4px;">
-    <p>You requested a login link for the Aleut Federal Media Gallery.</p>
-    <p>Click the button below to sign in. This link expires in <strong>10 minutes</strong> and can only be used once.</p>
-    <p style="margin: 32px 0;">
-      <a href="${magicLinkUrl}"
-         style="background: #1e3a5f; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
-        Sign In to Media Gallery
-      </a>
-    </p>
-    <p style="font-size: 12px; color: #6c757d;">
-      If you did not request this link, you can safely ignore this email.<br>
-      Do not share this link with anyone.
-    </p>
-    <hr style="border: none; border-top: 1px solid #dee2e6; margin: 16px 0;">
-    <p style="font-size: 11px; color: #6c757d; margin: 0;">
-      This system may contain Controlled Unclassified Information (CUI).
-      Handle in accordance with applicable laws and organizational policies.
-    </p>
-  </div>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Media Gallery Login Link</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: Arial, Helvetica, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f1f5f9; padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 16px rgba(0,0,0,0.08);">
+
+          <!-- Branded header -->
+          <tr>
+            <td style="background-color: #1e3a5f; padding: 20px 28px;">
+              <table cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding-right: 14px; vertical-align: middle;">
+                    <!-- Lock icon (inline SVG as a table cell for email client compat) -->
+                    <div style="width: 40px; height: 40px; background-color: rgba(255,255,255,0.15); border-radius: 8px; text-align: center; line-height: 40px;">
+                      <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' fill='none' stroke='white' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Crect x='3' y='11' width='18' height='11' rx='2' ry='2'%3E%3C/rect%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'%3E%3C/path%3E%3C/svg%3E"
+                           width="20" height="20" alt="" style="margin-top: 10px; display: inline-block;">
+                    </div>
+                  </td>
+                  <td style="vertical-align: middle;">
+                    <div style="color: #ffffff; font-size: 17px; font-weight: bold; line-height: 1.2;">Aleut Federal Media Gallery</div>
+                    <div style="color: #bfdbfe; font-size: 11px; margin-top: 3px;">Controlled Unclassified Information</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding: 32px 28px 24px;">
+              <p style="margin: 0 0 8px; font-size: 20px; font-weight: bold; color: #1e293b;">Sign in to Media Gallery</p>
+              <p style="margin: 0 0 24px; font-size: 14px; color: #64748b; line-height: 1.6;">
+                You requested a one-time login link. Click the button below to sign in.
+                This link expires in <strong style="color: #1e293b;">10 minutes</strong> and can only be used once.
+              </p>
+
+              <!-- CTA button -->
+              <table cellpadding="0" cellspacing="0" style="margin: 0 0 28px;">
+                <tr>
+                  <td style="border-radius: 8px; background-color: #1e3a5f;">
+                    <a href="${magicLinkUrl}"
+                       style="display: inline-block; padding: 13px 28px; color: #ffffff; font-size: 15px; font-weight: bold; text-decoration: none; border-radius: 8px; letter-spacing: 0.01em;">
+                      Sign In to Media Gallery
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 0 0 4px; font-size: 12px; color: #94a3b8; line-height: 1.6;">
+                If you did not request this link, you can safely ignore this email.
+                Do not share this link with anyone.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 16px 28px 20px; border-top: 1px solid #e2e8f0; background-color: #f8fafc;">
+              <p style="margin: 0; font-size: 11px; color: #94a3b8; line-height: 1.6;">
+                This system may contain Controlled Unclassified Information (CUI).
+                Handle in accordance with applicable laws, regulations, and organizational policies.
+                Unauthorized disclosure is prohibited.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>
   `.trim();
