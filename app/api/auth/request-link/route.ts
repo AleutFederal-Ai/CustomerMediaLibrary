@@ -72,9 +72,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   try {
     const rawToken = await generateMagicLinkToken(email, ip);
+    // Prefer the explicit public URL env var. Fallback to the incoming request's
+    // own host/proto — Next.js already honours x-forwarded-host and
+    // x-forwarded-proto on App Service / behind a reverse proxy.
     const baseUrl =
       process.env.NEXT_PUBLIC_BASE_URL ??
-      (request.headers.get("origin") || "http://localhost:3000");
+      `${request.nextUrl.protocol}//${request.nextUrl.host}`;
     const tenantParam = tenantSlug ? `&tenant=${encodeURIComponent(tenantSlug)}` : "";
     const modeParam = mode === "platform-admin" ? "&mode=platform-admin" : "";
     const magicLinkUrl = `${baseUrl}/api/auth/verify?token=${rawToken}${tenantParam}${modeParam}`;
