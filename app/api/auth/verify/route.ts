@@ -3,6 +3,7 @@ import { validateMagicLinkToken } from "@/lib/auth/magic-link";
 import { createSession } from "@/lib/auth/session";
 import { getTenantBySlug } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/logger";
+import { getPublicBaseUrl } from "@/lib/auth/base-url";
 import { AuditAction } from "@/types";
 
 function getIp(request: NextRequest): string {
@@ -19,8 +20,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const tenantSlug = request.nextUrl.searchParams.get("tenant") ?? "";
   const isPlatformAdminMode = request.nextUrl.searchParams.get("mode") === "platform-admin";
 
+  const publicBase = getPublicBaseUrl(request);
+
   if (!token) {
-    return NextResponse.redirect(new URL("/login?error=invalid", request.url));
+    return NextResponse.redirect(new URL("/login?error=invalid", publicBase));
   }
 
   const email = await validateMagicLinkToken(token, ip);
@@ -32,7 +35,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       action: AuditAction.MAGIC_LINK_FAILED,
       detail: {},
     });
-    return NextResponse.redirect(new URL("/login?error=invalid", request.url));
+    return NextResponse.redirect(new URL("/login?error=invalid", publicBase));
   }
 
   await writeAuditLog({
@@ -72,7 +75,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   // Build final redirect response and copy the session cookie set by createSession
-  const response = NextResponse.redirect(new URL(redirectPath, request.url));
+  const response = NextResponse.redirect(new URL(redirectPath, publicBase));
   tempResponse.cookies.getAll().forEach((cookie) => {
     response.cookies.set(cookie);
   });

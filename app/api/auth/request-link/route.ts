@@ -3,6 +3,7 @@ import { isDomainAllowed } from "@/lib/auth/domain-check";
 import { checkRateLimit, generateMagicLinkToken } from "@/lib/auth/magic-link";
 import { sendMagicLinkEmail } from "@/lib/azure/graph";
 import { writeAuditLog } from "@/lib/audit/logger";
+import { getPublicBaseUrl } from "@/lib/auth/base-url";
 import { AuditAction } from "@/types";
 
 // Strict email regex — rejects malformed addresses
@@ -72,19 +73,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   try {
     const rawToken = await generateMagicLinkToken(email, ip);
-    // Build the base URL for the magic link.
-    // Priority order:
-    //   1. NEXT_PUBLIC_BASE_URL — explicit production override (recommended)
-    //   2. x-forwarded-proto + x-forwarded-host — set by Azure App Service /
-    //      Front Door; always contains the public-facing address
-    //   3. request.nextUrl — last resort for bare local dev (no proxy)
-    const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
-    const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
-    const baseUrl =
-      process.env.NEXT_PUBLIC_BASE_URL ??
-      (forwardedHost && forwardedProto
-        ? `${forwardedProto}://${forwardedHost}`
-        : `${request.nextUrl.protocol}//${request.nextUrl.host}`);
+    const baseUrl = getPublicBaseUrl(request);
     const tenantParam = tenantSlug ? `&tenant=${encodeURIComponent(tenantSlug)}` : "";
     const modeParam = mode === "platform-admin" ? "&mode=platform-admin" : "";
     const magicLinkUrl = `${baseUrl}/api/auth/verify?token=${rawToken}${tenantParam}${modeParam}`;
