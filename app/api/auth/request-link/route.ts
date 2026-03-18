@@ -72,12 +72,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   try {
     const rawToken = await generateMagicLinkToken(email, ip);
-    // Prefer the explicit public URL env var. Fallback to the incoming request's
-    // own host/proto — Next.js already honours x-forwarded-host and
-    // x-forwarded-proto on App Service / behind a reverse proxy.
+    // Build the base URL for the magic link.
+    // Priority order:
+    //   1. NEXT_PUBLIC_BASE_URL — explicit production override (recommended)
+    //   2. x-forwarded-proto + x-forwarded-host — set by Azure App Service /
+    //      Front Door; always contains the public-facing address
+    //   3. request.nextUrl — last resort for bare local dev (no proxy)
+    const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+    const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
     const baseUrl =
       process.env.NEXT_PUBLIC_BASE_URL ??
-      `${request.nextUrl.protocol}//${request.nextUrl.host}`;
+      (forwardedHost && forwardedProto
+        ? `${forwardedProto}://${forwardedHost}`
+        : `${request.nextUrl.protocol}//${request.nextUrl.host}`);
     const tenantParam = tenantSlug ? `&tenant=${encodeURIComponent(tenantSlug)}` : "";
     const modeParam = mode === "platform-admin" ? "&mode=platform-admin" : "";
     const magicLinkUrl = `${baseUrl}/api/auth/verify?token=${rawToken}${tenantParam}${modeParam}`;
