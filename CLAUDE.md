@@ -24,7 +24,7 @@ These apply to every file, every function, every PR. No exceptions.
 
 - Never hardcode credentials, connection strings, API keys, tokens, or signing secrets
 - Never read secrets from `process.env` directly — load them from Azure Key Vault at runtime using `DefaultAzureCredential`
-- The only environment variables permitted in `.env` or App Service config are non-sensitive pointers: `AZURE_KEY_VAULT_URI`, `AZURE_CLOUD`, `GRAPH_ENDPOINT`, `NODE_ENV`
+- The only environment variables permitted in `.env` or App Service config are non-sensitive pointers: `AZURE_KEY_VAULT_URI`, `AZURE_CLOUD`, `GRAPH_ENDPOINT`, `NODE_ENV`, `APP_BASE_URL`
 - Never commit a `.env` file. The `.gitignore` must exclude it.
 
 ### 2. GCCH Endpoints Only — Never Commercial Azure
@@ -111,37 +111,57 @@ Maintain this structure exactly. Do not reorganize without updating this file.
 ├── app/
 │   ├── (auth)/
 │   │   └── login/
-│   │       └── page.tsx          # Login splash — email input only
+│   │       └── page.tsx          # Login splash — email + password tabs
 │   ├── (gallery)/
-│   │   ├── page.tsx              # Album grid home
+│   │   ├── page.tsx              # Album grid home (+ Create Album for admins)
 │   │   └── album/[id]/
-│   │       └── page.tsx          # Album media view
-│   └── admin/
-│       ├── page.tsx              # Admin dashboard
-│       ├── upload/page.tsx
-│       ├── albums/page.tsx
-│       ├── users/page.tsx
-│       └── audit-logs/page.tsx
+│   │       └── page.tsx          # Album media view + lightbox + bulk download
+│   ├── admin/
+│   │   ├── page.tsx              # Admin dashboard — KPIs, activity, tenant summaries
+│   │   ├── upload/page.tsx
+│   │   ├── albums/page.tsx       # Album CRUD (edit, reorder, cover image)
+│   │   ├── users/page.tsx        # User mgmt (block, set password, promote)
+│   │   ├── members/page.tsx      # Tenant member mgmt (add, remove, change role)
+│   │   ├── domains/page.tsx      # Domain allowlist mgmt
+│   │   ├── tenants/page.tsx      # Organization CRUD (super-admin only)
+│   │   └── audit-logs/page.tsx   # Audit log viewer + CSV export
+│   └── select-tenant/
+│       └── page.tsx              # Tenant switcher for multi-tenant users
 ├── app/api/
 │   ├── auth/
 │   │   ├── request-link/route.ts # POST — validate email, send magic link
-│   │   └── verify/route.ts       # GET — validate token, issue session cookie
+│   │   ├── verify/route.ts       # GET — validate token, issue session cookie
+│   │   ├── password/route.ts     # POST — password login for platform admins
+│   │   └── signout/route.ts      # GET — clear session, redirect to /login
 │   ├── media/
 │   │   ├── [id]/route.ts         # GET — return signed SAS URL
 │   │   └── download/route.ts     # GET — single file download via server
-│   ├── albums/route.ts           # GET — list albums
+│   ├── albums/route.ts           # GET — list albums for active tenant
 │   ├── search/route.ts           # GET — server-side search/filter
+│   ├── me/route.ts               # GET — current user permissions
 │   ├── download/bulk/route.ts    # POST — zip and stream multiple files
+│   ├── tenants/
+│   │   ├── route.ts              # GET — user's tenants
+│   │   ├── current/route.ts      # GET/PATCH — active tenant
+│   │   ├── public/route.ts       # GET — public tenants for login page
+│   │   └── lookup/route.ts       # GET — tenant lookup by slug
+│   ├── sessions/
+│   │   └── current/route.ts      # PATCH — switch active tenant
 │   └── admin/
 │       ├── upload/route.ts       # POST — chunked upload handler
-│       ├── albums/route.ts       # CRUD album management
-│       ├── users/route.ts        # GET/POST user management
-│       ├── domains/route.ts      # GET/POST domain allowlist
+│       ├── albums/route.ts       # GET/POST/PATCH/DELETE album management
+│       ├── users/route.ts        # GET/POST/PATCH user management
+│       ├── users/set-password/route.ts  # POST — set user password
+│       ├── members/route.ts      # GET/POST/PATCH/DELETE member management
+│       ├── domains/route.ts      # GET/POST/DELETE domain allowlist
+│       ├── tenants/route.ts      # GET/POST/PATCH/DELETE tenant CRUD
+│       ├── stats/route.ts        # GET — dashboard aggregate metrics
 │       └── audit/route.ts        # GET audit logs + CSV export
 ├── components/
 │   ├── gallery/
 │   │   ├── AlbumGrid.tsx
 │   │   ├── AlbumCard.tsx
+│   │   ├── CreateAlbumCard.tsx   # Inline album creation from gallery
 │   │   ├── MediaGrid.tsx
 │   │   └── MediaThumbnail.tsx
 │   ├── lightbox/
@@ -152,13 +172,20 @@ Maintain this structure exactly. Do not reorganize without updating this file.
 │   │   └── CuiBanner.tsx         # CUI notice shown post-login
 │   └── admin/
 │       ├── UploadForm.tsx
-│       ├── AlbumManager.tsx
-│       ├── UserManager.tsx
-│       └── AuditLogViewer.tsx
+│       ├── AlbumManager.tsx      # Edit, reorder, cover image, create, delete
+│       ├── UserManager.tsx       # Search, block, set password, promote/demote
+│       ├── MemberManager.tsx     # Add, remove, inline role change
+│       ├── DomainManager.tsx     # Add, deactivate email domains
+│       └── AuditLogViewer.tsx    # Filter by date/action/email/IP + CSV export
 ├── lib/
 │   ├── auth/
 │   │   ├── magic-link.ts         # Token generate / hash / validate
 │   │   ├── session.ts            # Session create / validate / expire
+│   │   ├── admin.ts              # canAccessAdmin — Cosmos flag + Entra ID fallback
+│   │   ├── permissions.ts        # isSuperAdmin, isTenantAdmin, isMediaContributor
+│   │   ├── base-url.ts           # getPublicBaseUrl — derive public URL for redirects
+│   │   ├── tenant.ts             # getUserTenantIds, getTenantById
+│   │   ├── password.ts           # PBKDF2-SHA256 hash + verify
 │   │   └── domain-check.ts       # Cosmos DB domain allowlist lookup
 │   ├── azure/
 │   │   ├── keyvault.ts           # Secret client, secret loader
@@ -167,9 +194,12 @@ Maintain this structure exactly. Do not reorganize without updating this file.
 │   │   └── graph.ts              # Graph client for sending email
 │   └── audit/
 │       └── logger.ts             # Append-only audit log writer
-├── middleware.ts                  # Session gate for all protected routes
+├── proxy.ts                      # Session gate for all protected routes (Next.js 16)
 ├── types/
-│   └── index.ts                  # Shared TypeScript interfaces
+│   └── index.ts                  # Shared TypeScript interfaces + AuditAction enum
+├── scripts/
+│   ├── seed-dev.ts               # Seed dev data (admin user, tenant, etc.)
+│   └── setup-prod.ts             # Production setup wizard
 ├── infrastructure/
 │   └── bicep/                    # All Azure IaC (see infrastructure guide)
 ├── docs/
@@ -213,10 +243,25 @@ Maintain this structure exactly. Do not reorganize without updating this file.
 
 ### Admin Authentication
 
-- Admin routes (`/admin/*`, `/api/admin/*`) require the session user's email to belong to the Entra ID group `MediaGallery-Admins`
-- Check group membership by calling Microsoft Graph: `GET /v1.0/groups/{adminGroupId}/members` and verify the email is present
-- Cache this check for the duration of the session — do not call Graph on every admin request
-- The admin group object ID is loaded from Key Vault (`AdminGroupObjectId`)
+Admin access is resolved by `lib/auth/admin.ts` → `canAccessAdmin(email)`:
+
+1. **Cosmos DB `isPlatformAdmin` flag** — checked first. Allows seeded admins (e.g. `admin@admin.com`) to work without Entra ID.
+2. **Entra ID group membership** — fallback. Calls Microsoft Graph `GET /v1.0/groups/{adminGroupId}/members`.
+
+All admin pages and API routes must use `canAccessAdmin` or `isSuperAdmin` from `lib/auth/permissions.ts`. **Never** call `isAdminGroupMember` directly outside of `lib/auth/admin.ts`.
+
+**Permission tiers:**
+- `isSuperAdmin(email)` — platform-wide admin (Cosmos flag OR Entra group)
+- `isTenantAdmin(email, tenantId)` — super-admin OR membership role="admin" in that tenant
+- `isMediaContributor(email, tenantId)` — tenant admin OR role="contributor"
+
+### Multi-Tenant Architecture
+
+- Every album, media item, membership, and domain belongs to a `tenantId`
+- Sessions track `activeTenantId` and `tenantIds[]`
+- Middleware attaches `x-active-tenant-id` and `x-tenant-ids` headers to every request
+- Users switch tenants via `/select-tenant` → `PATCH /api/sessions/current`
+- `APP_BASE_URL` env var (plain, NOT `NEXT_PUBLIC_`) provides the canonical public URL at runtime. `NEXT_PUBLIC_*` vars are baked at Docker build time and cannot be overridden via App Service settings.
 
 ---
 
@@ -259,6 +304,8 @@ Maintain this structure exactly. Do not reorganize without updating this file.
   absoluteExpiresAt?: string; // 8-hour hard limit for sessions
   usedAt?: string;         // for magic links — set on first use
   ipAddress: string;
+  activeTenantId?: string; // current tenant context
+  tenantIds?: string[];    // all tenants user has access to
   ttl: number;             // Cosmos TTL in seconds — set to auto-expire records
 }
 ```
@@ -274,6 +321,39 @@ Maintain this structure exactly. Do not reorganize without updating this file.
   isBlocked: boolean;
   blockedAt?: string;
   blockedBy?: string;      // admin email
+  passwordHash?: string;   // PBKDF2-SHA256 — only when admin assigns a password
+  isPlatformAdmin?: boolean; // super-admin flag (bypasses Entra ID check)
+}
+```
+
+### `tenants` container — partition key: `/id`
+```typescript
+{
+  id: string;
+  name: string;
+  slug: string;            // URL-safe identifier, unique
+  isActive: boolean;
+  isPublic: boolean;       // appears in login page tenant selection
+  description?: string;
+  logoUrl?: string;
+  brandColor?: string;     // hex color, e.g. "#1e3a5f"
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+}
+```
+
+### `memberships` container — partition key: `/tenantId`
+```typescript
+{
+  id: string;
+  tenantId: string;        // partition key
+  userEmail: string;
+  role: "viewer" | "contributor" | "admin";
+  source: "domain" | "explicit";
+  addedAt: string;
+  addedBy: string;
+  isActive: boolean;
 }
 ```
 
@@ -281,7 +361,9 @@ Maintain this structure exactly. Do not reorganize without updating this file.
 ```typescript
 {
   id: string;
+  tenantId: string;        // which tenant owns this album
   name: string;
+  description?: string;
   coverMediaId?: string;
   order: number;
   createdAt: string;
@@ -295,12 +377,13 @@ Maintain this structure exactly. Do not reorganize without updating this file.
 {
   id: string;
   albumId: string;
+  tenantId: string;        // which tenant owns this media
   fileName: string;
   fileType: "image" | "video";
   mimeType: string;
   sizeBytes: number;
-  blobName: string;        // path in blob storage
-  thumbnailBlobName: string;
+  blobName: string;        // {tenantId}/{albumId}/{mediaId}.{ext}
+  thumbnailBlobName: string; // {tenantId}/{albumId}/{mediaId}_thumb.webp
   tags: string[];
   uploadedAt: string;
   uploadedBy: string;      // admin email
@@ -318,6 +401,7 @@ Maintain this structure exactly. Do not reorganize without updating this file.
   userEmail: string;
   ipAddress: string;
   action: AuditAction;     // enum — see types/index.ts
+  tenantId?: string;       // null for cross-tenant / platform actions
   detail: Record<string, unknown>;  // action-specific payload
   ttl: number;             // set for 90-day minimum retention
 }
@@ -328,6 +412,7 @@ Maintain this structure exactly. Do not reorganize without updating this file.
 {
   id: string;
   domain: string;          // e.g. "aleutfederal.com"
+  tenantId: string;        // which tenant this domain grants access to
   addedAt: string;
   addedBy: string;
   isActive: boolean;
@@ -404,42 +489,117 @@ This banner must not be dismissible. Style it in amber/yellow to be clearly visi
 
 ---
 
-## Open Items (Do Not Implement Until Confirmed)
+## Deployed Infrastructure Reference
 
-These are blockers that require client input. Build placeholder stubs only:
+> Source: `handoff-doc.md` — actual Azure resource names and configuration.
+> Resource names use "mymedia" prefix (not "mediagallery" from the build spec).
 
-- [ ] `AZURE_TENANT_ID` — needed for Graph and Entra ID auth
-- [ ] `GRAPH_CLIENT_ID` — MediaGallery-MailSender app registration
-- [ ] `ADMIN_GROUP_OBJECT_ID` — MediaGallery-Admins Entra group ID
-- [ ] `MAIL_SENDER_ADDRESS` — licensed GCC High Exchange mailbox
-- [ ] Customer logo and brand colors
-- [ ] Custom domain name
-- [ ] Soft-delete recovery window duration (default assumption: 30 days)
-- [ ] Max video upload size per file
+### Azure Environment
+
+| Item | Value |
+|---|---|
+| Cloud | Azure Government (`AzureUSGovernment`) |
+| Portal | `https://portal.azure.us` |
+| Subscription ID | `b2fba6de-c97e-42f2-b4f4-86cfa84a6de0` |
+| Tenant ID | `8b37dad1-f014-4751-907b-9c53d310a45f` |
+| Resource Group | `rg-mymedia-prod` |
+| Region | US Gov Virginia |
+
+### App Service
+
+| Item | Value |
+|---|---|
+| Name | `mymedia-app` |
+| Plan | `mymedia-plan` (P2V3 Linux) |
+| Runtime | Node 20 LTS |
+| Default Hostname | `mymedia-app.azurewebsites.us` |
+| Custom Domain | `mymedia.aleutfederal.us` |
+| Managed Identity ID | `8a768bb9-4f65-48c8-8366-e9309a875ab3` |
+
+**App Service environment variables:**
+
+| Name | Value |
+|---|---|
+| `AZURE_KEY_VAULT_URI` | `https://mymedia-kv.vault.usgovcloudapi.net/` |
+| `AZURE_CLOUD` | `AzureUSGovernment` |
+| `GRAPH_ENDPOINT` | `https://graph.microsoft.us` |
+| `GRAPH_TOKEN_ENDPOINT` | `https://login.microsoftonline.us` |
+| `APP_BASE_URL` | `https://mymedia.aleutfederal.us` |
+| `NODE_ENV` | `production` |
+| `WEBSITES_PORT` | `3000` |
+
+### Key Vault — `mymedia-kv`
+
+| Secret Name | Purpose |
+|---|---|
+| `GraphTenantId` | GCCH Entra ID tenant ID |
+| `GraphClientId` | MediaGallery-MailSender app registration |
+| `MailSenderAddress` | `noreply@aleutfederal.us` |
+| `SessionSigningSecret` | 64-byte base64 for session cookie signing |
+| `MagicLinkSigningSecret` | 64-byte base64 for magic link tokens |
+| `CosmosDbEndpoint` | Cosmos DB account URI |
+| `StorageAccountName` | `mymediastor` |
+| `AdminGroupObjectId` | MediaGallery-Admins Entra group object ID |
+
+### Blob Storage — `mymediastor`
+
+| Item | Value |
+|---|---|
+| URL | `https://mymediastor.blob.core.usgovcloudapi.net` |
+| Auth | Managed identity only (key access disabled) |
+| Containers | `media` (originals), `thumbnails` (webp thumbs) |
+
+### Cosmos DB — `mymedia-cosmos`
+
+| Item | Value |
+|---|---|
+| Endpoint | `https://mymedia-cosmos.documents.azure.us:443/` |
+| Database | `mymedia` |
+| Capacity | Serverless |
+| Auth | Managed identity (Data Contributor role) |
+| Containers | `sessions`, `users`, `albums`, `media`, `auditlogs`, `domains`, `tenants`, `memberships` |
+
+### Graph API — Email
+
+| Item | Value |
+|---|---|
+| App Registration | `MediaGallery-MailSender` |
+| Permission | `Mail.Send` (application, admin-consented) |
+| Sender | `noreply@aleutfederal.us` |
+| Certificate | `MailSenderCert` in Key Vault |
+| Restriction | Access policy scoped to sender mailbox only |
+
+### Networking
+
+| Item | Value |
+|---|---|
+| VNet | `mymedia-vnet` (`10.0.0.0/16`) |
+| App Gateway | `mymedia-appgw` (WAF V2, Prevention mode, OWASP 3.2) |
+| Public IP | `52.245.225.20` |
+| TLS | Self-signed placeholder — **must be replaced before go-live** |
+| App Service access | Restricted to App Gateway subnet only |
+
+### Monitoring
+
+| Item | Value |
+|---|---|
+| Log Analytics | `mymedia-logs` (90-day retention) |
+| Diagnostics on | Key Vault, Blob Storage, Cosmos DB, App Service, App Gateway |
 
 ---
 
-## Build Order
+## Open Items (Do Not Implement Until Confirmed)
 
-Follow this sequence. Do not skip ahead — each phase depends on the previous.
-
-1. **`lib/azure/keyvault.ts`** — secret loader that everything else depends on
-2. **`lib/azure/cosmos.ts`** — DB client and container helpers
-3. **`lib/azure/blob.ts`** — storage client and SAS generation
-4. **`lib/azure/graph.ts`** — Graph email client
-5. **`lib/audit/logger.ts`** — audit writer (depends on Cosmos)
-6. **`middleware.ts`** — route protection (depends on Cosmos session lookup)
-7. **`lib/auth/`** — magic link + session logic
-8. **`/api/auth/request-link`** and **`/api/auth/verify`** routes
-9. **`app/(auth)/login/page.tsx`** — login splash UI
-10. **`app/(gallery)/page.tsx`** and **`album/[id]/page.tsx`** — gallery UI
-11. **Components:** `AlbumGrid`, `MediaGrid`, `Lightbox`, `VideoPlayer`, `CuiBanner`
-12. **`/api/media/`** routes — SAS URL generation, single download
-13. **`/api/download/bulk`** — zip streaming
-14. **`app/admin/`** pages and **`/api/admin/`** routes
-15. **`infrastructure/bicep/`** — Bicep IaC for all resources
-16. **`README.md`** — deployment instructions
-17. **`SECURITY.md`** — threat model and compliance mapping
+- [x] `AZURE_TENANT_ID` — **resolved** in Key Vault as `GraphTenantId`
+- [x] `GRAPH_CLIENT_ID` — **resolved** in Key Vault as `GraphClientId`
+- [x] `ADMIN_GROUP_OBJECT_ID` — **resolved** in Key Vault as `AdminGroupObjectId`
+- [x] `MAIL_SENDER_ADDRESS` — **resolved**: `noreply@aleutfederal.us`
+- [x] Custom domain — **resolved**: `mymedia.aleutfederal.us` (set as `APP_BASE_URL`)
+- [ ] Replace self-signed TLS cert on App Gateway (requires IT/DNS admin)
+- [ ] Customer logo and brand colors (per-tenant branding supported via tenant settings)
+- [ ] Soft-delete recovery window duration (default assumption: 30 days)
+- [ ] Max video upload size per file
+- [ ] Rotate signing secrets on schedule (recommend 90-day rotation via Key Vault expiration)
 
 ---
 

@@ -135,6 +135,75 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 }
 
+// PATCH /api/admin/members?tenantId=<id> — change a member's role
+// Body: { email: string, role: MemberRole }
+export async function PATCH(request: NextRequest): Promise<NextResponse> {
+  const caller = await requireTenantAdmin(request);
+  if (!caller) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const ip = request.headers.get("x-client-ip") ?? "unknown";
+
+  let body: { email?: string; role?: MemberRole };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  }
+
+  const targetEmail = (body.email ?? "").toLowerCase().trim();
+  const newRole = body.role;
+
+  if (!targetEmail || !EMAIL_RE.test(targetEmail)) {
+    return NextResponse.json({ error: "Valid email is required" }, { status: 400 });
+  }
+
+  if (newRole !== "viewer" && newRole !== "contributor" && newRole !== "admin") {
+    return NextResponse.json({ error: "role must be 'viewer', 'contributor', or 'admin'" }, { status: 400 });
+  }
+
+  try {
+    const container = await memberships();
+    const { resources } = await container.items
+      .query<MembershipRecord>({
+        query:
+          "SELECT * FROM c WHERE c.tenantId = @tenantId AND c.userEmail = @email AND c.isActive = true",
+        parameters: [
+          { name: "@tenantId", value: caller.tenantId },
+          { name: "@email", value: targetEmail },
+        ],
+      })
+      .fetchAll();
+
+    if (resources.length === 0) {
+      return NextResponse.json({ error: "Member not found" }, { status: 404 });
+    }
+
+    const member = resources[0];
+    const oldRole = member.role;
+
+    if (oldRole === newRole) {
+      return NextResponse.json({ error: "Role is already " + newRole }, { status: 400 });
+    }
+
+    await container.item(member.id, member.id).patch([
+      { op: "replace", path: "/role", value: newRole },
+    ]);
+
+    await writeAuditLog({
+      userEmail: caller.email,
+      ipAddress: ip,
+      tenantId: caller.tenantId,
+      action: AuditAction.MEMBER_ROLE_CHANGED,
+      detail: { targetEmail, oldRole, newRole },
+    });
+
+    return NextResponse.json({ ...member, role: newRole });
+  } catch (err) {
+    console.error("[admin/members] PATCH error:", err);
+    return NextResponse.json({ error: "Failed to update member role" }, { status: 500 });
+  }
+}
+
 // DELETE /api/admin/members?tenantId=<id>&email=<email> — remove a member
 export async function DELETE(request: NextRequest): Promise<NextResponse> {
   const caller = await requireTenantAdmin(request);

@@ -79,6 +79,42 @@ export default function MemberManager({ initialMembers, tenantId }: Props) {
     );
   }
 
+  async function handleRoleChange(member: MembershipRecord, newRole: MemberRole) {
+    if (newRole === member.role) return;
+
+    // Optimistic update
+    setMembers((prev) =>
+      prev.map((m) => (m.id === member.id ? { ...m, role: newRole } : m))
+    );
+
+    try {
+      const res = await fetch(`/api/admin/members?tenantId=${tenantId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: member.userEmail, role: newRole }),
+      });
+
+      if (!res.ok) {
+        // Revert on failure
+        setMembers((prev) =>
+          prev.map((m) =>
+            m.id === member.id ? { ...m, role: member.role } : m
+          )
+        );
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "Failed to change role.");
+      }
+    } catch {
+      // Revert on network error
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.id === member.id ? { ...m, role: member.role } : m
+        )
+      );
+      alert("Network error.");
+    }
+  }
+
   const activeMembers = members.filter((m) => m.isActive);
 
   return (
@@ -113,7 +149,7 @@ export default function MemberManager({ initialMembers, tenantId }: Props) {
           disabled={adding}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm rounded transition-colors"
         >
-          {adding ? "Adding…" : "Add Member"}
+          {adding ? "Adding\u2026" : "Add Member"}
         </button>
         {error && <p className="w-full text-red-400 text-sm">{error}</p>}
       </form>
@@ -142,9 +178,17 @@ export default function MemberManager({ initialMembers, tenantId }: Props) {
               <tr key={m.id}>
                 <td className="py-3 text-white">{m.userEmail}</td>
                 <td className="py-3">
-                  <span className={`px-2 py-0.5 rounded text-xs ${ROLE_COLORS[m.role]}`}>
-                    {ROLE_LABELS[m.role]}
-                  </span>
+                  <select
+                    value={m.role}
+                    onChange={(e) =>
+                      handleRoleChange(m, e.target.value as MemberRole)
+                    }
+                    className={`px-2 py-0.5 rounded text-xs border-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 ${ROLE_COLORS[m.role]}`}
+                  >
+                    <option value="viewer">Viewer</option>
+                    <option value="contributor">Media Contributor</option>
+                    <option value="admin">Admin</option>
+                  </select>
                 </td>
                 <td className="py-3 text-slate-400 capitalize">{m.source}</td>
                 <td className="py-3 text-slate-400">

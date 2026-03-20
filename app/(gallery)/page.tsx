@@ -1,7 +1,9 @@
 import { headers } from "next/headers";
 import Link from "next/link";
-import AlbumGrid from "@/components/gallery/AlbumGrid";
+import AlbumCard from "@/components/gallery/AlbumCard";
+import CreateAlbumCard from "@/components/gallery/CreateAlbumCard";
 import { canAccessAdmin } from "@/lib/auth/admin";
+import { isTenantAdmin } from "@/lib/auth/permissions";
 import { AlbumListItem, TenantPublicItem } from "@/types";
 
 export default async function GalleryHomePage() {
@@ -41,9 +43,12 @@ export default async function GalleryHomePage() {
     return res.json();
   }
 
-  const [albums, isAdmin, activeTenant, userTenants] = await Promise.all([
+  const activeTenantId = headerStore.get("x-active-tenant-id") ?? "";
+
+  const [albums, isAdmin, isTenantAdm, activeTenant, userTenants] = await Promise.all([
     getAlbums(),
     canAccessAdmin(email),
+    activeTenantId ? isTenantAdmin(email, activeTenantId) : Promise.resolve(false),
     getActiveTenant(),
     getUserTenants(),
   ]);
@@ -108,7 +113,24 @@ export default async function GalleryHomePage() {
       </header>
 
       <main className="flex-1 px-6 py-8 max-w-7xl mx-auto w-full">
-        <AlbumGrid albums={albums} />
+        {isTenantAdm && (
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-slate-400 text-sm">
+              {albums.length} {albums.length === 1 ? "album" : "albums"}
+            </p>
+          </div>
+        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {isTenantAdm && <CreateAlbumCard />}
+          {albums.map((album) => (
+            <AlbumCard key={album.id} album={album} />
+          ))}
+        </div>
+        {!isTenantAdm && albums.length === 0 && (
+          <div className="text-center py-24 text-slate-500">
+            <p className="text-lg">No albums available.</p>
+          </div>
+        )}
       </main>
     </div>
   );

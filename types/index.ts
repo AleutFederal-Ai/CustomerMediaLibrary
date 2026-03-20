@@ -171,6 +171,10 @@ export enum AuditAction {
   // Admin — memberships
   MEMBER_ADDED = "member_added",
   MEMBER_REMOVED = "member_removed",
+  MEMBER_ROLE_CHANGED = "member_role_changed",
+
+  // Admin — user management
+  USER_PROMOTED = "user_promoted",
 }
 
 // ============================================================

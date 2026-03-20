@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auditLogs } from "@/lib/azure/cosmos";
-import { isAdminGroupMember } from "@/lib/azure/graph";
+import { isSuperAdmin } from "@/lib/auth/permissions";
 import { AuditLogRecord } from "@/types";
 
 async function requireAdmin(request: NextRequest): Promise<boolean> {
   const email = request.headers.get("x-session-email");
   if (!email) return false;
-  return isAdminGroupMember(email);
+  return isSuperAdmin(email);
 }
 
-// GET /api/admin/audit?from=<ISO>&to=<ISO>&action=<action>&cursor=<token>&format=json|csv
+// GET /api/admin/audit?from=<ISO>&to=<ISO>&action=<action>&email=<email>&ip=<ip>&cursor=<token>&format=json|csv
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await requireAdmin(request))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -19,6 +19,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const from = searchParams.get("from");
   const to = searchParams.get("to");
   const action = searchParams.get("action");
+  const emailFilter = searchParams.get("email");
+  const ipFilter = searchParams.get("ip");
   const format = searchParams.get("format") ?? "json";
   const continuationToken = searchParams.get("cursor") ?? undefined;
 
@@ -40,7 +42,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     parameters.push({ name: "@action", value: action });
   }
 
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  if (emailFilter) {
+    conditions.push("CONTAINS(c.userEmail, @email)");
+    parameters.push({ name: "@email", value: emailFilter.toLowerCase() });
+  }
+
+  if (ipFilter) {
+    conditions.push("CONTAINS(c.ipAddress, @ip)");
+    parameters.push({ name: "@ip", value: ipFilter });
+  }
+
+  const where =
+    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
   const query = `SELECT * FROM c ${where} ORDER BY c.timestamp DESC`;
 
   try {
@@ -76,16 +89,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     });
   } catch (err) {
     console.error("[admin/audit] GET error:", err);
-    return NextResponse.json({ error: "Failed to load audit logs" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to load audit logs" },
+      { status: 500 }
+    );
   }
 }
 
 function buildCsv(records: AuditLogRecord[]): string {
-  const header = "timestamp,userEmail,ipAddress,action,detail\r\n";
+  const header = "timestamp,userEmail,ipAddress,action,tenantId,detail\r\n";
   const rows = records
     .map((r) => {
       const detail = JSON.stringify(r.detail).replace(/"/g, '""');
-      return `"${r.timestamp}","${r.userEmail}","${r.ipAddress}","${r.action}","${detail}"`;
+      return `"${r.timestamp}","${r.userEmail}","${r.ipAddress}","${r.action}","${r.tenantId ?? ""}","${detail}"`;
     })
     .join("\r\n");
   return header + rows;

@@ -2,29 +2,26 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { canAccessAdmin } from "@/lib/auth/admin";
-import { users } from "@/lib/azure/cosmos";
-import { UserRecord, TenantPublicItem } from "@/types";
-import UserManager from "@/components/admin/UserManager";
+import { domains } from "@/lib/azure/cosmos";
+import { DomainRecord, TenantPublicItem } from "@/types";
+import DomainManager from "@/components/admin/DomainManager";
 
-async function getRecentUsers(): Promise<{
-  items: UserRecord[];
-  cursor: string | null;
-}> {
-  const container = await users();
-  const iterator = container.items.query<UserRecord>(
-    { query: "SELECT * FROM c ORDER BY c.lastLoginAt DESC" },
-    { maxItemCount: 50 }
-  );
-  const page = await iterator.fetchNext();
-  return {
-    items: page.resources,
-    cursor: page.continuationToken ?? null,
-  };
+async function getDomains(tenantId: string): Promise<DomainRecord[]> {
+  const container = await domains();
+  const { resources } = await container.items
+    .query<DomainRecord>({
+      query:
+        "SELECT * FROM c WHERE c.tenantId = @tenantId ORDER BY c.addedAt DESC",
+      parameters: [{ name: "@tenantId", value: tenantId }],
+    })
+    .fetchAll();
+  return resources;
 }
 
-export default async function AdminUsersPage() {
+export default async function AdminDomainsPage() {
   const headerStore = await headers();
   const email = headerStore.get("x-session-email");
+  const tenantId = headerStore.get("x-active-tenant-id") ?? "";
   const host =
     headerStore.get("x-forwarded-host") ??
     headerStore.get("host") ??
@@ -35,8 +32,8 @@ export default async function AdminUsersPage() {
   const isAdmin = await canAccessAdmin(email);
   if (!isAdmin) redirect("/");
 
-  const [{ items: userList, cursor }, activeTenant] = await Promise.all([
-    getRecentUsers(),
+  const [domainList, activeTenant] = await Promise.all([
+    getDomains(tenantId),
     fetch(`${proto}://${host}/api/tenants/current`, {
       headers: { cookie: headerStore.get("cookie") ?? "" },
       cache: "no-store",
@@ -57,12 +54,12 @@ export default async function AdminUsersPage() {
           &larr; Admin
         </Link>
         <h1 className="text-white font-semibold">
-          Users{activeTenant ? ` \u2014 ${activeTenant.name}` : ""}
+          Domains{activeTenant ? ` \u2014 ${activeTenant.name}` : ""}
         </h1>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
-        <UserManager initialUsers={userList} initialCursor={cursor} />
+      <main className="max-w-4xl mx-auto px-6 py-8">
+        <DomainManager initialDomains={domainList} tenantId={tenantId} />
       </main>
     </div>
   );

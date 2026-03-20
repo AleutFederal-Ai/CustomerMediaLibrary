@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { isAdminGroupMember } from "@/lib/azure/graph";
+import { canAccessAdmin } from "@/lib/auth/admin";
 import { albums } from "@/lib/azure/cosmos";
 import { AlbumRecord } from "@/types";
 import UploadForm from "@/components/admin/UploadForm";
@@ -22,7 +22,7 @@ export default async function UploadPage() {
   const email = headerStore.get("x-session-email");
 
   if (!email) redirect("/login");
-  const isAdmin = await isAdminGroupMember(email);
+  const isAdmin = await canAccessAdmin(email);
   if (!isAdmin) redirect("/");
 
   const albumList = await getActiveAlbums();

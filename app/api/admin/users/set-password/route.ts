@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { users } from "@/lib/azure/cosmos";
 import { hashPassword } from "@/lib/auth/password";
 import { writeAuditLog } from "@/lib/audit/logger";
-import { isAdminGroupMember } from "@/lib/azure/graph";
+import { isSuperAdmin } from "@/lib/auth/permissions";
 import { AuditAction, UserRecord } from "@/types";
 
 async function requireAdmin(request: NextRequest): Promise<string | null> {
   const email = request.headers.get("x-session-email");
   if (!email) return null;
-  const isAdmin = await isAdminGroupMember(email);
+  const isAdmin = await isSuperAdmin(email);
   return isAdmin ? email : null;
 }
 

@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { isAdminGroupMember } from "@/lib/azure/graph";
+import { canAccessAdmin } from "@/lib/auth/admin";
 import { auditLogs } from "@/lib/azure/cosmos";
 import { AuditLogRecord } from "@/types";
 import AuditLogViewer from "@/components/admin/AuditLogViewer";
@@ -26,7 +26,7 @@ export default async function AuditLogsPage() {
   const email = headerStore.get("x-session-email");
 
   if (!email) redirect("/login");
-  const isAdmin = await isAdminGroupMember(email);
+  const isAdmin = await canAccessAdmin(email);
   if (!isAdmin) redirect("/");
 
   const { items, cursor } = await getRecentAuditLogs();
