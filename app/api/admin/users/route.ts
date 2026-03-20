@@ -195,14 +195,11 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     }
 
     const user = resources[0];
-    const wasPlatformAdmin = user.isPlatformAdmin === true;
-
-    if (wasPlatformAdmin === body.isPlatformAdmin) {
-      return NextResponse.json({ error: `User is already ${body.isPlatformAdmin ? "a platform admin" : "not a platform admin"}` }, { status: 400 });
-    }
-
+    // Use "add" instead of "replace" — "replace" fails if the property
+    // doesn't exist yet on the document (users created before this field).
+    // "add" creates or overwrites the property in both cases.
     await container.item(user.id, user.id).patch([
-      { op: "replace", path: "/isPlatformAdmin", value: body.isPlatformAdmin },
+      { op: "add", path: "/isPlatformAdmin", value: body.isPlatformAdmin },
     ]);
 
     await writeAuditLog({

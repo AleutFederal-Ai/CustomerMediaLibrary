@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { TenantPublicItem } from "@/types";
@@ -53,7 +53,46 @@ export default function AdminTenantSection({
   const router = useRouter();
   const [activeTenant, setActiveTenant] = useState(initialTenant);
   const [switching, setSwitching] = useState<string | null>(null);
-  const [showPicker, setShowPicker] = useState(false);
+  const [showPicker, setShowPicker] = useState(!initialTenant);
+
+  // If tenantSummaries is empty (stats didn't load), fetch user's tenants
+  const [fallbackTenants, setFallbackTenants] = useState<TenantPublicItem[]>(
+    []
+  );
+  useEffect(() => {
+    if (tenantSummaries.length === 0) {
+      fetch("/api/tenants")
+        .then((r) => (r.ok ? r.json() : []))
+        .then((data) =>
+          setFallbackTenants(Array.isArray(data) ? data : [])
+        )
+        .catch(() => {});
+    }
+  }, [tenantSummaries.length]);
+
+  // Build the list of tenants to show in the picker
+  // Prefer tenantSummaries (has stats), fall back to user's tenants
+  const pickerTenants: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    brandColor?: string;
+    logoUrl?: string;
+    isActive: boolean;
+    albumCount?: number;
+    mediaCount?: number;
+    memberCount?: number;
+  }> =
+    tenantSummaries.length > 0
+      ? tenantSummaries
+      : fallbackTenants.map((t) => ({
+          id: t.id,
+          name: t.name,
+          slug: t.slug,
+          brandColor: t.brandColor,
+          logoUrl: t.logoUrl,
+          isActive: true,
+        }));
 
   async function switchToTenant(tenantId: string) {
     setSwitching(tenantId);
@@ -64,21 +103,23 @@ export default function AdminTenantSection({
         body: JSON.stringify({ tenantId }),
       });
       if (res.ok) {
-        // Update local state to reflect the switch immediately
-        const summary = tenantSummaries.find((t) => t.id === tenantId);
-        if (summary) {
+        const match =
+          tenantSummaries.find((t) => t.id === tenantId) ??
+          fallbackTenants.find((t) => t.id === tenantId);
+        if (match) {
           setActiveTenant({
-            id: summary.id,
-            name: summary.name,
-            slug: summary.slug,
-            brandColor: summary.brandColor,
-            logoUrl: summary.logoUrl,
+            id: match.id,
+            name: match.name,
+            slug: match.slug,
+            brandColor: match.brandColor,
+            logoUrl: match.logoUrl,
           });
         }
         setShowPicker(false);
         router.refresh();
       } else {
-        alert("Failed to switch tenant.");
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "Failed to switch tenant.");
       }
     } catch {
       alert("Network error.");
@@ -104,7 +145,7 @@ export default function AdminTenantSection({
           className="flex items-center justify-between p-4 rounded-lg border-l-4"
           style={{
             borderLeftColor: brandColor,
-            backgroundColor: "rgb(30 41 59)", // bg-slate-800
+            backgroundColor: "rgb(30 41 59)",
           }}
         >
           <div className="flex items-center gap-3">
@@ -123,15 +164,13 @@ export default function AdminTenantSection({
               </div>
             )}
             <div>
-              <p className="text-white font-medium">
-                {activeTenant.name}
-              </p>
+              <p className="text-white font-medium">{activeTenant.name}</p>
               <p className="text-slate-400 text-xs">
-                Managing this organization's content, members, and domains
+                Managing this organization&apos;s content, members, and domains
               </p>
             </div>
           </div>
-          {tenantSummaries.length > 1 && (
+          {pickerTenants.length > 1 && (
             <button
               type="button"
               onClick={() => setShowPicker(!showPicker)}
@@ -151,33 +190,31 @@ export default function AdminTenantSection({
               No tenant selected
             </p>
             <p className="text-amber-300/70 text-xs mt-0.5">
-              Select a tenant below to manage its albums, members, and
-              domains. Tenant-specific actions are disabled until one is
-              selected.
+              Select a tenant below to manage its albums, members, and domains.
             </p>
           </div>
         </div>
       )}
 
       {/* ─── Tenant Picker (inline) ───────────────────────────────── */}
-      {(showPicker || !activeTenant) && tenantSummaries.length > 0 && (
+      {showPicker && pickerTenants.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {tenantSummaries
+          {pickerTenants
             .filter((t) => t.isActive)
             .map((t) => {
-              const isActive = activeTenant?.id === t.id;
+              const isCurrent = activeTenant?.id === t.id;
               return (
                 <button
                   key={t.id}
                   type="button"
                   onClick={() => {
-                    if (!isActive) switchToTenant(t.id);
+                    if (!isCurrent) switchToTenant(t.id);
                   }}
                   disabled={switching !== null}
                   className={`p-4 rounded-lg border text-left transition-all disabled:opacity-60 ${
-                    isActive
+                    isCurrent
                       ? "border-blue-500 bg-blue-900/20 ring-1 ring-blue-500/50"
-                      : "border-slate-700 bg-slate-800 hover:border-slate-500"
+                      : "border-slate-700 bg-slate-800 hover:border-slate-500 cursor-pointer"
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-2">
@@ -200,7 +237,7 @@ export default function AdminTenantSection({
                     <span className="text-white font-medium text-sm truncate">
                       {t.name}
                     </span>
-                    {isActive && (
+                    {isCurrent && (
                       <span className="text-xs px-1.5 py-0.5 bg-blue-900/50 text-blue-300 border border-blue-700 rounded ml-auto flex-shrink-0">
                         Active
                       </span>
@@ -209,25 +246,47 @@ export default function AdminTenantSection({
                       <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin ml-auto flex-shrink-0" />
                     )}
                   </div>
-                  <div className="grid grid-cols-3 gap-1 text-center text-xs">
-                    <div>
-                      <p className="text-white font-medium">{t.albumCount}</p>
-                      <p className="text-slate-500">Albums</p>
+                  {"albumCount" in t && (
+                    <div className="grid grid-cols-3 gap-1 text-center text-xs">
+                      <div>
+                        <p className="text-white font-medium">
+                          {t.albumCount}
+                        </p>
+                        <p className="text-slate-500">Albums</p>
+                      </div>
+                      <div>
+                        <p className="text-white font-medium">
+                          {t.mediaCount}
+                        </p>
+                        <p className="text-slate-500">Media</p>
+                      </div>
+                      <div>
+                        <p className="text-white font-medium">
+                          {t.memberCount}
+                        </p>
+                        <p className="text-slate-500">Members</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-white font-medium">{t.mediaCount}</p>
-                      <p className="text-slate-500">Media</p>
-                    </div>
-                    <div>
-                      <p className="text-white font-medium">
-                        {t.memberCount}
-                      </p>
-                      <p className="text-slate-500">Members</p>
-                    </div>
-                  </div>
+                  )}
                 </button>
               );
             })}
+        </div>
+      )}
+
+      {/* No tenants at all */}
+      {showPicker && pickerTenants.length === 0 && (
+        <div className="p-6 bg-slate-800 border border-slate-700 rounded-lg text-center">
+          <p className="text-slate-400 text-sm">
+            No organizations available. Create one from{" "}
+            <Link
+              href="/admin/tenants"
+              className="text-blue-400 hover:text-blue-300 underline"
+            >
+              Organizations
+            </Link>{" "}
+            first.
+          </p>
         </div>
       )}
 
