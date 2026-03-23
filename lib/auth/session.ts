@@ -146,35 +146,60 @@ export async function createSession(
  * Extends the idle timeout on each valid request.
  * Returns SessionContext on success, null on failure.
  */
+/**
+ * Result of session validation.
+ * - SessionContext: valid session
+ * - null: definitely invalid (no cookie, bad signature, expired, blocked)
+ * - "error": infrastructure failure (Cosmos/Key Vault) — caller should
+ *   return 503, NOT treat as unauthorized
+ */
 export async function validateSession(
   request: NextRequest
-): Promise<SessionContext | null> {
+): Promise<SessionContext | null | "error"> {
+  const cookieValue = request.cookies.get(COOKIE_NAME)?.value;
+  if (!cookieValue) return null;
+
+  let parsed: { sessionId: string; email: string } | null;
   try {
-    const cookieValue = request.cookies.get(COOKIE_NAME)?.value;
-    if (!cookieValue) return null;
+    parsed = await verifySignedCookie(cookieValue);
+  } catch {
+    // Key Vault failure during HMAC verification — infrastructure error
+    return "error";
+  }
+  if (!parsed) return null;
+  const { sessionId } = parsed;
 
-    const parsed = await verifySignedCookie(cookieValue);
-    if (!parsed) return null;
-    const { sessionId } = parsed;
+  let container;
+  try {
+    container = await sessions();
+  } catch {
+    return "error";
+  }
 
-    const container = await sessions();
-    const { resource: record } = await container
+  let record: SessionRecord | undefined;
+  try {
+    const result = await container
       .item(sessionId, sessionId)
       .read<SessionRecord>();
+    record = result.resource;
+  } catch {
+    return "error";
+  }
 
-    if (!record || record.type !== "session") return null;
+  if (!record || record.type !== "session") return null;
 
-    const now = new Date();
+  const now = new Date();
 
-    // Check idle timeout
-    if (now > new Date(record.expiresAt)) return null;
+  // Check idle timeout
+  if (now > new Date(record.expiresAt)) return null;
 
-    // Check absolute timeout
-    if (record.absoluteExpiresAt && now > new Date(record.absoluteExpiresAt)) {
-      return null;
-    }
+  // Check absolute timeout
+  if (record.absoluteExpiresAt && now > new Date(record.absoluteExpiresAt)) {
+    return null;
+  }
 
-    // Check if user is blocked
+  // Check if user is blocked
+  try {
     const usersContainer = await users();
     const { resources: blockedRecords } = await usersContainer.items
       .query({
@@ -185,8 +210,13 @@ export async function validateSession(
       .fetchAll();
 
     if (blockedRecords.length > 0) return null;
+  } catch {
+    // If we can't check blocked status, don't kill the session — fail open
+    // for availability. Blocked users will be caught on next successful check.
+  }
 
-    // Extend idle timeout
+  // Extend idle timeout (best-effort — don't fail the request if this errors)
+  try {
     const newIdleExpiry = new Date(
       now.getTime() + IDLE_TIMEOUT_MINUTES * 60 * 1000
     );
@@ -202,17 +232,17 @@ export async function validateSession(
         value: now.toISOString(),
       },
     ]);
-
-    return {
-      sessionId,
-      email: record.email,
-      isAdmin: false, // Admin check done separately (cached per session)
-      activeTenantId: record.activeTenantId ?? null,
-      tenantIds: record.tenantIds ?? [],
-    };
   } catch {
-    return null;
+    // Non-critical — session remains valid even if we can't extend it
   }
+
+  return {
+    sessionId,
+    email: record.email,
+    isAdmin: false, // Admin check done separately (cached per session)
+    activeTenantId: record.activeTenantId ?? null,
+    tenantIds: record.tenantIds ?? [],
+  };
 }
 
 /**

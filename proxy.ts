@@ -118,9 +118,32 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   const session = await validateSession(request);
 
+  if (session === "error") {
+    // Infrastructure failure (Cosmos/Key Vault) — NOT an auth problem.
+    // Return 503 so the client retries or shows a transient error.
+    // Never clear the cookie for infra failures.
+    if (pathname.startsWith("/api/")) {
+      return withSecurityHeaders(
+        NextResponse.json(
+          { error: "Service temporarily unavailable" },
+          { status: 503 }
+        ),
+        nonce
+      );
+    }
+    // For page navigations, show a simple retry page rather than
+    // redirecting to login and destroying the session.
+    return new NextResponse(
+      "<html><body style='font-family:sans-serif;text-align:center;padding:60px'>" +
+        "<h2>Temporarily unavailable</h2>" +
+        "<p>Please try refreshing the page in a few seconds.</p>" +
+        "</body></html>",
+      { status: 503, headers: { "Content-Type": "text/html", "Retry-After": "5" } }
+    );
+  }
+
   if (!session) {
-    // API routes: return 401 JSON so client-side fetch() gets a proper error
-    // instead of a redirect that silently clears the cookie.
+    // Session is genuinely invalid (no cookie, bad sig, expired, blocked).
     if (pathname.startsWith("/api/")) {
       return withSecurityHeaders(
         NextResponse.json({ error: "Unauthorized" }, { status: 401 }),

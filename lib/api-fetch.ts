@@ -1,18 +1,19 @@
 /**
  * Thin wrapper around fetch() for client-side API calls.
- * Handles 401 (session expired) globally so every component
- * doesn't need its own redirect-to-login logic.
+ *
+ * Returns the response as-is so callers handle errors via their
+ * existing `!res.ok` branches. Does NOT reload or redirect on 401 —
+ * a 401 from the proxy can be a transient infrastructure hiccup
+ * (Cosmos timeout, Key Vault cold start) rather than a truly expired
+ * session. Reloading would just hit the same flaky path again and
+ * clear the cookie on the page-level redirect, destroying the session.
+ *
+ * If the session is genuinely gone, the next page navigation will
+ * redirect to /login naturally via the proxy.
  */
 export async function apiFetch(
   input: RequestInfo | URL,
   init?: RequestInit
 ): Promise<Response> {
-  const res = await fetch(input, init);
-  if (res.status === 401) {
-    // Session expired — reload so the proxy redirects to /login
-    window.location.reload();
-    // Throw to prevent callers from processing the response
-    throw new Error("Session expired");
-  }
-  return res;
+  return fetch(input, init);
 }
