@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { canAccessAdmin } from "@/lib/auth/admin";
 import { tenants as tenantsContainer } from "@/lib/azure/cosmos";
 import { TenantRecord, TenantListItem } from "@/types";
 
@@ -8,24 +9,31 @@ import { TenantRecord, TenantListItem } from "@/types";
  * The user's tenant IDs come from the session (set at login by getUserTenantIds).
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  const email = request.headers.get("x-session-email") ?? "";
   const tenantIdsHeader = request.headers.get("x-tenant-ids") ?? "";
   const tenantIds = tenantIdsHeader
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
 
-  if (tenantIds.length === 0) {
-    return NextResponse.json([] as TenantListItem[]);
-  }
-
   try {
     const container = await tenantsContainer();
+    const isPlatformAdmin = email ? await canAccessAdmin(email) : false;
 
-    // Fetch all tenants whose IDs are in the user's list
+    if (!isPlatformAdmin && tenantIds.length === 0) {
+      return NextResponse.json([] as TenantListItem[]);
+    }
+
     const { resources } = await container.items
       .query<TenantRecord>({
-        query: `SELECT * FROM c WHERE c.id IN (${tenantIds.map((_, i) => `@t${i}`).join(", ")}) AND c.isActive = true ORDER BY c.name ASC`,
-        parameters: tenantIds.map((id, i) => ({ name: `@t${i}`, value: id })),
+        query: isPlatformAdmin
+          ? "SELECT * FROM c WHERE c.isActive = true ORDER BY c.name ASC"
+          : `SELECT * FROM c WHERE c.id IN (${tenantIds
+              .map((_, i) => `@t${i}`)
+              .join(", ")}) AND c.isActive = true ORDER BY c.name ASC`,
+        parameters: isPlatformAdmin
+          ? []
+          : tenantIds.map((id, i) => ({ name: `@t${i}`, value: id })),
       })
       .fetchAll();
 

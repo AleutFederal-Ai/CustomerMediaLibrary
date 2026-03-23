@@ -4,8 +4,7 @@ import GalleryAlbumWorkspace from "@/components/gallery/GalleryAlbumWorkspace";
 import TenantScopeRibbon from "@/components/gallery/TenantScopeRibbon";
 import { canAccessAdmin } from "@/lib/auth/admin";
 import { isTenantAdmin } from "@/lib/auth/permissions";
-import { tenants as tenantsContainer } from "@/lib/azure/cosmos";
-import { AlbumListItem, TenantPublicItem, TenantRecord } from "@/types";
+import { AlbumListItem, TenantPublicItem } from "@/types";
 import {
   AppShell,
   PageWidth,
@@ -20,10 +19,6 @@ export default async function GalleryHomePage() {
     headerStore.get("host") ??
     "localhost:3000";
   const proto = headerStore.get("x-forwarded-proto") ?? "http";
-  const tenantIds = (headerStore.get("x-tenant-ids") ?? "")
-    .split(",")
-    .filter(Boolean);
-
   const baseHeaders = { cookie: headerStore.get("cookie") ?? "" };
 
   async function getAlbums(): Promise<AlbumListItem[]> {
@@ -44,54 +39,13 @@ export default async function GalleryHomePage() {
     return res.json();
   }
 
-  async function getTenantOptions(
-    isPlatformAdmin: boolean
-  ): Promise<TenantPublicItem[]> {
-    try {
-      const container = await tenantsContainer();
-
-      if (isPlatformAdmin) {
-        const { resources } = await container.items
-          .query<TenantRecord>({
-            query: "SELECT * FROM c WHERE c.isActive = true ORDER BY c.name ASC",
-          })
-          .fetchAll();
-
-        return resources.map((tenant) => ({
-          id: tenant.id,
-          name: tenant.name,
-          slug: tenant.slug,
-          ...(tenant.description && { description: tenant.description }),
-          ...(tenant.logoUrl && { logoUrl: tenant.logoUrl }),
-          ...(tenant.brandColor && { brandColor: tenant.brandColor }),
-        }));
-      }
-
-      if (tenantIds.length <= 1) return [];
-
-      const { resources } = await container.items
-        .query<TenantRecord>({
-          query: `SELECT * FROM c WHERE c.id IN (${tenantIds
-            .map((_, index) => `@tenant${index}`)
-            .join(", ")}) AND c.isActive = true ORDER BY c.name ASC`,
-          parameters: tenantIds.map((tenantId, index) => ({
-            name: `@tenant${index}`,
-            value: tenantId,
-          })),
-        })
-        .fetchAll();
-
-      return resources.map((tenant) => ({
-        id: tenant.id,
-        name: tenant.name,
-        slug: tenant.slug,
-        ...(tenant.description && { description: tenant.description }),
-        ...(tenant.logoUrl && { logoUrl: tenant.logoUrl }),
-        ...(tenant.brandColor && { brandColor: tenant.brandColor }),
-      }));
-    } catch {
-      return [];
-    }
+  async function getTenantOptions(): Promise<TenantPublicItem[]> {
+    const res = await fetch(`${proto}://${host}/api/tenants`, {
+      headers: baseHeaders,
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    return res.json();
   }
 
   const activeTenantId = headerStore.get("x-active-tenant-id") ?? "";
@@ -104,7 +58,7 @@ export default async function GalleryHomePage() {
 
   const [isTenantAdm, userTenants] = await Promise.all([
     activeTenantId ? isTenantAdmin(email, activeTenantId) : Promise.resolve(false),
-    getTenantOptions(isPlatformAdmin),
+    getTenantOptions(),
   ]);
 
   const brandColor = activeTenant?.brandColor ?? "#174365";

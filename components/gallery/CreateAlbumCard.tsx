@@ -21,6 +21,11 @@ export default function CreateAlbumCard({ tenantId, onCreated }: Props) {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
+    if (!tenantId) {
+      setError("Select a tenant context before creating a collection.");
+      return;
+    }
+
     setSaving(true);
     setError("");
 

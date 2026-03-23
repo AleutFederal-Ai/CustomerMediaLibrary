@@ -3,7 +3,8 @@ import { v4 as uuidv4 } from "uuid";
 import { NextRequest, NextResponse } from "next/server";
 import { sessions, users } from "@/lib/azure/cosmos";
 import { getSecret } from "@/lib/azure/keyvault";
-import { getUserTenantIds } from "@/lib/auth/tenant";
+import { canAccessAdmin } from "@/lib/auth/admin";
+import { getTenantById, getUserTenantIds } from "@/lib/auth/tenant";
 import { SessionRecord, SessionContext } from "@/types";
 
 const COOKIE_NAME = "mg_session";
@@ -114,9 +115,21 @@ export async function createSession(
   const ttl = ABSOLUTE_TIMEOUT_HOURS * 60 * 60 + 3600;
 
   // Resolve all tenants the user belongs to
-  const tenantIds = await getUserTenantIds(email);
+  let tenantIds = await getUserTenantIds(email);
+  const isPlatformAdmin = await canAccessAdmin(email);
 
-  // Use the preferred tenant if the user is a member of it; otherwise first in list
+  if (
+    preferredTenantId &&
+    !tenantIds.includes(preferredTenantId) &&
+    isPlatformAdmin
+  ) {
+    const preferredTenant = await getTenantById(preferredTenantId);
+    if (preferredTenant) {
+      tenantIds = [...tenantIds, preferredTenantId];
+    }
+  }
+
+  // Use the preferred tenant whenever the session is allowed to operate in it.
   const activeTenantId =
     preferredTenantId && tenantIds.includes(preferredTenantId)
       ? preferredTenantId
@@ -285,6 +298,7 @@ export async function switchActiveTenant(
     const container = await sessions();
     await container.item(sessionId, sessionId).patch([
       { op: "replace", path: "/activeTenantId", value: tenantId },
+      { op: "replace", path: "/tenantIds", value: currentTenantIds },
     ]);
     return true;
   } catch {
