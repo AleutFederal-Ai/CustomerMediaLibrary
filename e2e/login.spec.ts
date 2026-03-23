@@ -1,6 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
-test("login page renders secure tenant entry flow", async ({ page }) => {
+async function stubLoginApis(page: Page) {
   await page.route("**/api/tenants/public", async (route) => {
     await route.fulfill({
       status: 200,
@@ -33,6 +33,10 @@ test("login page renders secure tenant entry flow", async ({ page }) => {
       }),
     });
   });
+}
+
+test("login page renders secure tenant entry flow", async ({ page }) => {
+  await stubLoginApis(page);
 
   await page.goto("/login");
 
@@ -40,7 +44,32 @@ test("login page renders secure tenant entry flow", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /myMedia Platform/i })).toBeVisible();
   await expect(page.getByRole("heading", { name: /Choose your organization/i })).toBeVisible();
   await expect(page.getByRole("button", { name: /Acme Mission Group/i })).toBeVisible();
-
-  await page.getByRole("button", { name: /Platform health/i }).click();
   await expect(page.getByText(/Cosmos DB/i)).toBeVisible();
+  await expect(page.getByText(/Authorized, monitored, and tenant-scoped access/i)).toBeVisible();
+});
+
+test("login page stays mobile-friendly without horizontal overflow", async ({
+  page,
+}) => {
+  await stubLoginApis(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  await page.goto("/login");
+
+  await expect(
+    page.getByRole("heading", {
+      name: /Controlled media access with tenant-safe sign-in/i,
+    })
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Choose your organization/i })).toBeVisible();
+  await expect(page.getByText(/Platform Health/i)).toBeVisible();
+  await expect(
+    page.getByText(/Authorized, monitored, and tenant-scoped access/i)
+  ).toBeVisible();
+
+  const hasHorizontalOverflow = await page.evaluate(() => {
+    return document.documentElement.scrollWidth > window.innerWidth;
+  });
+
+  expect(hasHorizontalOverflow).toBeFalsy();
 });
