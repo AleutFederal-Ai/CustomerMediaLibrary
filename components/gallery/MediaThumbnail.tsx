@@ -11,81 +11,99 @@ interface Props {
   onDelete?: (item: MediaListItem) => void;
 }
 
-export default function MediaThumbnail({ item, selected, onSelect, onClick, canContribute, onDelete }: Props) {
+export default function MediaThumbnail({
+  item,
+  selected,
+  onSelect,
+  onClick,
+  canContribute,
+  onDelete,
+}: Props) {
   return (
     <div
-      className={`relative group aspect-square rounded overflow-hidden bg-slate-800 cursor-pointer
-        ${selected ? "ring-2 ring-blue-500" : "hover:ring-2 hover:ring-slate-500"}`}
+      className={`group relative aspect-square overflow-hidden rounded-[1.2rem] border cursor-pointer ${
+        selected
+          ? "border-[rgba(105,211,255,0.46)] shadow-[0_0_0_3px_rgba(105,211,255,0.14)]"
+          : "border-[rgba(140,172,197,0.12)]"
+      }`}
       onClick={() => onClick?.(item)}
     >
-      {/* Thumbnail image */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={item.thumbnailUrl}
         alt={item.fileName}
-        className="w-full h-full object-cover"
+        className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
         loading="lazy"
       />
 
-      {/* Video overlay */}
-      {item.fileType === "video" && (
+      <div className="absolute inset-0 bg-gradient-to-t from-[#06101a] via-transparent to-transparent opacity-80" />
+
+      {item.fileType === "video" ? (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-10 h-10 rounded-full bg-black/60 flex items-center justify-center">
-            <svg
-              className="w-5 h-5 text-white ml-0.5"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
+          <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/14 bg-black/45 backdrop-blur">
+            <svg className="ml-0.5 h-5 w-5 text-white" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8 5v14l11-7z" />
             </svg>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Selection checkbox */}
-      {onSelect && (
+      {onSelect ? (
         <div
-          className="absolute top-2 left-2"
+          className="absolute left-3 top-3"
           onClick={(e) => {
             e.stopPropagation();
             onSelect(item.id, !selected);
           }}
         >
           <div
-            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors
-              ${selected
-                ? "bg-blue-600 border-blue-600"
-                : "bg-black/50 border-slate-400 opacity-0 group-hover:opacity-100"}`}
+            className={`flex h-6 w-6 items-center justify-center rounded-full border text-white ${
+              selected
+                ? "border-[rgba(105,211,255,0.46)] bg-[rgba(25,134,179,0.96)]"
+                : "border-white/30 bg-black/36 opacity-0 backdrop-blur group-hover:opacity-100"
+            }`}
           >
-            {selected && (
-              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+            {selected ? (
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={3}
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
-            )}
+            ) : null}
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Delete button — contributors and admins only */}
-      {canContribute && onDelete && (
+      {canContribute && onDelete ? (
         <button
           type="button"
           aria-label="Delete media"
-          className="absolute top-2 right-2 w-7 h-7 rounded bg-red-600/80 hover:bg-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-[rgba(101,29,29,0.78)] text-white opacity-0 backdrop-blur group-hover:opacity-100"
           onClick={(e) => {
             e.stopPropagation();
             onDelete(item);
           }}
         >
-          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </button>
-      )}
+      ) : null}
 
-      {/* Filename on hover */}
-      <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5 translate-y-full group-hover:translate-y-0 transition-transform">
-        <p className="text-white text-xs truncate">{item.fileName}</p>
+      <div className="absolute inset-x-0 bottom-0 translate-y-0 p-3">
+        <div className="rounded-2xl border border-white/8 bg-black/26 px-3 py-2 backdrop-blur">
+          <p className="truncate text-xs font-medium text-white">{item.fileName}</p>
+          <p className="mt-1 text-[0.7rem] uppercase tracking-[0.16em] text-[rgba(231,238,245,0.64)]">
+            {item.fileType}
+          </p>
+        </div>
       </div>
     </div>
   );

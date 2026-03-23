@@ -1,7 +1,7 @@
 # Developer Handoff Document
 ## Media Gallery — Azure GCCH Infrastructure
 
-> ⚠️ **Naming Note:** Resource names in this document reflect what was actually provisioned in Azure. Where the build specification references "mediagallery" naming conventions, the actual deployed resources use "mymedia" equivalents (e.g. `mymedia-cosmos` instead of `mediagallery-cosmos`). The dev team should use the names in this document, not those in the build spec.
+> ⚠️ **Naming Note:** Resource names in this document reflect what was actually provisioned in Azure. The deployed environment uses the `mymedia` naming convention consistently.
 
 ---
 
@@ -56,13 +56,13 @@
 | Secret Name | Description |
 |---|---|
 | `GraphTenantId` | GCCH Entra ID tenant ID |
-| `GraphClientId` | MediaGallery-MailSender app registration client ID |
+| `GraphClientId` | myMedia-MailSender app registration client ID |
 | `MailSenderAddress` | `noreply@aleutfederal.us` |
 | `SessionSigningSecret` | Random 64-byte base64 string for session cookie signing |
 | `MagicLinkSigningSecret` | Random 64-byte base64 string for magic link token signing |
 | `CosmosDbEndpoint` | Cosmos DB account URI |
 | `StorageAccountName` | `mymediastor` |
-| `AdminGroupObjectId` | MediaGallery-Admins Entra ID security group object ID |
+| `AdminGroupObjectId` | myMedia-Admins Entra ID security group object ID |
 
 ### How to Access Secrets at Runtime
 All secrets must be retrieved using `DefaultAzureCredential` from the `@azure/identity` package combined with `@azure/keyvault-secrets`. The app uses its managed identity — no connection strings or passwords in code or environment variables.
@@ -106,7 +106,7 @@ All media URLs served to users must be **short-lived SAS URLs generated server-s
 |---|---|
 | Account Name | `mymedia-cosmos` |
 | Endpoint URI | https://mymedia-cosmos.documents.azure.us:443/ |
-| Database Name | `mediagallery` |
+| Database Name | `mymedia` |
 | Capacity Mode | Serverless |
 | Authentication | Managed identity (Built-in Data Contributor role assigned) |
 
@@ -133,7 +133,7 @@ The following domains need to be seeded into the `domains` container on first de
 
 | Item | Value |
 |---|---|
-| App Registration Name | `MediaGallery-MailSender` |
+| App Registration Name | `myMedia-MailSender` |
 | Client ID | *(from Key Vault — `GraphClientId`)* |
 | Tenant ID | *(from Key Vault — `GraphTenantId`)* |
 | Graph Endpoint | `https://graph.microsoft.us` |
@@ -204,7 +204,7 @@ const client = Client.initWithMiddleware({
 
 | Item | Value |
 |---|---|
-| Admin Security Group | `MediaGallery-Admins` |
+| Admin Security Group | `myMedia-Admins` |
 | Admin Group Object ID | *(from Key Vault — `AdminGroupObjectId`)* |
 | Admin Authentication | Entra ID + MFA enforced at tenant level |
 

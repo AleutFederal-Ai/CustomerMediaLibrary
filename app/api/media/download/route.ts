@@ -11,6 +11,11 @@ import { MediaRecord, AuditAction } from "@/types";
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const email = request.headers.get("x-session-email") ?? "unknown";
   const ip = request.headers.get("x-client-ip") ?? "unknown";
+  const tenantId = request.headers.get("x-active-tenant-id") ?? "";
+
+  if (!tenantId) {
+    return NextResponse.json({ error: "No active tenant" }, { status: 403 });
+  }
 
   const id = request.nextUrl.searchParams.get("id");
   const albumId = request.nextUrl.searchParams.get("albumId");
@@ -28,7 +33,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       .item(id, id)
       .read<MediaRecord>();
 
-    if (!record || record.isDeleted) {
+    if (
+      !record ||
+      record.isDeleted ||
+      record.tenantId !== tenantId ||
+      record.albumId !== albumId
+    ) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
@@ -45,6 +55,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     await writeAuditLog({
       userEmail: email,
       ipAddress: ip,
+      tenantId,
       action: AuditAction.MEDIA_DOWNLOADED,
       detail: { mediaId: id, albumId, fileName: record.fileName },
     });

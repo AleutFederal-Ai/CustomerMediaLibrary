@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, FormEvent } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 
 interface Album {
@@ -18,7 +18,9 @@ export default function UploadForm({ albums, onSuccess }: Props) {
   const [tags, setTags] = useState("");
   const [files, setFiles] = useState<FileList | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(
+    null
+  );
   const [errors, setErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -68,27 +70,42 @@ export default function UploadForm({ albums, onSuccess }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-slate-300 mb-1">
-          Album
-        </label>
-        <select
-          value={albumId}
-          onChange={(e) => setAlbumId(e.target.value)}
-          required
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          {albums.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div>
+          <label className="mb-2 block text-sm font-medium text-white/86">
+            Album
+          </label>
+          <select
+            value={albumId}
+            onChange={(e) => setAlbumId(e.target.value)}
+            required
+            className="ops-select"
+          >
+            {albums.map((album) => (
+              <option key={album.id} value={album.id}>
+                {album.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium text-white/86">
+            Tags
+          </label>
+          <input
+            type="text"
+            value={tags}
+            onChange={(e) => setTags(e.target.value)}
+            placeholder="training, exercise-2024, bravo-team"
+            className="ops-input"
+          />
+        </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-slate-300 mb-1">
+      <div className="surface-card-soft rounded-[1.2rem] p-5">
+        <label className="mb-2 block text-sm font-medium text-white/86">
           Files
         </label>
         <input
@@ -98,62 +115,48 @@ export default function UploadForm({ albums, onSuccess }: Props) {
           accept="image/*,video/*"
           required
           onChange={(e) => setFiles(e.target.files)}
-          className="w-full text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:bg-slate-600 file:text-slate-200 file:text-sm hover:file:bg-slate-500"
+          className="w-full cursor-pointer text-sm text-[var(--text-muted)] file:mr-4 file:rounded-full file:border file:border-[rgba(105,211,255,0.22)] file:bg-[rgba(105,211,255,0.12)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#d8f7ff]"
         />
-        {files && files.length > 0 && (
-          <p className="text-slate-400 text-xs mt-1">
+        {files && files.length > 0 ? (
+          <p className="mt-3 text-sm text-[var(--text-muted)]">
             {files.length} file{files.length !== 1 ? "s" : ""} selected
           </p>
-        )}
+        ) : null}
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-slate-300 mb-1">
-          Tags{" "}
-          <span className="text-slate-500 font-normal">(comma-separated)</span>
-        </label>
-        <input
-          type="text"
-          value={tags}
-          onChange={(e) => setTags(e.target.value)}
-          placeholder="training, exercise-2024, bravo-team"
-          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-
-      {progress && (
-        <div>
-          <div className="flex justify-between text-xs text-slate-400 mb-1">
-            <span>Uploading…</span>
+      {progress ? (
+        <div className="surface-card-soft rounded-[1.2rem] p-5">
+          <div className="mb-3 flex items-center justify-between text-sm text-[var(--text-muted)]">
+            <span>Uploading files...</span>
             <span>
               {progress.done} / {progress.total}
             </span>
           </div>
-          <div className="w-full bg-slate-700 rounded-full h-2">
+          <div className="h-2.5 rounded-full bg-[rgba(7,18,28,0.82)]">
             <div
-              className="bg-blue-600 h-2 rounded-full transition-all"
+              className="h-2.5 rounded-full bg-[linear-gradient(90deg,var(--accent-strong),var(--accent))] transition-all"
               style={{
                 width: `${Math.round((progress.done / progress.total) * 100)}%`,
               }}
             />
           </div>
         </div>
-      )}
+      ) : null}
 
-      {errors.length > 0 && (
-        <ul className="text-red-400 text-sm space-y-1">
-          {errors.map((e, i) => (
-            <li key={i}>{e}</li>
+      {errors.length > 0 ? (
+        <ul className="ops-danger-panel rounded-[1.2rem] px-4 py-4 text-sm">
+          {errors.map((error, index) => (
+            <li key={index}>{error}</li>
           ))}
         </ul>
-      )}
+      ) : null}
 
       <button
         type="submit"
         disabled={uploading || !files || files.length === 0}
-        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded transition-colors text-sm font-medium"
+        className="ops-button"
       >
-        {uploading ? "Uploading…" : "Upload"}
+        {uploading ? "Uploading..." : "Upload Media"}
       </button>
     </form>
   );

@@ -53,7 +53,11 @@ export default function DomainManager({ initialDomains, tenantId }: Props) {
   }
 
   async function handleDeactivate(domain: DomainRecord) {
-    if (!confirm(`Deactivate domain "${domain.domain}"? Users from this domain will lose auto-access.`))
+    if (
+      !confirm(
+        `Deactivate domain "${domain.domain}"? Users from this domain will lose auto-access.`
+      )
+    )
       return;
 
     try {
@@ -80,104 +84,88 @@ export default function DomainManager({ initialDomains, tenantId }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Add domain form */}
-      <form onSubmit={handleAdd} className="flex flex-wrap gap-2 items-end">
-        <div className="flex-1 min-w-[220px]">
-          <label className="block text-slate-400 text-xs mb-1">
-            Email domain
-          </label>
-          <input
-            type="text"
-            value={newDomain}
-            onChange={(e) => setNewDomain(e.target.value)}
-            placeholder="example.com"
-            required
-            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+      <form onSubmit={handleAdd} className="surface-card-soft rounded-[1.25rem] p-5">
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-white/86">
+              Email domain
+            </label>
+            <input
+              type="text"
+              value={newDomain}
+              onChange={(e) => setNewDomain(e.target.value)}
+              placeholder="example.com"
+              required
+              className="ops-input"
+            />
+          </div>
+          <div className="flex items-end">
+            <button type="submit" disabled={adding} className="ops-button">
+              {adding ? "Adding..." : "Add Domain"}
+            </button>
+          </div>
         </div>
-        <button
-          type="submit"
-          disabled={adding}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm rounded transition-colors"
-        >
-          {adding ? "Adding\u2026" : "Add Domain"}
-        </button>
-        {error && <p className="w-full text-red-400 text-sm">{error}</p>}
+
+        <p className="mt-4 text-sm leading-7 text-[var(--text-muted)]">
+          Users whose email matches an active domain automatically gain viewer
+          access to this organization when they log in.
+        </p>
+
+        {error ? <p className="mt-3 text-sm text-[#ffb7b7]">{error}</p> : null}
       </form>
 
-      <p className="text-slate-500 text-xs">
-        Users with an email address matching an active domain will
-        automatically gain viewer access to this organization when they log
-        in.
-      </p>
-
-      {/* Active domains table */}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="ops-table text-sm">
           <thead>
-            <tr className="text-left text-slate-400 border-b border-slate-700">
-              <th className="pb-2 font-medium">Domain</th>
-              <th className="pb-2 font-medium">Added By</th>
-              <th className="pb-2 font-medium">Added</th>
-              <th className="pb-2 font-medium">Actions</th>
+            <tr>
+              <th>Domain</th>
+              <th>Added By</th>
+              <th>Added</th>
+              <th>Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800">
-            {activeDomains.map((d) => (
-              <tr key={d.id}>
-                <td className="py-3 text-white font-mono text-sm">
-                  {d.domain}
+          <tbody>
+            {activeDomains.map((domain) => (
+              <tr key={domain.id}>
+                <td className="ops-code text-white">{domain.domain}</td>
+                <td className="ops-muted">{domain.addedBy}</td>
+                <td className="ops-muted">
+                  {new Date(domain.addedAt).toLocaleDateString()}
                 </td>
-                <td className="py-3 text-slate-400">{d.addedBy}</td>
-                <td className="py-3 text-slate-400">
-                  {new Date(d.addedAt).toLocaleDateString()}
-                </td>
-                <td className="py-3">
+                <td>
                   <button
                     type="button"
-                    onClick={() => handleDeactivate(d)}
-                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                    onClick={() => handleDeactivate(domain)}
+                    className="ops-button-danger"
                   >
                     Deactivate
                   </button>
                 </td>
               </tr>
             ))}
-            {activeDomains.length === 0 && (
+            {activeDomains.length === 0 ? (
               <tr>
-                <td colSpan={4} className="py-8 text-center text-slate-500">
-                  No active domains. Add one above.
+                <td colSpan={4}>
+                  <div className="ops-empty">No active domains. Add one above.</div>
                 </td>
               </tr>
-            )}
+            ) : null}
           </tbody>
         </table>
       </div>
 
-      {/* Inactive domains */}
-      {inactiveDomains.length > 0 && (
-        <div>
-          <h3 className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-2">
-            Inactive Domains
-          </h3>
-          <div className="overflow-x-auto opacity-60">
-            <table className="w-full text-sm">
-              <tbody className="divide-y divide-slate-800">
-                {inactiveDomains.map((d) => (
-                  <tr key={d.id}>
-                    <td className="py-2 text-slate-400 font-mono text-sm">
-                      {d.domain}
-                    </td>
-                    <td className="py-2 text-slate-500 text-xs">
-                      Deactivated
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {inactiveDomains.length > 0 ? (
+        <div className="surface-card-soft rounded-[1.25rem] p-5">
+          <p className="hero-kicker">Inactive Domains</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {inactiveDomains.map((domain) => (
+              <span key={domain.id} className="chip ops-code">
+                {domain.domain}
+              </span>
+            ))}
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

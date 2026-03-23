@@ -14,7 +14,7 @@ export default function VideoPlayer({ src, mimeType, fileName }: Props) {
     <video
       controls
       playsInline
-      className="max-h-[80vh] max-w-full rounded"
+      className="max-h-[80vh] max-w-full rounded-[1.2rem] bg-black"
       aria-label={fileName}
     >
       <source src={src} type={mimeType} />

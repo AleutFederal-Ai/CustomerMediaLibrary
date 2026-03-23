@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlbumRecord, MediaListItem } from "@/types";
 import { apiFetch } from "@/lib/api-fetch";
 
@@ -24,12 +24,10 @@ function CoverPicker({
   const [error, setError] = useState("");
 
   // Fetch media for this album on mount
-  useState(() => {
+  useEffect(() => {
     (async () => {
       try {
-        const res = await apiFetch(
-          `/api/search?albumId=${albumId}&type=image&pageSize=50`
-        );
+        const res = await apiFetch(`/api/search?albumId=${albumId}&type=image`);
         if (res.ok) {
           const data = await res.json();
           setItems(data.items ?? data);
@@ -42,7 +40,7 @@ function CoverPicker({
         setLoading(false);
       }
     })();
-  });
+  }, [albumId]);
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">

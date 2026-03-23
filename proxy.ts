@@ -3,6 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateSession, SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import { getPublicBaseUrl } from "@/lib/auth/base-url";
 import crypto from "crypto";
+import {
+  logError,
+  logInfo,
+  logWarn,
+} from "@/lib/logging/structured";
 
 // In Docker dev mode, Next.js App Router does not automatically apply the
 // x-nonce to its own hydration scripts, so we relax to unsafe-inline.
@@ -58,7 +63,7 @@ function injectDevSession(response: NextResponse): NextResponse {
 const PUBLIC_PATHS = [
   "/login",
   "/select-tenant",
-  "/t/",                         // /t/[slug] — direct tenant landing pages
+  "/t",                          // /t/[slug] — direct tenant landing pages
   "/api/auth/request-link",
   "/api/auth/verify",
   "/api/auth/password",
@@ -80,19 +85,36 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   // Generate a per-request nonce for CSP. Forward it as x-nonce so Next.js
   // injects it into its own inline hydration scripts automatically.
   const nonce = crypto.randomBytes(16).toString("base64");
+  const requestId = crypto.randomUUID();
+  const start = Date.now();
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("x-request-id", requestId);
 
   function nextWithNonce() {
     return NextResponse.next({ request: { headers: requestHeaders } });
   }
+
+  logInfo("proxy.request.received", {
+    requestId,
+    method: request.method,
+    path: pathname,
+    queryKeys: Array.from(request.nextUrl.searchParams.keys()),
+  });
 
   // Dev bypass — only active when DOCKER_DEV=true
   if (process.env.DOCKER_DEV === "true") {
     const hasBypassCookie = request.cookies.get("dev_bypass")?.value === "1";
     const hasBypassHeader = request.headers.get("x-dev-bypass") === "1";
     if (hasBypassCookie || hasBypassHeader) {
-      return withSecurityHeaders(injectDevSession(nextWithNonce()), nonce);
+      const response = injectDevSession(nextWithNonce());
+      response.headers.set("x-request-id", requestId);
+      logWarn("proxy.request.dev_bypass", {
+        requestId,
+        path: pathname,
+        durationMs: Date.now() - start,
+      });
+      return withSecurityHeaders(response, nonce);
     }
   }
 
@@ -108,7 +130,14 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   // Allow public paths without authentication
   if (isPublicPath(pathname)) {
-    return withSecurityHeaders(nextWithNonce(), nonce);
+    const response = nextWithNonce();
+    response.headers.set("x-request-id", requestId);
+    logInfo("proxy.request.public", {
+      requestId,
+      path: pathname,
+      durationMs: Date.now() - start,
+    });
+    return withSecurityHeaders(response, nonce);
   }
 
   const ip =
@@ -123,6 +152,11 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     // Return 503 so the client retries or shows a transient error.
     // Never clear the cookie for infra failures.
     if (pathname.startsWith("/api/")) {
+      logError("proxy.session.validation_failed", {
+        requestId,
+        path: pathname,
+        durationMs: Date.now() - start,
+      });
       return withSecurityHeaders(
         NextResponse.json(
           { error: "Service temporarily unavailable" },
@@ -133,18 +167,25 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     }
     // For page navigations, show a simple retry page rather than
     // redirecting to login and destroying the session.
-    return new NextResponse(
+    const response = new NextResponse(
       "<html><body style='font-family:sans-serif;text-align:center;padding:60px'>" +
         "<h2>Temporarily unavailable</h2>" +
         "<p>Please try refreshing the page in a few seconds.</p>" +
         "</body></html>",
       { status: 503, headers: { "Content-Type": "text/html", "Retry-After": "5" } }
     );
+    response.headers.set("x-request-id", requestId);
+    return response;
   }
 
   if (!session) {
     // Session is genuinely invalid (no cookie, bad sig, expired, blocked).
     if (pathname.startsWith("/api/")) {
+      logWarn("proxy.request.unauthorized", {
+        requestId,
+        path: pathname,
+        durationMs: Date.now() - start,
+      });
       return withSecurityHeaders(
         NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
         nonce
@@ -154,6 +195,12 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     // Page navigations: redirect to login and clear stale cookie
     const response = NextResponse.redirect(new URL("/login", getPublicBaseUrl(request)));
     response.cookies.set(SESSION_COOKIE_NAME, "", { maxAge: 0, path: "/" });
+    response.headers.set("x-request-id", requestId);
+    logWarn("proxy.request.redirect_login", {
+      requestId,
+      path: pathname,
+      durationMs: Date.now() - start,
+    });
     return response;
   }
 
@@ -164,6 +211,17 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   response.headers.set("x-client-ip", ip);
   response.headers.set("x-active-tenant-id", session.activeTenantId ?? "");
   response.headers.set("x-tenant-ids", session.tenantIds.join(","));
+  response.headers.set("x-request-id", requestId);
+
+  logInfo("proxy.request.authorized", {
+    requestId,
+    path: pathname,
+    durationMs: Date.now() - start,
+    sessionId: session.sessionId,
+    userEmail: session.email,
+    tenantId: session.activeTenantId ?? null,
+    tenantCount: session.tenantIds.length,
+  });
 
   return withSecurityHeaders(response, nonce);
 }

@@ -9,18 +9,6 @@ interface Props {
   tenantId: string;
 }
 
-const ROLE_LABELS: Record<MemberRole, string> = {
-  viewer: "Viewer",
-  contributor: "Media Contributor",
-  admin: "Admin",
-};
-
-const ROLE_COLORS: Record<MemberRole, string> = {
-  viewer: "bg-slate-700 text-slate-300",
-  contributor: "bg-blue-900/50 text-blue-300",
-  admin: "bg-purple-900/50 text-purple-300",
-};
-
 export default function MemberManager({ initialMembers, tenantId }: Props) {
   const [members, setMembers] = useState(initialMembers);
   const [email, setEmail] = useState("");
@@ -66,7 +54,9 @@ export default function MemberManager({ initialMembers, tenantId }: Props) {
     if (!confirm(`Remove ${member.userEmail} from this tenant?`)) return;
 
     const res = await fetch(
-      `/api/admin/members?tenantId=${tenantId}&email=${encodeURIComponent(member.userEmail)}`,
+      `/api/admin/members?tenantId=${tenantId}&email=${encodeURIComponent(
+        member.userEmail
+      )}`,
       { method: "DELETE" }
     );
 
@@ -76,14 +66,13 @@ export default function MemberManager({ initialMembers, tenantId }: Props) {
     }
 
     setMembers((prev) =>
-      prev.map((m) => m.id === member.id ? { ...m, isActive: false } : m)
+      prev.map((m) => (m.id === member.id ? { ...m, isActive: false } : m))
     );
   }
 
   async function handleRoleChange(member: MembershipRecord, newRole: MemberRole) {
     if (newRole === member.role) return;
 
-    // Optimistic update
     setMembers((prev) =>
       prev.map((m) => (m.id === member.id ? { ...m, role: newRole } : m))
     );
@@ -96,21 +85,15 @@ export default function MemberManager({ initialMembers, tenantId }: Props) {
       });
 
       if (!res.ok) {
-        // Revert on failure
         setMembers((prev) =>
-          prev.map((m) =>
-            m.id === member.id ? { ...m, role: member.role } : m
-          )
+          prev.map((m) => (m.id === member.id ? { ...m, role: member.role } : m))
         );
         const data = await res.json().catch(() => ({}));
         alert(data.error ?? "Failed to change role.");
       }
     } catch {
-      // Revert on network error
       setMembers((prev) =>
-        prev.map((m) =>
-          m.id === member.id ? { ...m, role: member.role } : m
-        )
+        prev.map((m) => (m.id === member.id ? { ...m, role: member.role } : m))
       );
       alert("Network error.");
     }
@@ -120,99 +103,116 @@ export default function MemberManager({ initialMembers, tenantId }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Add member form */}
-      <form onSubmit={handleAdd} className="flex flex-wrap gap-2 items-end">
-        <div className="flex-1 min-w-[220px]">
-          <label className="block text-slate-400 text-xs mb-1">Email address</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="user@example.com"
-            required
-            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+      <form onSubmit={handleAdd} className="surface-card-soft rounded-[1.25rem] p-5">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_auto]">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-white/86">
+              Email address
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="user@example.com"
+              required
+              className="ops-input"
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-white/86">
+              Role
+            </label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as MemberRole)}
+              className="ops-select"
+            >
+              <option value="viewer">Viewer</option>
+              <option value="contributor">Media Contributor</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button type="submit" disabled={adding} className="ops-button">
+              {adding ? "Adding..." : "Add Member"}
+            </button>
+          </div>
         </div>
-        <div>
-          <label className="block text-slate-400 text-xs mb-1">Role</label>
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as MemberRole)}
-            className="px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="viewer">Viewer</option>
-            <option value="contributor">Media Contributor</option>
-            <option value="admin">Admin</option>
-          </select>
-        </div>
-        <button
-          type="submit"
-          disabled={adding}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm rounded transition-colors"
-        >
-          {adding ? "Adding\u2026" : "Add Member"}
-        </button>
-        {error && <p className="w-full text-red-400 text-sm">{error}</p>}
+
+        {error ? <p className="mt-3 text-sm text-[#ffb7b7]">{error}</p> : null}
       </form>
 
-      {/* Role legend */}
-      <div className="flex flex-wrap gap-3 text-xs text-slate-400">
-        <span><span className="font-medium text-slate-300">Viewer</span> — read-only gallery access</span>
-        <span><span className="font-medium text-blue-300">Media Contributor</span> — can upload, edit, and delete media within albums</span>
-        <span><span className="font-medium text-purple-300">Admin</span> — full access including albums, users, and audit logs</span>
+      <div className="grid gap-3 xl:grid-cols-3">
+        <div className="surface-card-soft rounded-[1.15rem] p-4">
+          <p className="hero-kicker">Viewer</p>
+          <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
+            Read-only access to published gallery content.
+          </p>
+        </div>
+        <div className="surface-card-soft rounded-[1.15rem] p-4">
+          <p className="hero-kicker">Media Contributor</p>
+          <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
+            Upload, edit, and delete media within tenant albums.
+          </p>
+        </div>
+        <div className="surface-card-soft rounded-[1.15rem] p-4">
+          <p className="hero-kicker">Admin</p>
+          <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
+            Full tenant administration across membership, domains, and albums.
+          </p>
+        </div>
       </div>
 
-      {/* Members table */}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="ops-table text-sm">
           <thead>
-            <tr className="text-left text-slate-400 border-b border-slate-700">
-              <th className="pb-2 font-medium">Email</th>
-              <th className="pb-2 font-medium">Role</th>
-              <th className="pb-2 font-medium">Source</th>
-              <th className="pb-2 font-medium">Added</th>
-              <th className="pb-2 font-medium">Actions</th>
+            <tr>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Source</th>
+              <th>Added</th>
+              <th>Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800">
-            {activeMembers.map((m) => (
-              <tr key={m.id}>
-                <td className="py-3 text-white">{m.userEmail}</td>
-                <td className="py-3">
+          <tbody>
+            {activeMembers.map((member) => (
+              <tr key={member.id}>
+                <td className="text-white">{member.userEmail}</td>
+                <td>
                   <select
-                    value={m.role}
+                    value={member.role}
                     onChange={(e) =>
-                      handleRoleChange(m, e.target.value as MemberRole)
+                      handleRoleChange(member, e.target.value as MemberRole)
                     }
-                    className={`px-2 py-0.5 rounded text-xs border-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 ${ROLE_COLORS[m.role]}`}
+                    className="ops-select max-w-[190px]"
                   >
                     <option value="viewer">Viewer</option>
                     <option value="contributor">Media Contributor</option>
                     <option value="admin">Admin</option>
                   </select>
                 </td>
-                <td className="py-3 text-slate-400 capitalize">{m.source}</td>
-                <td className="py-3 text-slate-400">
-                  {new Date(m.addedAt).toLocaleDateString()}
+                <td className="ops-muted capitalize">{member.source}</td>
+                <td className="ops-muted">
+                  {new Date(member.addedAt).toLocaleDateString()}
                 </td>
-                <td className="py-3">
+                <td>
                   <button
                     type="button"
-                    onClick={() => handleRemove(m)}
-                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                    onClick={() => handleRemove(member)}
+                    className="ops-button-danger"
                   >
                     Remove
                   </button>
                 </td>
               </tr>
             ))}
-            {activeMembers.length === 0 && (
+            {activeMembers.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-slate-500">
-                  No members yet. Add one above.
+                <td colSpan={5}>
+                  <div className="ops-empty">No members yet. Add one above.</div>
                 </td>
               </tr>
-            )}
+            ) : null}
           </tbody>
         </table>
       </div>

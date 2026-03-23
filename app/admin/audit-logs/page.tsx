@@ -1,10 +1,16 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { canAccessAdmin } from "@/lib/auth/admin";
 import { auditLogs } from "@/lib/azure/cosmos";
 import { AuditLogRecord } from "@/types";
 import AuditLogViewer from "@/components/admin/AuditLogViewer";
+import {
+  AppShell,
+  BackLink,
+  HeroSection,
+  PageWidth,
+  TopBar,
+} from "@/components/ui/AppFrame";
 
 async function getRecentAuditLogs(): Promise<{
   items: AuditLogRecord[];
@@ -32,17 +38,36 @@ export default async function AuditLogsPage() {
   const { items, cursor } = await getRecentAuditLogs();
 
   return (
-    <div className="min-h-screen bg-slate-900">
-      <header className="bg-slate-800 border-b border-slate-700 px-6 py-3 flex items-center gap-4">
-        <Link href="/admin" className="text-slate-400 hover:text-white text-sm transition-colors">
-          ← Admin
-        </Link>
-        <h1 className="text-white font-semibold">Audit Logs</h1>
-      </header>
+    <AppShell>
+      <TopBar>
+        <div className="flex items-center gap-3">
+          <BackLink href="/admin">Return to Admin</BackLink>
+          <div>
+            <p className="hero-kicker">Audit Timeline</p>
+            <p className="text-sm text-[var(--text-muted)]">
+              Cross-tenant activity and administrative events
+            </p>
+          </div>
+        </div>
+      </TopBar>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        <AuditLogViewer initialItems={items} initialCursor={cursor} />
-      </main>
-    </div>
+      <PageWidth className="space-y-6 py-8 sm:space-y-8 sm:py-10">
+        <HeroSection
+          eyebrow="Audit Logs"
+          title="Inspect operational history across the environment."
+          description="Filter on user, IP, date range, or action type to trace critical access and administrative events through the platform."
+          meta={
+            <span className="chip chip-accent">
+              Loaded Events
+              <strong>{items.length}</strong>
+            </span>
+          }
+        />
+
+        <div className="surface-card rounded-[1.5rem] p-5 sm:p-6">
+          <AuditLogViewer initialItems={items} initialCursor={cursor} />
+        </div>
+      </PageWidth>
+    </AppShell>
   );
 }

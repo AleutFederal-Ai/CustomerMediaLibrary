@@ -1,18 +1,31 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TenantPublicItem } from "@/types";
+import CuiBanner from "@/components/ui/CuiBanner";
 
-/**
- * /select-tenant
- *
- * Post-authentication tenant picker. Shown when a user has access to multiple
- * tenants and no preferred tenant was pre-selected at login time.
- *
- * Fetches the user's accessible tenants from /api/tenants (authenticated),
- * lets them choose one, then patches the session via /api/sessions/current.
- */
+function TenantBadge({ tenant }: { tenant: TenantPublicItem }) {
+  if (tenant.logoUrl) {
+    return (
+      <img
+        src={tenant.logoUrl}
+        alt={tenant.name}
+        className="h-10 w-10 rounded-2xl border border-white/10 bg-slate-950/40 object-contain p-2"
+      />
+    );
+  }
+
+  return (
+    <div
+      className="flex h-10 w-10 items-center justify-center rounded-2xl text-sm font-bold text-white"
+      style={{ backgroundColor: tenant.brandColor ?? "#1e3a5f" }}
+    >
+      {tenant.name.charAt(0).toUpperCase()}
+    </div>
+  );
+}
+
 export default function SelectTenantPage() {
   const router = useRouter();
   const [tenants, setTenants] = useState<TenantPublicItem[]>([]);
@@ -32,7 +45,6 @@ export default function SelectTenantPage() {
       .then((data) => {
         if (!data) return;
         setTenants(Array.isArray(data) ? data : []);
-        // If only one tenant, auto-select it
         if (Array.isArray(data) && data.length === 1) {
           selectTenant(data[0].id);
         } else {
@@ -43,7 +55,7 @@ export default function SelectTenantPage() {
         setError("Failed to load your organizations. Please try again.");
         setLoading(false);
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function selectTenant(tenantId: string) {
@@ -59,7 +71,10 @@ export default function SelectTenantPage() {
         router.push("/");
       } else {
         const data = await res.json().catch(() => ({}));
-        setError((data as { error?: string }).error ?? "Failed to select organization.");
+        setError(
+          (data as { error?: string }).error ??
+            "Failed to select organization."
+        );
         setSwitching(null);
       }
     } catch {
@@ -68,119 +83,117 @@ export default function SelectTenantPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="mb-8 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-900 mb-4">
-            <svg
-              className="w-8 h-8 text-blue-300"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-              />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-semibold text-white">Select Organization</h1>
-          <p className="text-slate-400 mt-1 text-sm">
-            You have access to multiple organizations. Choose one to continue.
-          </p>
-        </div>
+    <>
+      <CuiBanner />
 
-        {/* Tenant list */}
-        <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
-          {tenants.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="text-slate-400 text-sm">
-                Your account is not associated with any organization.
-                Contact your administrator.
-              </p>
-              <a
-                href="/api/auth/signout"
-                className="mt-4 inline-block text-blue-400 hover:text-blue-300 text-sm underline"
-              >
-                Sign out
-              </a>
+      <div className="app-shell flex min-h-[calc(100vh-44px)] items-center justify-center px-4 py-10">
+        <div className="surface-card w-full max-w-3xl rounded-[2rem] p-6 sm:p-8">
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
             </div>
           ) : (
-            <ul className="divide-y divide-slate-700">
-              {tenants.map((t) => (
-                <li key={t.id}>
-                  <button
-                    type="button"
-                    onClick={() => selectTenant(t.id)}
-                    disabled={switching !== null}
-                    className="w-full flex items-center gap-3 px-6 py-4 hover:bg-slate-700 transition-colors text-left group disabled:opacity-60"
-                  >
-                    {t.logoUrl ? (
-                      <img
-                        src={t.logoUrl}
-                        alt={t.name}
-                        className="w-9 h-9 rounded object-contain flex-shrink-0"
-                      />
-                    ) : (
-                      <div
-                        className="w-9 h-9 rounded flex items-center justify-center flex-shrink-0 text-white font-bold text-sm"
-                        style={{ backgroundColor: t.brandColor ?? "#1e3a5f" }}
-                      >
-                        {t.name.charAt(0).toUpperCase()}
+            <>
+              <div className="space-y-4">
+                <p className="hero-kicker">Tenant Switch</p>
+                <h1 className="hero-title max-w-3xl text-[clamp(1.8rem,4vw,2.8rem)]">
+                  Select the organization context for this session.
+                </h1>
+                <p className="hero-subtitle max-w-2xl">
+                  Your account has access to multiple organizations. Choose the
+                  tenant boundary you want to operate in before entering the
+                  media workspace.
+                </p>
+              </div>
+
+              <div className="mt-8 grid gap-4 sm:grid-cols-3">
+                <div className="metric-card">
+                  <p className="metric-label">Organizations</p>
+                  <p className="metric-value">{tenants.length}</p>
+                  <p className="metric-subtext">Available to this identity</p>
+                </div>
+                <div className="metric-card">
+                  <p className="metric-label">Routing</p>
+                  <p className="metric-value">Tenant Scoped</p>
+                  <p className="metric-subtext">Session target is updated before load</p>
+                </div>
+                <div className="metric-card">
+                  <p className="metric-label">Controls</p>
+                  <p className="metric-value">Audited</p>
+                  <p className="metric-subtext">Tenant switching is recorded in session history</p>
+                </div>
+              </div>
+
+              <div className="mt-8 space-y-3">
+                {tenants.length === 0 ? (
+                  <div className="ops-empty">
+                    <p className="text-lg font-semibold text-white">
+                      No organizations are currently assigned to this account.
+                    </p>
+                    <p className="mx-auto mt-2 max-w-xl text-sm">
+                      Contact a tenant or platform administrator if you expected
+                      access.
+                    </p>
+                    <a href="/api/auth/signout" className="ops-button-secondary mt-6 inline-flex">
+                      Sign Out
+                    </a>
+                  </div>
+                ) : (
+                  tenants.map((tenant) => (
+                    <button
+                      key={tenant.id}
+                      type="button"
+                      onClick={() => selectTenant(tenant.id)}
+                      disabled={switching !== null}
+                      className="surface-card-soft group flex w-full items-center gap-4 rounded-[1.2rem] p-4 text-left disabled:opacity-60"
+                    >
+                      <TenantBadge tenant={tenant} />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-base font-semibold tracking-[-0.02em] text-white">
+                          {tenant.name}
+                        </div>
+                        {tenant.description ? (
+                          <div className="mt-1 truncate text-xs text-[var(--text-muted)]">
+                            {tenant.description}
+                          </div>
+                        ) : null}
                       </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="text-white font-medium group-hover:text-blue-300 transition-colors truncate">
-                        {t.name}
-                      </div>
-                      {t.description && (
-                        <div className="text-slate-400 text-xs truncate">{t.description}</div>
+                      {switching === tenant.id ? (
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+                      ) : (
+                        <svg
+                          className="h-4 w-4 flex-shrink-0 text-[var(--text-muted)]"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                          />
+                        </svg>
                       )}
-                    </div>
-                    {switching === t.id ? (
-                      <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
-                    ) : (
-                      <svg
-                        className="w-4 h-4 text-slate-500 group-hover:text-slate-300 flex-shrink-0"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    )}
-                  </button>
-                </li>
-              ))}
-            </ul>
+                    </button>
+                  ))
+                )}
+              </div>
+
+              {error ? (
+                <p className="mt-4 text-sm text-[#ffb7b7]">{error}</p>
+              ) : null}
+
+              <div className="mt-6">
+                <a href="/api/auth/signout" className="ops-button-ghost">
+                  Sign Out
+                </a>
+              </div>
+            </>
           )}
         </div>
-
-        {error && (
-          <p className="mt-4 text-red-400 text-sm text-center">{error}</p>
-        )}
-
-        <div className="mt-6 text-center">
-          <a
-            href="/api/auth/signout"
-            className="text-slate-500 hover:text-slate-400 text-sm"
-          >
-            Sign out
-          </a>
-        </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -3,16 +3,15 @@ export default function CuiBanner() {
     <div
       role="banner"
       aria-label="CUI classification notice"
-      className="w-full bg-amber-500 text-amber-950 px-4 py-2 text-center text-sm font-medium"
+      className="border-b border-[rgba(241,197,108,0.22)] bg-[linear-gradient(90deg,rgba(91,62,11,0.96),rgba(140,101,20,0.92),rgba(91,62,11,0.96))] px-4 py-2.5 text-center text-[0.76rem] font-semibold uppercase tracking-[0.18em] text-[#fff2c5]"
     >
-      <span className="font-bold">
-        &#9888; CONTROLLED UNCLASSIFIED INFORMATION (CUI)
+      <span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full border border-black/18 bg-black/12 text-[0.65rem]">
+        !
       </span>
-      <span className="hidden sm:inline">
-        {" — "}
-        This system may contain Controlled Unclassified Information. Handle in
-        accordance with applicable laws, regulations, and organizational
-        policies. Unauthorized disclosure is prohibited.
+      Controlled Unclassified Information
+      <span className="hidden text-[0.68rem] tracking-[0.14em] text-[#ffe9ab] sm:inline">
+        {" "}
+        - Handle in accordance with applicable laws, regulations, and organizational policy.
       </span>
     </div>
   );

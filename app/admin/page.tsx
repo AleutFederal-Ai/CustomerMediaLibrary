@@ -2,8 +2,18 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { canAccessAdmin } from "@/lib/auth/admin";
+import { isTenantAdmin } from "@/lib/auth/permissions";
 import { TenantPublicItem, AuditLogRecord } from "@/types";
 import AdminTenantSection from "./AdminTenantSection";
+import {
+  AppShell,
+  BackLink,
+  HeroSection,
+  Metric,
+  PageWidth,
+  SectionHeader,
+  TopBar,
+} from "@/components/ui/AppFrame";
 
 interface TenantSummary {
   id: string;
@@ -52,6 +62,7 @@ function formatAction(action: string): string {
 export default async function AdminDashboard() {
   const headerStore = await headers();
   const email = headerStore.get("x-session-email");
+  const activeTenantId = headerStore.get("x-active-tenant-id") ?? "";
   const host =
     headerStore.get("x-forwarded-host") ??
     headerStore.get("host") ??
@@ -60,180 +71,219 @@ export default async function AdminDashboard() {
 
   if (!email) redirect("/login");
 
-  const [isAdmin, activeTenant, stats] = await Promise.all([
+  const [isPlatformAdmin, isTenantAdm] = await Promise.all([
     canAccessAdmin(email),
+    activeTenantId ? isTenantAdmin(email, activeTenantId) : Promise.resolve(false),
+  ]);
+
+  if (!isPlatformAdmin && !isTenantAdm) redirect("/");
+
+  const [activeTenant, stats] = await Promise.all([
     fetch(`${proto}://${host}/api/tenants/current`, {
       headers: { cookie: headerStore.get("cookie") ?? "" },
       cache: "no-store",
     })
       .then((r) => (r.ok ? (r.json() as Promise<TenantPublicItem>) : null))
       .catch(() => null),
-    fetch(`${proto}://${host}/api/admin/stats`, {
-      headers: { cookie: headerStore.get("cookie") ?? "" },
-      cache: "no-store",
-    })
-      .then((r) => (r.ok ? (r.json() as Promise<StatsResponse>) : null))
-      .catch(() => null),
+    isPlatformAdmin
+      ? fetch(`${proto}://${host}/api/admin/stats`, {
+          headers: { cookie: headerStore.get("cookie") ?? "" },
+          cache: "no-store",
+        })
+          .then((r) => (r.ok ? (r.json() as Promise<StatsResponse>) : null))
+          .catch(() => null)
+      : Promise.resolve(null),
   ]);
 
-  if (!isAdmin) redirect("/");
-
   return (
-    <div className="min-h-screen bg-slate-900">
-      <header className="bg-slate-800 border-b border-slate-700 px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/"
-            className="text-slate-400 hover:text-white text-sm transition-colors"
-          >
-            &larr; Gallery
-          </Link>
-          <h1 className="text-white font-semibold">Admin Console</h1>
-        </div>
+    <AppShell>
+      <TopBar accentColor={activeTenant?.brandColor}>
         <div className="flex items-center gap-3">
-          <span className="text-slate-400 text-sm">{email}</span>
+          <BackLink href="/">Return to Gallery</BackLink>
+          <div>
+            <p className="hero-kicker">Administrative Control Plane</p>
+            <p className="text-sm text-[var(--text-muted)]">
+              {email}
+            </p>
+          </div>
         </div>
-      </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-8 space-y-10">
-        {/* ═══════════════════════════════════════════════════════════
-            PLATFORM ADMINISTRATION (top)
-            ═══════════════════════════════════════════════════════════ */}
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          {isPlatformAdmin ? (
+            <span className="chip chip-accent">Platform Administrator</span>
+          ) : null}
+          {isTenantAdm && !isPlatformAdmin ? (
+            <span className="chip">Tenant Administrator</span>
+          ) : null}
+        </div>
+      </TopBar>
 
-        {/* ─── KPI Row ────────────────────────────────────────────── */}
-        {stats && (
-          <section>
-            <h2 className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-3">
-              Platform Overview
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <PageWidth className="space-y-8 py-8 sm:space-y-10 sm:py-10">
+        <HeroSection
+          eyebrow="Operations Dashboard"
+          title="Secure media administration at tenant and platform scale."
+          description="Monitor tenant posture, review recent activity, and move directly into the administrative workflows that keep media delivery governed and auditable."
+          meta={
+            <>
+              <span className="chip chip-accent">
+                Active Scope
+                <strong>{activeTenant?.name ?? "Platform"}</strong>
+              </span>
+              <span className="chip">
+                Role
+                <strong>{isPlatformAdmin ? "Platform" : "Tenant"}</strong>
+              </span>
+            </>
+          }
+          actions={
+            <>
+              <Link href="/admin/upload" className="ops-button">
+                Upload Media
+              </Link>
+              <Link href="/admin/albums" className="ops-button-secondary">
+                Manage Albums
+              </Link>
+            </>
+          }
+        />
+
+        {stats ? (
+          <section className="space-y-5">
+            <SectionHeader
+              eyebrow="Platform Overview"
+              title="Operational visibility across the environment"
+              description="Cross-tenant totals provide a quick signal on platform growth, active usage, and current storage posture."
+            />
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+              <Metric
+                label="Tenants"
+                value={stats.totals.activeTenants}
+                subtext={`${stats.totals.tenants} total organizations`}
+              />
+              <Metric label="Users" value={stats.totals.users} />
+              <Metric label="Media Files" value={stats.totals.media} />
+              <Metric
+                label="Storage"
+                value={
+                  stats.totals.storageMB >= 1024
+                    ? `${(stats.totals.storageMB / 1024).toFixed(1)} GB`
+                    : `${stats.totals.storageMB} MB`
+                }
+              />
+              <Metric
+                label="Active Sessions"
+                value={stats.totals.activeSessions}
+              />
+              <Metric label="Albums" value={stats.totals.albums} />
+            </div>
+          </section>
+        ) : null}
+
+        {isPlatformAdmin ? (
+          <section className="space-y-5">
+            <SectionHeader
+              eyebrow="Platform Administration"
+              title="High-impact control surfaces"
+              description="These workflows affect the full environment, including user control, tenant creation, and global audit visibility."
+            />
+            <div className="grid gap-4 lg:grid-cols-3">
               {[
                 {
-                  label: "Tenants",
-                  value: stats.totals.activeTenants,
-                  sub: `${stats.totals.tenants} total`,
-                },
-                { label: "Users", value: stats.totals.users },
-                { label: "Media Files", value: stats.totals.media },
-                {
-                  label: "Storage",
-                  value:
-                    stats.totals.storageMB >= 1024
-                      ? `${(stats.totals.storageMB / 1024).toFixed(1)} GB`
-                      : `${stats.totals.storageMB} MB`,
+                  href: "/admin/tenants",
+                  label: "Organizations",
+                  description:
+                    "Create, activate, and configure tenant identity and branding.",
                 },
                 {
-                  label: "Active Sessions",
-                  value: stats.totals.activeSessions,
+                  href: "/admin/users",
+                  label: "User Control",
+                  description:
+                    "Review access posture, set passwords, block accounts, and promote platform admins.",
                 },
-                { label: "Albums", value: stats.totals.albums },
-              ].map((kpi) => (
-                <div
-                  key={kpi.label}
-                  className="p-4 bg-slate-800 border border-slate-700 rounded-lg"
+              {
+                href: "/admin/audit-logs",
+                label: "Audit Timeline",
+                description:
+                  "Inspect cross-tenant activity, exports, and administrative events.",
+              },
+              {
+                href: "/admin/api-health",
+                label: "API Health",
+                description:
+                  "Run dependency checks, smoke probes, and manual API validation.",
+              },
+            ].map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="surface-card-soft rounded-[1.3rem] p-5"
                 >
-                  <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">
-                    {kpi.label}
+                  <p className="hero-kicker">{item.label}</p>
+                  <h3 className="mt-3 text-xl font-semibold tracking-[-0.03em] text-white">
+                    {item.label}
+                  </h3>
+                  <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
+                    {item.description}
                   </p>
-                  <p className="text-white text-2xl font-semibold mt-1">
-                    {kpi.value}
-                  </p>
-                  {kpi.sub && (
-                    <p className="text-slate-500 text-xs mt-0.5">{kpi.sub}</p>
-                  )}
-                </div>
+                </Link>
               ))}
             </div>
           </section>
-        )}
+        ) : null}
 
-        {/* ─── Platform Admin Links ───────────────────────────────── */}
-        <section>
-          <h2 className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-3">
-            Platform Administration
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {[
-              {
-                href: "/admin/tenants",
-                label: "Organizations",
-                description: "Create and manage tenant organizations",
-              },
-              {
-                href: "/admin/users",
-                label: "Manage Users",
-                description:
-                  "View users, block, set passwords, promote admins",
-              },
-              {
-                href: "/admin/audit-logs",
-                label: "Audit Logs",
-                description:
-                  "Review all system activity across all tenants",
-              },
-            ].map((s) => (
-              <Link
-                key={s.href}
-                href={s.href}
-                className="block p-4 bg-slate-800 border border-slate-700 rounded-lg hover:border-slate-500 transition-colors group"
-              >
-                <h3 className="text-white font-medium group-hover:text-blue-300 transition-colors text-sm">
-                  {s.label}
-                </h3>
-                <p className="text-slate-400 text-xs mt-1">{s.description}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
+        {isPlatformAdmin && stats && stats.recentActivity.length > 0 ? (
+          <section className="space-y-5">
+            <SectionHeader
+              eyebrow="Recent Activity"
+              title="Latest control-plane events"
+              description="Recent platform actions provide immediate situational awareness for operators working across tenants."
+              actions={
+                <Link href="/admin/audit-logs" className="ops-button-secondary">
+                  View Full Audit Log
+                </Link>
+              }
+            />
 
-        {/* ─── Recent Activity ────────────────────────────────────── */}
-        {stats && stats.recentActivity.length > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-slate-400 text-xs font-medium uppercase tracking-wider">
-                Recent Activity
-              </h2>
-              <Link
-                href="/admin/audit-logs"
-                className="text-blue-400 hover:text-blue-300 text-xs transition-colors"
-              >
-                View all &rarr;
-              </Link>
-            </div>
-            <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
-                <tbody className="divide-y divide-slate-700">
-                  {stats.recentActivity.map((log) => (
-                    <tr key={log.id}>
-                      <td className="px-4 py-2.5 text-slate-500 text-xs whitespace-nowrap w-24">
-                        {formatRelativeTime(log.timestamp)}
-                      </td>
-                      <td className="px-4 py-2.5 text-slate-300 text-xs">
-                        {log.userEmail}
-                      </td>
-                      <td className="px-4 py-2.5 text-white text-xs">
-                        {formatAction(log.action)}
-                      </td>
-                      <td className="px-4 py-2.5 text-slate-500 text-xs truncate max-w-[200px]">
-                        {log.ipAddress}
-                      </td>
+            <div className="surface-card rounded-[1.5rem] overflow-hidden p-5 sm:p-6">
+              <div className="overflow-x-auto">
+                <table className="ops-table text-sm">
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>User</th>
+                      <th>Action</th>
+                      <th>Source</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {stats.recentActivity.map((log) => (
+                      <tr key={log.id}>
+                        <td className="ops-muted whitespace-nowrap">
+                          {formatRelativeTime(log.timestamp)}
+                        </td>
+                        <td className="text-white">{log.userEmail}</td>
+                        <td>
+                          <span className="ops-badge ops-badge-info">
+                            {formatAction(log.action)}
+                          </span>
+                        </td>
+                        <td className="ops-code ops-muted max-w-[220px] truncate">
+                          {log.ipAddress}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </section>
-        )}
-
-        {/* ═══════════════════════════════════════════════════════════
-            TENANT ADMINISTRATION (bottom — with context switcher)
-            ═══════════════════════════════════════════════════════════ */}
+        ) : null}
 
         <AdminTenantSection
           activeTenant={activeTenant}
           tenantSummaries={stats?.tenantSummaries ?? []}
         />
-      </main>
-    </div>
+      </PageWidth>
+    </AppShell>
   );
 }

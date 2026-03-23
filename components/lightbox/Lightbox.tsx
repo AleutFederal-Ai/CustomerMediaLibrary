@@ -37,7 +37,6 @@ export default function Lightbox({
   hasPrev,
   hasNext,
 }: Props) {
-  // Keyboard navigation
   const handleKey = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -49,7 +48,6 @@ export default function Lightbox({
 
   useEffect(() => {
     document.addEventListener("keydown", handleKey);
-    // Prevent body scroll while lightbox open
     document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", handleKey);
@@ -58,9 +56,7 @@ export default function Lightbox({
   }, [handleKey]);
 
   const handleDownload = async () => {
-    const res = await apiFetch(
-      `/api/media/download?id=${item.id}&albumId=${item.albumId}`
-    );
+    const res = await apiFetch(`/api/media/download?id=${item.id}&albumId=${item.albumId}`);
     if (!res.ok) return;
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
@@ -73,95 +69,89 @@ export default function Lightbox({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col bg-black/95"
+      className="fixed inset-0 z-50 flex flex-col bg-[rgba(1,7,12,0.96)] backdrop-blur-xl"
       role="dialog"
       aria-modal="true"
       aria-label={item.fileName}
     >
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-3 bg-black/60 shrink-0">
-        <div className="text-white min-w-0">
-          <p className="font-medium truncate text-sm">{item.fileName}</p>
-          <p className="text-slate-400 text-xs">{formatBytes(item.sizeBytes)}</p>
-        </div>
-        <div className="flex items-center gap-2 ml-4">
-          <button
-            type="button"
-            onClick={handleDownload}
-            className="p-2 text-slate-400 hover:text-white transition-colors"
-            aria-label="Download"
-            title="Download"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white transition-colors"
-            aria-label="Close"
-            title="Close (Esc)"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+      <div className="border-b border-[rgba(140,172,197,0.14)] bg-[rgba(5,16,25,0.84)] px-4 py-4">
+        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="hero-kicker">Secure Viewer</p>
+            <p className="mt-2 truncate text-lg font-semibold tracking-[-0.03em] text-white">
+              {item.fileName}
+            </p>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              {item.fileType.toUpperCase()} - {formatBytes(item.sizeBytes)}
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button type="button" onClick={handleDownload} className="ops-button">
+              Download Asset
+            </button>
+            <button type="button" onClick={onClose} className="ops-button-secondary">
+              Close Viewer
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Media area */}
-      <div className="flex-1 flex items-center justify-center relative overflow-hidden">
-        {/* Prev button */}
-        {hasPrev && (
+      <div className="relative flex flex-1 items-center justify-center overflow-hidden px-4 py-6 sm:px-6">
+        {hasPrev ? (
           <button
             type="button"
             onClick={onPrev}
-            className="absolute left-3 p-2 text-slate-400 hover:text-white bg-black/40 hover:bg-black/70 rounded-full transition-colors z-10"
+            className="absolute left-4 z-10 flex h-12 w-12 items-center justify-center rounded-full border border-white/12 bg-black/35 text-white backdrop-blur"
             aria-label="Previous"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
             </svg>
           </button>
-        )}
+        ) : null}
 
-        {item.fileType === "image" ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={item.sasUrl}
-            alt={item.fileName}
-            className="max-h-full max-w-full object-contain"
-            draggable={false}
-          />
-        ) : (
-          <VideoPlayer
-            src={item.sasUrl}
-            mimeType={item.mimeType}
-            fileName={item.fileName}
-          />
-        )}
+        <div className="surface-card flex h-full max-h-full w-full items-center justify-center overflow-hidden rounded-[1.75rem] p-3 sm:p-5">
+          {item.fileType === "image" ? (
+            <img
+              src={item.sasUrl}
+              alt={item.fileName}
+              className="max-h-full max-w-full rounded-[1.2rem] object-contain"
+              draggable={false}
+            />
+          ) : (
+            <VideoPlayer
+              src={item.sasUrl}
+              mimeType={item.mimeType}
+              fileName={item.fileName}
+            />
+          )}
+        </div>
 
-        {/* Next button */}
-        {hasNext && (
+        {hasNext ? (
           <button
             type="button"
             onClick={onNext}
-            className="absolute right-3 p-2 text-slate-400 hover:text-white bg-black/40 hover:bg-black/70 rounded-full transition-colors z-10"
+            className="absolute right-4 z-10 flex h-12 w-12 items-center justify-center rounded-full border border-white/12 bg-black/35 text-white backdrop-blur"
             aria-label="Next"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
             </svg>
           </button>
-        )}
+        ) : null}
 
-        {/* Backdrop click to close */}
-        <div
-          className="absolute inset-0 -z-10"
-          onClick={onClose}
-          aria-hidden="true"
-        />
+        <div className="absolute inset-0 -z-10" onClick={onClose} aria-hidden="true" />
       </div>
     </div>
   );

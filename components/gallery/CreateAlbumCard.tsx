@@ -22,7 +22,10 @@ export default function CreateAlbumCard() {
       const res = await apiFetch("/api/admin/albums", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), description: description.trim() }),
+        body: JSON.stringify({
+          name: name.trim(),
+          description: description.trim(),
+        }),
       });
 
       if (res.ok) {
@@ -32,10 +35,10 @@ export default function CreateAlbumCard() {
         router.refresh();
       } else {
         const data = await res.json().catch(() => ({}));
-        setError(data.error ?? "Failed to create album");
+        setError(data.error ?? "Failed to create album.");
       }
     } catch {
-      setError("Network error");
+      setError("Network error.");
     } finally {
       setSaving(false);
     }
@@ -46,21 +49,33 @@ export default function CreateAlbumCard() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex flex-col items-center justify-center aspect-[4/3] rounded-lg border-2 border-dashed border-slate-600 hover:border-blue-500 bg-slate-800/50 hover:bg-slate-800 transition-colors group cursor-pointer"
+        className="group surface-card-soft flex aspect-[4/3] flex-col items-start justify-between rounded-[1.4rem] border border-dashed border-[rgba(105,211,255,0.26)] p-5 text-left"
       >
-        <span className="text-3xl text-slate-500 group-hover:text-blue-400 transition-colors">
+        <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[rgba(105,211,255,0.12)] text-2xl text-[#d2f5ff]">
           +
-        </span>
-        <span className="text-slate-400 group-hover:text-blue-300 text-sm mt-1 transition-colors">
-          Create Album
-        </span>
+        </div>
+        <div className="space-y-2">
+          <p className="hero-kicker">Create Collection</p>
+          <h2 className="text-2xl font-semibold tracking-[-0.04em] text-white">
+            Stand up a new album workspace
+          </h2>
+          <p className="text-sm leading-6 text-[rgba(231,238,245,0.72)]">
+            Define a collection, assign a description, and publish a new tenant
+            media surface.
+          </p>
+        </div>
       </button>
     );
   }
 
   return (
-    <div className="flex flex-col aspect-[4/3] rounded-lg border border-slate-600 bg-slate-800 p-4">
-      <form onSubmit={handleCreate} className="flex flex-col h-full gap-2">
+    <div className="surface-card flex aspect-[4/3] flex-col rounded-[1.4rem] p-5">
+      <form onSubmit={handleCreate} className="flex h-full flex-col gap-3">
+        <div className="space-y-2">
+          <p className="hero-kicker">New Collection</p>
+          <h2 className="section-title">Initialize album metadata</h2>
+        </div>
+
         <input
           type="text"
           value={name}
@@ -68,23 +83,25 @@ export default function CreateAlbumCard() {
           placeholder="Album name *"
           required
           autoFocus
-          className="px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="ops-input"
         />
         <input
           type="text"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Description (optional)"
-          className="px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+          placeholder="Mission, event, or delivery summary"
+          className="ops-input"
         />
-        {error && <p className="text-red-400 text-xs">{error}</p>}
-        <div className="flex gap-2 mt-auto">
+
+        {error ? <p className="text-sm text-[#ffb7b7]">{error}</p> : null}
+
+        <div className="mt-auto flex flex-col gap-3 sm:flex-row">
           <button
             type="submit"
             disabled={saving || !name.trim()}
-            className="flex-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm rounded transition-colors"
+            className="ops-button"
           >
-            {saving ? "Creating\u2026" : "Create"}
+            {saving ? "Creating..." : "Create Album"}
           </button>
           <button
             type="button"
@@ -92,7 +109,7 @@ export default function CreateAlbumCard() {
               setOpen(false);
               setError("");
             }}
-            className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm rounded transition-colors"
+            className="ops-button-secondary"
           >
             Cancel
           </button>

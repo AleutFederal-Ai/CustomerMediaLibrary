@@ -492,7 +492,7 @@ This banner must not be dismissible. Style it in amber/yellow to be clearly visi
 ## Deployed Infrastructure Reference
 
 > Source: `handoff-doc.md` — actual Azure resource names and configuration.
-> Resource names use "mymedia" prefix (not "mediagallery" from the build spec).
+> Resource names use the "mymedia" prefix consistently.
 
 ### Azure Environment
 
@@ -533,13 +533,13 @@ This banner must not be dismissible. Style it in amber/yellow to be clearly visi
 | Secret Name | Purpose |
 |---|---|
 | `GraphTenantId` | GCCH Entra ID tenant ID |
-| `GraphClientId` | MediaGallery-MailSender app registration |
+| `GraphClientId` | myMedia-MailSender app registration |
 | `MailSenderAddress` | `noreply@aleutfederal.us` |
 | `SessionSigningSecret` | 64-byte base64 for session cookie signing |
 | `MagicLinkSigningSecret` | 64-byte base64 for magic link tokens |
 | `CosmosDbEndpoint` | Cosmos DB account URI |
 | `StorageAccountName` | `mymediastor` |
-| `AdminGroupObjectId` | MediaGallery-Admins Entra group object ID |
+| `AdminGroupObjectId` | myMedia-Admins Entra group object ID |
 
 ### Blob Storage — `mymediastor`
 
@@ -563,7 +563,7 @@ This banner must not be dismissible. Style it in amber/yellow to be clearly visi
 
 | Item | Value |
 |---|---|
-| App Registration | `MediaGallery-MailSender` |
+| App Registration | `myMedia-MailSender` |
 | Permission | `Mail.Send` (application, admin-consented) |
 | Sender | `noreply@aleutfederal.us` |
 | Certificate | `MailSenderCert` in Key Vault |

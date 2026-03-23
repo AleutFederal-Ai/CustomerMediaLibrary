@@ -21,7 +21,7 @@ import { v4 as uuidv4 } from "uuid";
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const TARGET_EMAIL = "admin@admin.com";
-const DB_NAME = "mymedia";
+const DB_NAME = process.env.COSMOS_DB_NAME ?? "mymedia";
 const COSMOS_ENDPOINT = "https://mymedia-cosmos.documents.azure.us:443/";
 
 // ── Credential wrapper (same as cosmos.ts) ───────────────────────────────────
@@ -120,7 +120,7 @@ async function main() {
 ⚠  ADMIN ACCESS NOTE
    This user can log in via the Password tab.
    Admin routes (/admin/*) require the email to be a member
-   of the MediaGallery-Admins Entra ID group.
+   of the myMedia-Admins Entra ID group.
    admin@admin.com is not a real Entra account, so admin
    routes will be inaccessible unless you add a dev bypass
    (ask Claude to add one to lib/azure/graph.ts).

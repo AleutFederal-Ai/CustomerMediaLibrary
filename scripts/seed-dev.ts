@@ -21,7 +21,7 @@ const BLOB_CS =
   "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://localhost:10000/devstoreaccount1;";
 
 // Must match cosmos.ts DB_NAME
-const DB_NAME = "mymedia";
+const DB_NAME = process.env.COSMOS_DB_NAME ?? "mymedia";
 
 // Container definitions — name + partition key path
 const COSMOS_CONTAINERS = [

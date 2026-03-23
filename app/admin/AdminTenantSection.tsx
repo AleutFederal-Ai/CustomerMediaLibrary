@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { TenantPublicItem } from "@/types";
 import { apiFetch } from "@/lib/api-fetch";
+import { SectionHeader } from "@/components/ui/AppFrame";
 
 interface TenantSummary {
   id: string;
@@ -16,7 +17,6 @@ interface TenantSummary {
   albumCount: number;
   mediaCount: number;
   memberCount: number;
-  storageMB: number;
 }
 
 interface Props {
@@ -28,24 +28,58 @@ const TENANT_LINKS = [
   {
     href: "/admin/upload",
     label: "Upload Media",
-    description: "Add photos and videos to albums",
+    description: "Add photos and video to approved albums.",
   },
   {
     href: "/admin/albums",
     label: "Manage Albums",
-    description: "Create, edit, reorder, and delete albums",
+    description: "Create, order, rename, and retire media collections.",
   },
   {
     href: "/admin/members",
     label: "Manage Members",
-    description: "Assign viewer, contributor, or admin roles",
+    description: "Grant viewer, contributor, and admin permissions.",
   },
   {
     href: "/admin/domains",
     label: "Manage Domains",
-    description: "Control which email domains auto-grant access",
+    description: "Control email domain auto-access for this tenant.",
+  },
+  {
+    href: "/admin/api-health",
+    label: "API Health",
+    description: "Run tenant-scoped smoke tests and endpoint verification.",
   },
 ];
+
+function TenantIdentity({
+  name,
+  logoUrl,
+  brandColor,
+}: {
+  name: string;
+  logoUrl?: string;
+  brandColor?: string;
+}) {
+  if (logoUrl) {
+    return (
+      <img
+        src={logoUrl}
+        alt={name}
+        className="h-10 w-10 rounded-2xl border border-white/10 bg-slate-950/40 object-contain p-2"
+      />
+    );
+  }
+
+  return (
+    <div
+      className="flex h-10 w-10 items-center justify-center rounded-2xl text-sm font-bold text-white"
+      style={{ backgroundColor: brandColor ?? "#1e3a5f" }}
+    >
+      {name.charAt(0).toUpperCase()}
+    </div>
+  );
+}
 
 export default function AdminTenantSection({
   activeTenant: initialTenant,
@@ -54,24 +88,17 @@ export default function AdminTenantSection({
   const router = useRouter();
   const [activeTenant, setActiveTenant] = useState(initialTenant);
   const [switching, setSwitching] = useState<string | null>(null);
+  const [fallbackTenants, setFallbackTenants] = useState<TenantPublicItem[]>([]);
 
-  // If tenantSummaries is empty (stats didn't load), fetch user's tenants
-  const [fallbackTenants, setFallbackTenants] = useState<TenantPublicItem[]>(
-    []
-  );
   useEffect(() => {
     if (tenantSummaries.length === 0) {
       apiFetch("/api/tenants")
         .then((r) => (r.ok ? r.json() : []))
-        .then((data) =>
-          setFallbackTenants(Array.isArray(data) ? data : [])
-        )
+        .then((data) => setFallbackTenants(Array.isArray(data) ? data : []))
         .catch(() => {});
     }
   }, [tenantSummaries.length]);
 
-  // Build the list of tenants to show in the picker
-  // Prefer tenantSummaries (has stats), fall back to user's tenants
   const pickerTenants: Array<{
     id: string;
     name: string;
@@ -85,12 +112,12 @@ export default function AdminTenantSection({
   }> =
     tenantSummaries.length > 0
       ? tenantSummaries
-      : fallbackTenants.map((t) => ({
-          id: t.id,
-          name: t.name,
-          slug: t.slug,
-          brandColor: t.brandColor,
-          logoUrl: t.logoUrl,
+      : fallbackTenants.map((tenant) => ({
+          id: tenant.id,
+          name: tenant.name,
+          slug: tenant.slug,
+          brandColor: tenant.brandColor,
+          logoUrl: tenant.logoUrl,
           isActive: true,
         }));
 
@@ -102,6 +129,7 @@ export default function AdminTenantSection({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tenantId }),
       });
+
       if (res.ok) {
         const match =
           tenantSummaries.find((t) => t.id === tenantId) ??
@@ -127,107 +155,182 @@ export default function AdminTenantSection({
     }
   }
 
-  const brandColor = activeTenant?.brandColor ?? "#1e3a5f";
-  const activeTenants = pickerTenants.filter((t) => t.isActive);
+  const activeTenants = pickerTenants.filter((tenant) => tenant.isActive);
 
   return (
-    <section className="space-y-4">
-      {/* ─── Divider ──────────────────────────────────────────────── */}
-      <div className="border-t border-slate-700 pt-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-slate-400 text-xs font-medium uppercase tracking-wider">
-            Tenant Administration
-          </h2>
+    <section className="space-y-5">
+      <SectionHeader
+        eyebrow="Tenant Administration"
+        title="Operate within the current tenant boundary"
+        description="Switch organizations, review current tenant posture, and move directly into scoped content and access workflows."
+      />
 
-          {/* ─── Tenant Dropdown Selector ──────────────────────────── */}
-          {activeTenants.length > 0 ? (
-            <div className="flex items-center gap-3">
-              {switching && (
-                <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-              )}
-              {activeTenant && (
-                <div
-                  className="w-5 h-5 rounded flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
-                  style={{ backgroundColor: brandColor }}
-                >
-                  {activeTenant.name.charAt(0).toUpperCase()}
+      <div className="surface-card rounded-[1.5rem] p-5 sm:p-6">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)]">
+          <div className="space-y-5">
+            {activeTenant ? (
+              <div className="surface-card-soft rounded-[1.25rem] p-5">
+                <div className="flex items-center gap-4">
+                  <TenantIdentity
+                    name={activeTenant.name}
+                    logoUrl={activeTenant.logoUrl}
+                    brandColor={activeTenant.brandColor}
+                  />
+                  <div className="min-w-0">
+                    <p className="hero-kicker">Selected Tenant</p>
+                    <h3 className="mt-2 truncate text-xl font-semibold tracking-[-0.03em] text-white">
+                      {activeTenant.name}
+                    </h3>
+                    <p className="ops-code mt-1 text-sm text-[var(--text-muted)]">
+                      /t/{activeTenant.slug}
+                    </p>
+                  </div>
                 </div>
-              )}
-              <select
-                value={activeTenant?.id ?? ""}
-                onChange={(e) => {
-                  if (e.target.value) switchToTenant(e.target.value);
-                }}
-                disabled={switching !== null}
-                className="bg-slate-800 border border-slate-600 text-white text-sm rounded-md px-3 py-1.5 pr-8 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:opacity-60 cursor-pointer appearance-none"
-                style={{
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M3 5l3 3 3-3'/%3E%3C/svg%3E")`,
-                  backgroundRepeat: "no-repeat",
-                  backgroundPosition: "right 8px center",
-                }}
-              >
-                {!activeTenant && (
-                  <option value="" disabled>
-                    Select a tenant...
-                  </option>
-                )}
-                {activeTenants.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
+              </div>
+            ) : (
+              <div className="ops-warning-panel rounded-[1.2rem] px-4 py-4 text-sm">
+                Select a tenant from the control on the right to manage its
+                content, access, and upload workflows.
+              </div>
+            )}
+
+            {activeTenant ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {TENANT_LINKS.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="surface-card-soft rounded-[1.2rem] p-5"
+                  >
+                    <p className="hero-kicker">{item.label}</p>
+                    <h3 className="mt-3 text-lg font-semibold tracking-[-0.03em] text-white">
+                      {item.label}
+                    </h3>
+                    <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
+                      {item.description}
+                    </p>
+                  </Link>
                 ))}
-              </select>
-            </div>
-          ) : (
-            <Link
-              href="/admin/tenants"
-              className="text-blue-400 hover:text-blue-300 text-xs transition-colors"
-            >
-              Create organization &rarr;
-            </Link>
-          )}
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 opacity-50">
+                {TENANT_LINKS.map((item) => (
+                  <div
+                    key={item.href}
+                    className="surface-card-soft rounded-[1.2rem] p-5"
+                  >
+                    <p className="hero-kicker">{item.label}</p>
+                    <h3 className="mt-3 text-lg font-semibold tracking-[-0.03em] text-white">
+                      {item.label}
+                    </h3>
+                    <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
+                      {item.description}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="surface-card-soft rounded-[1.25rem] p-5">
+            <p className="hero-kicker">Tenant Selector</p>
+            <h3 className="mt-3 text-lg font-semibold tracking-[-0.03em] text-white">
+              Change active tenant
+            </h3>
+            <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
+              Changing the active tenant updates the administrative scope and the
+              gallery routes associated with your current session.
+            </p>
+
+            {activeTenants.length > 0 ? (
+              <div className="mt-5 space-y-4">
+                <select
+                  value={activeTenant?.id ?? ""}
+                  onChange={(e) => {
+                    if (e.target.value) switchToTenant(e.target.value);
+                  }}
+                  disabled={switching !== null}
+                  className="ops-select disabled:opacity-60"
+                >
+                  {!activeTenant ? (
+                    <option value="" disabled>
+                      Select a tenant...
+                    </option>
+                  ) : null}
+                  {activeTenants.map((tenant) => (
+                    <option key={tenant.id} value={tenant.id}>
+                      {tenant.name}
+                    </option>
+                  ))}
+                </select>
+
+                {switching ? (
+                  <span className="chip chip-accent">Switching tenant...</span>
+                ) : null}
+
+                <div className="space-y-3">
+                  {activeTenants.map((tenant) => (
+                    <div
+                      key={tenant.id}
+                      className={`rounded-[1rem] border px-4 py-3 ${
+                        tenant.id === activeTenant?.id
+                          ? "border-[rgba(105,211,255,0.28)] bg-[rgba(105,211,255,0.08)]"
+                          : "border-[rgba(140,172,197,0.12)] bg-[rgba(7,18,28,0.48)]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <TenantIdentity
+                          name={tenant.name}
+                          logoUrl={tenant.logoUrl}
+                          brandColor={tenant.brandColor}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-white">
+                            {tenant.name}
+                          </p>
+                          <p className="ops-code mt-1 text-xs text-[var(--text-muted)]">
+                            /t/{tenant.slug}
+                          </p>
+                        </div>
+                      </div>
+                      {(tenant.albumCount != null ||
+                        tenant.mediaCount != null ||
+                        tenant.memberCount != null) && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {tenant.albumCount != null ? (
+                            <span className="chip">
+                              Albums
+                              <strong>{tenant.albumCount}</strong>
+                            </span>
+                          ) : null}
+                          {tenant.mediaCount != null ? (
+                            <span className="chip">
+                              Media
+                              <strong>{tenant.mediaCount}</strong>
+                            </span>
+                          ) : null}
+                          {tenant.memberCount != null ? (
+                            <span className="chip">
+                              Members
+                              <strong>{tenant.memberCount}</strong>
+                            </span>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="mt-5">
+                <Link href="/admin/tenants" className="ops-button">
+                  Create Organization
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-
-      {/* ─── No tenant selected hint ─────────────────────────────── */}
-      {!activeTenant && activeTenants.length > 0 && (
-        <div className="p-3 bg-amber-900/30 border border-amber-700 rounded-lg flex items-center gap-2">
-          <span className="text-amber-400 text-sm flex-shrink-0">&#9888;</span>
-          <p className="text-amber-200 text-sm">
-            Select a tenant from the dropdown above to manage its content.
-          </p>
-        </div>
-      )}
-
-      {/* ─── Tenant Admin Links ───────────────────────────────────── */}
-      {activeTenant ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {TENANT_LINKS.map((s) => (
-            <Link
-              key={s.href}
-              href={s.href}
-              className="block p-4 bg-slate-800 border border-slate-700 rounded-lg hover:border-slate-500 transition-colors group"
-            >
-              <h3 className="text-white font-medium group-hover:text-blue-300 transition-colors text-sm">
-                {s.label}
-              </h3>
-              <p className="text-slate-400 text-xs mt-1">{s.description}</p>
-            </Link>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 opacity-40 pointer-events-none select-none">
-          {TENANT_LINKS.map((s) => (
-            <div
-              key={s.href}
-              className="block p-4 bg-slate-800 border border-slate-700 rounded-lg"
-            >
-              <h3 className="text-white font-medium text-sm">{s.label}</h3>
-              <p className="text-slate-400 text-xs mt-1">{s.description}</p>
-            </div>
-          ))}
-        </div>
-      )}
     </section>
   );
 }

@@ -1,17 +1,25 @@
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import Link from "next/link";
-import { canAccessAdmin } from "@/lib/auth/admin";
+import { redirect } from "next/navigation";
+import { isMediaContributor } from "@/lib/auth/permissions";
 import { albums } from "@/lib/azure/cosmos";
-import { AlbumRecord } from "@/types";
+import { AlbumRecord, TenantPublicItem } from "@/types";
 import UploadForm from "@/components/admin/UploadForm";
+import {
+  AppShell,
+  BackLink,
+  HeroSection,
+  PageWidth,
+  TopBar,
+} from "@/components/ui/AppFrame";
 
-async function getActiveAlbums(): Promise<{ id: string; name: string }[]> {
+async function getActiveAlbums(tenantId: string): Promise<{ id: string; name: string }[]> {
   const container = await albums();
   const { resources } = await container.items
     .query<AlbumRecord>({
       query:
-        "SELECT c.id, c.name FROM c WHERE c.isDeleted = false ORDER BY c['order'] ASC",
+        "SELECT c.id, c.name FROM c WHERE c.tenantId = @tenantId AND c.isDeleted = false ORDER BY c['order'] ASC",
+      parameters: [{ name: "@tenantId", value: tenantId }],
     })
     .fetchAll();
   return resources;
@@ -20,34 +28,74 @@ async function getActiveAlbums(): Promise<{ id: string; name: string }[]> {
 export default async function UploadPage() {
   const headerStore = await headers();
   const email = headerStore.get("x-session-email");
+  const tenantId = headerStore.get("x-active-tenant-id") ?? "";
+  const host =
+    headerStore.get("x-forwarded-host") ??
+    headerStore.get("host") ??
+    "localhost:3000";
+  const proto = headerStore.get("x-forwarded-proto") ?? "http";
 
   if (!email) redirect("/login");
-  const isAdmin = await canAccessAdmin(email);
-  if (!isAdmin) redirect("/");
+  if (!tenantId) redirect("/admin");
+  const canUpload = await isMediaContributor(email, tenantId);
+  if (!canUpload) redirect("/");
 
-  const albumList = await getActiveAlbums();
+  const [albumList, activeTenant] = await Promise.all([
+    getActiveAlbums(tenantId),
+    fetch(`${proto}://${host}/api/tenants/current`, {
+      headers: { cookie: headerStore.get("cookie") ?? "" },
+      cache: "no-store",
+    })
+      .then((r) => (r.ok ? (r.json() as Promise<TenantPublicItem>) : null))
+      .catch(() => null),
+  ]);
 
   return (
-    <div className="min-h-screen bg-slate-900">
-      <header className="bg-slate-800 border-b border-slate-700 px-6 py-3 flex items-center gap-4">
-        <Link href="/admin" className="text-slate-400 hover:text-white text-sm transition-colors">
-          ← Admin
-        </Link>
-        <h1 className="text-white font-semibold">Upload Media</h1>
-      </header>
-
-      <main className="max-w-2xl mx-auto px-6 py-8">
-        {albumList.length === 0 ? (
-          <div className="text-slate-400 text-sm">
-            No albums exist yet.{" "}
-            <Link href="/admin/albums" className="text-blue-400 hover:underline">
-              Create an album first.
-            </Link>
+    <AppShell>
+      <TopBar accentColor={activeTenant?.brandColor}>
+        <div className="flex items-center gap-3">
+          <BackLink href="/admin">Return to Admin</BackLink>
+          <div>
+            <p className="hero-kicker">Media Intake</p>
+            <p className="text-sm text-[var(--text-muted)]">
+              {activeTenant?.name ?? "Active tenant"}
+            </p>
           </div>
-        ) : (
-          <UploadForm albums={albumList} />
-        )}
-      </main>
-    </div>
+        </div>
+      </TopBar>
+
+      <PageWidth className="space-y-6 py-8 sm:space-y-8 sm:py-10">
+        <HeroSection
+          eyebrow="Upload Workflow"
+          title={`Add new media into ${activeTenant?.name ?? "this tenant"}.`}
+          description="Select a target album, upload approved files, and attach tags that improve searchability across the tenant workspace."
+          meta={
+            <span className="chip chip-accent">
+              Available Albums
+              <strong>{albumList.length}</strong>
+            </span>
+          }
+        />
+
+        <div className="surface-card rounded-[1.5rem] p-5 sm:p-6">
+          {albumList.length === 0 ? (
+            <div className="ops-empty">
+              <p className="text-lg font-semibold text-white">
+                No albums exist yet.
+              </p>
+              <p className="mx-auto mt-2 max-w-xl text-sm">
+                Create an album first so uploaded media can be routed into an
+                approved collection.
+              </p>
+              <Link href="/admin/albums" className="ops-button mt-6 inline-flex">
+                Create an Album
+              </Link>
+            </div>
+          ) : (
+            <UploadForm albums={albumList} />
+          )}
+        </div>
+      </PageWidth>
+    </AppShell>
   );
 }

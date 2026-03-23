@@ -72,6 +72,15 @@ export interface UserRecord {
   isPlatformAdmin?: boolean;
 }
 
+export interface UserAdminListItem {
+  id: string;
+  email: string;
+  lastLoginAt: string;
+  loginCount: number;
+  isBlocked: boolean;
+  isPlatformAdmin?: boolean;
+}
+
 export interface AlbumRecord {
   id: string;
   tenantId: string;       // which tenant owns this album
@@ -251,4 +260,94 @@ export interface PaginatedResponse<T> {
   items: T[];
   continuationToken?: string;
   total?: number;
+}
+
+// ============================================================
+// Operational health + API verification
+// ============================================================
+
+export type HealthStatus = "healthy" | "degraded" | "unknown";
+
+export interface ServiceCheckResult {
+  ok: boolean | null;
+  message: string;
+  latencyMs?: number;
+}
+
+export interface DependencyHealthReport {
+  status: HealthStatus;
+  timestamp: string;
+  checks: {
+    cosmosDb: ServiceCheckResult;
+    blobStorage: ServiceCheckResult;
+    keyVault: ServiceCheckResult;
+    graphApi: ServiceCheckResult;
+  };
+}
+
+export type ApiAuthScope =
+  | "public"
+  | "authenticated"
+  | "tenant"
+  | "tenantAdmin"
+  | "contributor"
+  | "platformAdmin";
+
+export type ApiVerificationMode = "automated" | "manual";
+
+export interface ApiEndpointDefinition {
+  id: string;
+  category: string;
+  method: "GET" | "POST" | "PATCH" | "DELETE";
+  pathTemplate: string;
+  description: string;
+  authScope: ApiAuthScope;
+  verificationMode: ApiVerificationMode;
+  destructive?: boolean;
+  sampleBody?: string;
+}
+
+export type ApiProbeStatus = "passed" | "failed" | "skipped";
+
+export interface ApiProbeResult {
+  endpointId: string;
+  method: string;
+  path: string;
+  status: ApiProbeStatus;
+  httpStatus?: number;
+  durationMs?: number;
+  message: string;
+  responsePreview?: string;
+}
+
+export interface ApiProbeSummary {
+  passed: number;
+  failed: number;
+  skipped: number;
+}
+
+export interface ApiHealthSnapshot {
+  generatedAt: string;
+  dependencyHealth: DependencyHealthReport;
+  probes: {
+    summary: ApiProbeSummary;
+    results: ApiProbeResult[];
+  };
+  endpoints: ApiEndpointDefinition[];
+  samples: {
+    activeTenantId?: string;
+    activeTenantSlug?: string;
+    sampleAlbumId?: string;
+    sampleMediaId?: string;
+  };
+}
+
+export interface ApiManualProbeResponse {
+  method: string;
+  path: string;
+  ok: boolean;
+  status: number;
+  durationMs: number;
+  contentType: string;
+  responseBody: string;
 }

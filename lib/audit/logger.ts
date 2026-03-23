@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import { auditLogs } from "@/lib/azure/cosmos";
 import { AuditAction, AuditLogRecord } from "@/types";
+import { logError, logInfo } from "@/lib/logging/structured";
 
 // 90-day retention in seconds
 const AUDIT_TTL_SECONDS = 90 * 24 * 60 * 60;
@@ -33,8 +34,21 @@ export async function writeAuditLog(entry: AuditEntry): Promise<void> {
     };
 
     await container.items.create(record);
+    logInfo("audit.write.succeeded", {
+      action: entry.action,
+      userEmail: entry.userEmail,
+      tenantId: entry.tenantId ?? null,
+      ipAddress: entry.ipAddress,
+      auditId: record.id,
+    });
   } catch (err) {
     // Audit write failure must not fail the request
-    console.error("[AuditLog] Failed to write audit entry:", err);
+    logError("audit.write.failed", {
+      action: entry.action,
+      userEmail: entry.userEmail,
+      tenantId: entry.tenantId ?? null,
+      ipAddress: entry.ipAddress,
+      error: err,
+    });
   }
 }

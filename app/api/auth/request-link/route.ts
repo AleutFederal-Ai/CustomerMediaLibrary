@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isDomainAllowed } from "@/lib/auth/domain-check";
 import { checkRateLimit, generateMagicLinkToken } from "@/lib/auth/magic-link";
 import { sendMagicLinkEmail } from "@/lib/azure/graph";
 import { writeAuditLog } from "@/lib/audit/logger";
+import { canAccessAdmin } from "@/lib/auth/admin";
 import { getPublicBaseUrl } from "@/lib/auth/base-url";
+import { getUserTenantIds } from "@/lib/auth/tenant";
 import { AuditAction } from "@/types";
 
 // Strict email regex — rejects malformed addresses
@@ -65,9 +66,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     detail: { email },
   });
 
-  // Check domain allowlist — silently do nothing if not allowed
-  const { allowed } = await isDomainAllowed(email);
-  if (!allowed) {
+  // Allow magic links for users with tenant access or platform-admin access.
+  const [tenantIds, isPlatformAdmin] = await Promise.all([
+    getUserTenantIds(email),
+    mode === "platform-admin" ? canAccessAdmin(email) : Promise.resolve(false),
+  ]);
+  if (tenantIds.length === 0 && !isPlatformAdmin) {
     return NextResponse.json(GENERIC_RESPONSE, { status: 200 });
   }
 

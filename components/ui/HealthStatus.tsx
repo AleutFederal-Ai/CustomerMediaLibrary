@@ -23,23 +23,17 @@ const SERVICE_LABELS: Record<string, string> = {
   cosmosDb: "Cosmos DB",
   blobStorage: "Blob Storage",
   keyVault: "Key Vault",
-  graphApi: "Graph API (Email)",
+  graphApi: "Graph API",
 };
 
 function StatusDot({ ok }: { ok: boolean | null }) {
   if (ok === null) {
-    return (
-      <span className="inline-block w-2.5 h-2.5 rounded-full bg-slate-500" title="Not configured" />
-    );
+    return <span className="inline-block h-2.5 w-2.5 rounded-full bg-slate-500" title="Not configured" />;
   }
   if (ok) {
-    return (
-      <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-400" title="Healthy" />
-    );
+    return <span className="inline-block h-2.5 w-2.5 rounded-full bg-[var(--success)]" title="Healthy" />;
   }
-  return (
-    <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" title="Failing" />
-  );
+  return <span className="inline-block h-2.5 w-2.5 rounded-full bg-[var(--danger)] animate-pulse" title="Failing" />;
 }
 
 function OverallDot({
@@ -50,17 +44,15 @@ function OverallDot({
   loading: boolean;
 }) {
   if (loading || status === null) {
-    return (
-      <span className="inline-block w-2.5 h-2.5 rounded-full bg-slate-500 animate-pulse" />
-    );
+    return <span className="inline-block h-2.5 w-2.5 rounded-full bg-slate-500 animate-pulse" />;
   }
   if (status === "healthy") {
-    return <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-400" />;
+    return <span className="inline-block h-2.5 w-2.5 rounded-full bg-[var(--success)]" />;
   }
   if (status === "degraded") {
-    return <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />;
+    return <span className="inline-block h-2.5 w-2.5 rounded-full bg-[var(--danger)] animate-pulse" />;
   }
-  return <span className="inline-block w-2.5 h-2.5 rounded-full bg-yellow-400" />;
+  return <span className="inline-block h-2.5 w-2.5 rounded-full bg-[var(--warning)]" />;
 }
 
 const POLL_INTERVAL_MS = 30_000;
@@ -96,7 +88,7 @@ export default function HealthStatus() {
   const overallStatus = error ? "degraded" : health?.status ?? null;
 
   const overallLabel = loading
-    ? "Checking…"
+    ? "Checking..."
     : error
     ? "Unreachable"
     : overallStatus === "healthy"
@@ -106,89 +98,82 @@ export default function HealthStatus() {
     : "Status unknown";
 
   return (
-    <div className="w-full max-w-md mt-4">
+    <div className="w-full">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center justify-between px-3 py-2 rounded bg-slate-800/60 border border-slate-700 text-slate-400 hover:text-slate-300 hover:border-slate-600 transition-colors text-xs"
+        className="surface-card-soft flex w-full items-center justify-between rounded-[1.15rem] px-4 py-3 text-left"
         aria-expanded={expanded}
       >
-        <span className="flex items-center gap-2">
+        <span className="flex items-center gap-3 text-sm">
           <OverallDot status={overallStatus} loading={loading} />
-          <span>System Status</span>
-          <span className="text-slate-500">—</span>
+          <span className="font-medium text-white">Platform health</span>
+          <span className="ops-muted hidden sm:inline">-</span>
           <span
             className={
               overallStatus === "healthy"
-                ? "text-green-400"
+                ? "text-[var(--success)]"
                 : overallStatus === "degraded" || error
-                ? "text-red-400"
-                : "text-slate-400"
+                ? "text-[var(--danger)]"
+                : "ops-muted"
             }
           >
             {overallLabel}
           </span>
         </span>
-        <span className="ml-2 text-slate-500">
-          {expanded ? "▲" : "▼"}
-        </span>
+        <span className="ops-muted text-xs">{expanded ? "Collapse" : "Expand"}</span>
       </button>
 
-      {expanded && (
-        <div className="mt-1 rounded bg-slate-800/60 border border-slate-700 px-3 py-3 space-y-2">
-          {error && (
-            <p className="text-red-400 text-xs">
-              Could not reach health endpoint.
-            </p>
-          )}
+      {expanded ? (
+        <div className="surface-card-soft mt-2 space-y-3 rounded-[1.15rem] px-4 py-4">
+          {error ? (
+            <p className="text-sm text-[#ffb7b7]">Could not reach health endpoint.</p>
+          ) : null}
 
-          {health &&
-            Object.entries(health.checks).map(([key, check]) => (
-              <div key={key} className="flex items-center justify-between text-xs">
-                <span className="flex items-center gap-2 text-slate-300">
-                  <StatusDot ok={check.ok} />
-                  {SERVICE_LABELS[key] ?? key}
-                </span>
-                <span className="text-slate-500 flex items-center gap-2">
-                  {check.latencyMs != null && check.ok && (
-                    <span>{check.latencyMs}ms</span>
-                  )}
-                  <span
-                    className={
-                      check.ok === true
-                        ? "text-green-400"
-                        : check.ok === false
-                        ? "text-red-400"
-                        : "text-slate-500"
-                    }
-                  >
-                    {check.ok === true
-                      ? "OK"
-                      : check.ok === false
-                      ? check.message
-                      : "n/a"}
+          {health
+            ? Object.entries(health.checks).map(([key, check]) => (
+                <div key={key} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="flex items-center gap-2 text-white/88">
+                    <StatusDot ok={check.ok} />
+                    {SERVICE_LABELS[key] ?? key}
                   </span>
-                </span>
-              </div>
-            ))}
+                  <span className="flex items-center gap-2 text-[var(--text-muted)]">
+                    {check.latencyMs != null && check.ok ? <span>{check.latencyMs}ms</span> : null}
+                    <span
+                      className={
+                        check.ok === true
+                          ? "text-[var(--success)]"
+                          : check.ok === false
+                          ? "text-[var(--danger)]"
+                          : "ops-muted"
+                      }
+                    >
+                      {check.ok === true ? "OK" : check.ok === false ? check.message : "n/a"}
+                    </span>
+                  </span>
+                </div>
+              ))
+            : null}
 
-          <div className="pt-1 flex items-center justify-between text-xs text-slate-600 border-t border-slate-700">
+          <div className="ops-divider" />
+
+          <div className="flex flex-col gap-3 text-xs text-[var(--text-muted)] sm:flex-row sm:items-center sm:justify-between">
             <span>
               {lastChecked
                 ? `Last checked ${lastChecked.toLocaleTimeString()}`
-                : "Checking…"}
+                : "Checking..."}
             </span>
             <button
               type="button"
               onClick={fetchHealth}
               disabled={loading}
-              className="text-blue-500 hover:text-blue-400 disabled:opacity-50"
+              className="ops-button-ghost w-full justify-center sm:w-auto"
             >
-              Refresh
+              Refresh Status
             </button>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

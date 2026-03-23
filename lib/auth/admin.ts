@@ -2,6 +2,8 @@ import { users } from "@/lib/azure/cosmos";
 import { isAdminGroupMember } from "@/lib/azure/graph";
 import { UserRecord } from "@/types";
 
+const DEV_BYPASS_EMAIL = "dev@aleutfederal.com";
+
 /**
  * Determine whether a user can access the admin console.
  *
@@ -9,12 +11,16 @@ import { UserRecord } from "@/types";
  *   1. Cosmos DB isPlatformAdmin flag — for seeded / manually-granted super-admins
  *      who may not exist in the Azure Entra ID group (e.g. admin@admin.com)
  *   2. Entra ID group membership via Microsoft Graph — for production admins
- *      managed through the MediaGallery-Admins group
+ *      managed through the myMedia-Admins group
  *
  * Fails closed: any error returns false.
  */
 export async function canAccessAdmin(email: string): Promise<boolean> {
   const emailLower = email.toLowerCase();
+
+  if (process.env.DOCKER_DEV === "true" && emailLower === DEV_BYPASS_EMAIL) {
+    return true;
+  }
 
   // 1. Check Cosmos DB platform admin flag
   try {

@@ -28,7 +28,7 @@ import { v4 as uuidv4 } from "uuid";
 
 // ---- Configuration ----
 const COSMOS_ENDPOINT = "https://mymedia-cosmos.documents.azure.us:443/";
-const DB_NAME = "mediagallery";
+const DB_NAME = process.env.COSMOS_DB_NAME ?? "mymedia";
 
 // Containers that may be missing from the deployed infrastructure
 const ENSURE_CONTAINERS = [

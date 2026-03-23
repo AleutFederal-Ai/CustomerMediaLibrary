@@ -2,13 +2,31 @@ import { NextRequest, NextResponse } from "next/server";
 import { users, sessions } from "@/lib/azure/cosmos";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { isSuperAdmin } from "@/lib/auth/permissions";
-import { UserRecord, AuditAction } from "@/types";
+import { UserRecord, UserAdminListItem, AuditAction } from "@/types";
 
 async function requireAdmin(request: NextRequest): Promise<string | null> {
   const email = request.headers.get("x-session-email");
   if (!email) return null;
   const isAdmin = await isSuperAdmin(email);
   return isAdmin ? email : null;
+}
+
+function toUserAdminListItem(
+  user: Pick<
+    UserRecord,
+    "id" | "email" | "lastLoginAt" | "loginCount" | "isBlocked" | "isPlatformAdmin"
+  >
+): UserAdminListItem {
+  return {
+    id: user.id,
+    email: user.email,
+    lastLoginAt: user.lastLoginAt,
+    loginCount: user.loginCount,
+    isBlocked: user.isBlocked,
+    ...(typeof user.isPlatformAdmin === "boolean" && {
+      isPlatformAdmin: user.isPlatformAdmin,
+    }),
+  };
 }
 
 // GET /api/admin/users?cursor=<token>&search=<email>
@@ -22,10 +40,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const container = await users();
     const query = search
-      ? "SELECT * FROM c WHERE CONTAINS(c.email, @search) ORDER BY c.lastLoginAt DESC"
-      : "SELECT * FROM c ORDER BY c.lastLoginAt DESC";
+      ? "SELECT c.id, c.email, c.lastLoginAt, c.loginCount, c.isBlocked, c.isPlatformAdmin FROM c WHERE CONTAINS(c.email, @search) ORDER BY c.lastLoginAt DESC"
+      : "SELECT c.id, c.email, c.lastLoginAt, c.loginCount, c.isBlocked, c.isPlatformAdmin FROM c ORDER BY c.lastLoginAt DESC";
 
-    const iterator = container.items.query<UserRecord>(
+    const iterator = container.items.query<UserAdminListItem>(
       {
         query,
         ...(search && {
@@ -38,7 +56,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const page = await iterator.fetchNext();
 
     return NextResponse.json({
-      items: page.resources,
+      items: page.resources.map(toUserAdminListItem),
       continuationToken: page.continuationToken ?? null,
     });
   } catch (err) {

@@ -4,7 +4,7 @@ import { generateSasUrl } from "@/lib/azure/blob";
 import { MediaRecord, MediaListItem } from "@/types";
 
 /**
- * GET /api/search?q=<query>&albumId=<albumId>&type=image|video&page=<n>
+ * GET /api/search?q=<query>&albumId=<albumId>&type=image|video&cursor=<token>
  * Server-side search/filter across media items.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       parameters.push({ name: "@q", value: q });
     }
 
-    const queryText = `SELECT * FROM c WHERE ${conditions.join(" AND ")} ORDER BY c.uploadedAt DESC OFFSET 0 LIMIT ${PAGE_SIZE}`;
+    const queryText = `SELECT * FROM c WHERE ${conditions.join(" AND ")} ORDER BY c.uploadedAt DESC`;
 
     const iterator = container.items.query<MediaRecord>(
       { query: queryText, parameters },

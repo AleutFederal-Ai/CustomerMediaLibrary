@@ -1,18 +1,27 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { canAccessAdmin } from "@/lib/auth/admin";
 import { users } from "@/lib/azure/cosmos";
-import { UserRecord, TenantPublicItem } from "@/types";
+import { UserAdminListItem, TenantPublicItem } from "@/types";
 import UserManager from "@/components/admin/UserManager";
+import {
+  AppShell,
+  BackLink,
+  HeroSection,
+  PageWidth,
+  TopBar,
+} from "@/components/ui/AppFrame";
 
 async function getRecentUsers(): Promise<{
-  items: UserRecord[];
+  items: UserAdminListItem[];
   cursor: string | null;
 }> {
   const container = await users();
-  const iterator = container.items.query<UserRecord>(
-    { query: "SELECT * FROM c ORDER BY c.lastLoginAt DESC" },
+  const iterator = container.items.query<UserAdminListItem>(
+    {
+      query:
+        "SELECT c.id, c.email, c.lastLoginAt, c.loginCount, c.isBlocked, c.isPlatformAdmin FROM c ORDER BY c.lastLoginAt DESC",
+    },
     { maxItemCount: 50 }
   );
   const page = await iterator.fetchNext();
@@ -41,29 +50,41 @@ export default async function AdminUsersPage() {
       headers: { cookie: headerStore.get("cookie") ?? "" },
       cache: "no-store",
     })
-      .then((r) =>
-        r.ok ? (r.json() as Promise<TenantPublicItem>) : null
-      )
+      .then((r) => (r.ok ? (r.json() as Promise<TenantPublicItem>) : null))
       .catch(() => null),
   ]);
 
   return (
-    <div className="min-h-screen bg-slate-900">
-      <header className="bg-slate-800 border-b border-slate-700 px-6 py-3 flex items-center gap-4">
-        <Link
-          href="/admin"
-          className="text-slate-400 hover:text-white text-sm transition-colors"
-        >
-          &larr; Admin
-        </Link>
-        <h1 className="text-white font-semibold">
-          Users{activeTenant ? ` \u2014 ${activeTenant.name}` : ""}
-        </h1>
-      </header>
+    <AppShell>
+      <TopBar accentColor={activeTenant?.brandColor}>
+        <div className="flex items-center gap-3">
+          <BackLink href="/admin">Return to Admin</BackLink>
+          <div>
+            <p className="hero-kicker">User Governance</p>
+            <p className="text-sm text-[var(--text-muted)]">
+              Cross-tenant platform access control
+            </p>
+          </div>
+        </div>
+      </TopBar>
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
-        <UserManager initialUsers={userList} initialCursor={cursor} />
-      </main>
-    </div>
+      <PageWidth className="space-y-6 py-8 sm:space-y-8 sm:py-10">
+        <HeroSection
+          eyebrow="User Control"
+          title="Review user posture across the platform."
+          description="Search for user records, block or restore access, assign platform administrator rights, and set password credentials when required."
+          meta={
+            <span className="chip chip-accent">
+              Loaded Users
+              <strong>{userList.length}</strong>
+            </span>
+          }
+        />
+
+        <div className="surface-card rounded-[1.5rem] p-5 sm:p-6">
+          <UserManager initialUsers={userList} initialCursor={cursor} />
+        </div>
+      </PageWidth>
+    </AppShell>
   );
 }

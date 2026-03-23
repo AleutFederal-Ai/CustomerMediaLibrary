@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { UserRecord } from "@/types";
+import { UserAdminListItem } from "@/types";
 import { apiFetch } from "@/lib/api-fetch";
 
 interface Props {
-  initialUsers: UserRecord[];
+  initialUsers: UserAdminListItem[];
   initialCursor?: string | null;
 }
 
@@ -14,8 +14,6 @@ export default function UserManager({ initialUsers, initialCursor }: Props) {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [cursor, setCursor] = useState<string | null>(initialCursor ?? null);
-
-  // Set password state
   const [passwordTarget, setPasswordTarget] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
@@ -52,7 +50,7 @@ export default function UserManager({ initialUsers, initialCursor }: Props) {
     await fetchUsers(search, cursor);
   }
 
-  async function handleBlockToggle(user: UserRecord) {
+  async function handleBlockToggle(user: UserAdminListItem) {
     const action = user.isBlocked ? "unblock" : "block";
     const confirmMsg = user.isBlocked
       ? `Unblock ${user.email}?`
@@ -69,9 +67,7 @@ export default function UserManager({ initialUsers, initialCursor }: Props) {
 
       if (res.ok) {
         setUsers((prev) =>
-          prev.map((u) =>
-            u.id === user.id ? { ...u, isBlocked: !u.isBlocked } : u
-          )
+          prev.map((u) => (u.id === user.id ? { ...u, isBlocked: !u.isBlocked } : u))
         );
       } else {
         alert("Failed to update user.");
@@ -81,13 +77,13 @@ export default function UserManager({ initialUsers, initialCursor }: Props) {
     }
   }
 
-  async function handlePromoteToggle(user: UserRecord) {
+  async function handlePromoteToggle(user: UserAdminListItem) {
     const promoting = !user.isPlatformAdmin;
-    const msg = promoting
+    const message = promoting
       ? `Promote ${user.email} to platform admin? They will have full access to all tenants.`
       : `Demote ${user.email}? They will lose platform admin privileges.`;
 
-    if (!confirm(msg)) return;
+    if (!confirm(message)) return;
 
     try {
       const res = await apiFetch("/api/admin/users", {
@@ -102,9 +98,7 @@ export default function UserManager({ initialUsers, initialCursor }: Props) {
       if (res.ok) {
         setUsers((prev) =>
           prev.map((u) =>
-            u.id === user.id
-              ? { ...u, isPlatformAdmin: promoting }
-              : u
+            u.id === user.id ? { ...u, isPlatformAdmin: promoting } : u
           )
         );
       } else {
@@ -144,122 +138,116 @@ export default function UserManager({ initialUsers, initialCursor }: Props) {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Search */}
-      <form onSubmit={handleSearch} className="flex gap-2">
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by email\u2026"
-          className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white text-sm rounded transition-colors"
-        >
-          {loading ? "\u2026" : "Search"}
-        </button>
+    <div className="space-y-6">
+      <form onSubmit={handleSearch} className="surface-card-soft rounded-[1.25rem] p-5">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-white/86">
+              Search by email
+            </label>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="user@example.com"
+              className="ops-input"
+            />
+          </div>
+          <div className="flex items-end">
+            <button type="submit" disabled={loading} className="ops-button">
+              {loading ? "Searching..." : "Search"}
+            </button>
+          </div>
+        </div>
       </form>
 
-      {/* Set Password inline form */}
-      {passwordTarget && (
+      {passwordTarget ? (
         <form
           onSubmit={handleSetPassword}
-          className="p-4 bg-slate-800 border border-slate-700 rounded-lg space-y-3"
+          className="surface-card-soft rounded-[1.25rem] p-5"
         >
-          <h3 className="text-white text-sm font-medium">
+          <p className="hero-kicker">Credential Update</p>
+          <h3 className="mt-3 text-lg font-semibold tracking-[-0.03em] text-white">
             Set password for {passwordTarget}
           </h3>
-          <div>
+          <div className="mt-4 space-y-3">
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Min 12 characters"
+              placeholder="Minimum 12 characters"
               minLength={12}
               required
-              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="ops-input"
             />
-          </div>
-          {passwordError && (
-            <p className="text-red-400 text-sm">{passwordError}</p>
-          )}
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={passwordSaving || password.length < 12}
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm rounded transition-colors"
-            >
-              {passwordSaving ? "Setting\u2026" : "Set Password"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setPasswordTarget(null);
-                setPassword("");
-                setPasswordError("");
-              }}
-              className="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm rounded transition-colors"
-            >
-              Cancel
-            </button>
+            {passwordError ? (
+              <p className="text-sm text-[#ffb7b7]">{passwordError}</p>
+            ) : null}
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="submit"
+                disabled={passwordSaving || password.length < 12}
+                className="ops-button"
+              >
+                {passwordSaving ? "Setting..." : "Set Password"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPasswordTarget(null);
+                  setPassword("");
+                  setPasswordError("");
+                }}
+                className="ops-button-secondary"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </form>
-      )}
+      ) : null}
 
-      {/* Users table */}
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="ops-table text-sm">
           <thead>
-            <tr className="text-left text-slate-400 border-b border-slate-700">
-              <th className="pb-2 font-medium">Email</th>
-              <th className="pb-2 font-medium">Last Login</th>
-              <th className="pb-2 font-medium">Logins</th>
-              <th className="pb-2 font-medium">Status</th>
-              <th className="pb-2 font-medium">Actions</th>
+            <tr>
+              <th>Email</th>
+              <th>Last Login</th>
+              <th>Logins</th>
+              <th>Status</th>
+              <th>Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800">
+          <tbody>
             {users.map((user) => (
-              <tr
-                key={user.id}
-                className={user.isBlocked ? "opacity-60" : ""}
-              >
-                <td className="py-3 text-white">
-                  <span>{user.email}</span>
-                  {user.isPlatformAdmin && (
-                    <span className="ml-2 px-1.5 py-0.5 rounded text-xs bg-purple-900/50 text-purple-300 border border-purple-800">
-                      Admin
-                    </span>
-                  )}
+              <tr key={user.id} className={user.isBlocked ? "opacity-70" : ""}>
+                <td className="text-white">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span>{user.email}</span>
+                    {user.isPlatformAdmin ? (
+                      <span className="ops-badge ops-badge-warning">Admin</span>
+                    ) : null}
+                  </div>
                 </td>
-                <td className="py-3 text-slate-400">
+                <td className="ops-muted">
                   {new Date(user.lastLoginAt).toLocaleDateString()}
                 </td>
-                <td className="py-3 text-slate-400">{user.loginCount}</td>
-                <td className="py-3">
-                  {user.isBlocked ? (
-                    <span className="px-2 py-0.5 rounded text-xs bg-red-900/50 text-red-300">
-                      Blocked
-                    </span>
-                  ) : (
-                    <span className="px-2 py-0.5 rounded text-xs bg-green-900/50 text-green-300">
-                      Active
-                    </span>
-                  )}
+                <td className="ops-muted">{user.loginCount}</td>
+                <td>
+                  <span
+                    className={`ops-badge ${
+                      user.isBlocked ? "ops-badge-danger" : "ops-badge-success"
+                    }`}
+                  >
+                    {user.isBlocked ? "Blocked" : "Active"}
+                  </span>
                 </td>
-                <td className="py-3">
-                  <div className="flex items-center gap-2 flex-wrap">
+                <td>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                     <button
                       type="button"
                       onClick={() => handleBlockToggle(user)}
-                      className={`text-xs transition-colors ${
-                        user.isBlocked
-                          ? "text-green-400 hover:text-green-300"
-                          : "text-red-400 hover:text-red-300"
-                      }`}
+                      className={user.isBlocked ? "ops-button" : "ops-button-danger"}
                     >
                       {user.isBlocked ? "Unblock" : "Block"}
                     </button>
@@ -270,18 +258,14 @@ export default function UserManager({ initialUsers, initialCursor }: Props) {
                         setPassword("");
                         setPasswordError("");
                       }}
-                      className="text-xs text-slate-400 hover:text-white transition-colors"
+                      className="ops-button-secondary"
                     >
                       Set Password
                     </button>
                     <button
                       type="button"
                       onClick={() => handlePromoteToggle(user)}
-                      className={`text-xs transition-colors ${
-                        user.isPlatformAdmin
-                          ? "text-amber-400 hover:text-amber-300"
-                          : "text-purple-400 hover:text-purple-300"
-                      }`}
+                      className="ops-button-secondary"
                     >
                       {user.isPlatformAdmin ? "Demote" : "Promote"}
                     </button>
@@ -289,30 +273,29 @@ export default function UserManager({ initialUsers, initialCursor }: Props) {
                 </td>
               </tr>
             ))}
-            {users.length === 0 && (
+            {users.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-slate-500">
-                  No users found.
+                <td colSpan={5}>
+                  <div className="ops-empty">No users found.</div>
                 </td>
               </tr>
-            )}
+            ) : null}
           </tbody>
         </table>
       </div>
 
-      {/* Load More */}
-      {cursor && (
+      {cursor ? (
         <div className="flex justify-center">
           <button
             type="button"
             onClick={handleLoadMore}
             disabled={loading}
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-300 text-sm rounded transition-colors"
+            className="ops-button-secondary"
           >
-            {loading ? "Loading\u2026" : "Load More"}
+            {loading ? "Loading..." : "Load More"}
           </button>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -9,9 +9,8 @@ interface Props {
   initialCursor: string | null;
 }
 
-// Group audit actions into categories for easier filtering
 const ACTION_GROUPS: Record<string, AuditAction[]> = {
-  "Authentication": [
+  Authentication: [
     AuditAction.MAGIC_LINK_REQUESTED,
     AuditAction.MAGIC_LINK_VERIFIED,
     AuditAction.MAGIC_LINK_FAILED,
@@ -30,19 +29,19 @@ const ACTION_GROUPS: Record<string, AuditAction[]> = {
     AuditAction.BULK_DOWNLOAD,
     AuditAction.ALBUM_VIEWED,
   ],
-  "Admin \u2014 Media": [
+  "Admin - Media": [
     AuditAction.MEDIA_UPLOADED,
     AuditAction.MEDIA_DELETED,
     AuditAction.ALBUM_CREATED,
     AuditAction.ALBUM_UPDATED,
     AuditAction.ALBUM_DELETED,
   ],
-  "Admin \u2014 Users": [
+  "Admin - Users": [
     AuditAction.USER_BLOCKED,
     AuditAction.USER_UNBLOCKED,
     AuditAction.USER_PROMOTED,
   ],
-  "Admin \u2014 Tenants": [
+  "Admin - Tenants": [
     AuditAction.TENANT_CREATED,
     AuditAction.TENANT_UPDATED,
     AuditAction.TENANT_DEACTIVATED,
@@ -54,24 +53,28 @@ const ACTION_GROUPS: Record<string, AuditAction[]> = {
   ],
 };
 
-// Color-code action badges by category
 function actionColor(action: string): string {
-  const authActions = ACTION_GROUPS["Authentication"] ?? [];
+  const authActions = ACTION_GROUPS.Authentication ?? [];
   const accessActions = ACTION_GROUPS["Media Access"] ?? [];
 
   if (authActions.includes(action as AuditAction)) {
     if (action.includes("failed") || action.includes("rate_limited")) {
-      return "bg-red-900/50 text-red-300";
+      return "ops-badge-danger";
     }
-    return "bg-blue-900/50 text-blue-300";
+    return "ops-badge-info";
   }
   if (accessActions.includes(action as AuditAction)) {
-    return "bg-green-900/50 text-green-300";
+    return "ops-badge-success";
   }
-  if (action.includes("deleted") || action.includes("blocked") || action.includes("deactivated") || action.includes("removed")) {
-    return "bg-red-900/50 text-red-300";
+  if (
+    action.includes("deleted") ||
+    action.includes("blocked") ||
+    action.includes("deactivated") ||
+    action.includes("removed")
+  ) {
+    return "ops-badge-danger";
   }
-  return "bg-slate-700 text-slate-300";
+  return "ops-badge-neutral";
 }
 
 function formatAction(action: string): string {
@@ -84,7 +87,7 @@ function formatDetail(detail: Record<string, unknown>): string {
   const entries = Object.entries(detail);
   if (entries.length === 0) return "";
   return entries
-    .map(([k, v]) => `${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`)
+    .map(([key, value]) => `${key}: ${typeof value === "string" ? value : JSON.stringify(value)}`)
     .join(", ");
 }
 
@@ -102,7 +105,7 @@ export default function AuditLogViewer({ initialItems, initialCursor }: Props) {
   function buildParams(reset: boolean): URLSearchParams {
     const params = new URLSearchParams();
     if (from) params.set("from", new Date(from).toISOString());
-    if (to) params.set("to", new Date(to + "T23:59:59").toISOString());
+    if (to) params.set("to", new Date(`${to}T23:59:59`).toISOString());
     if (action) params.set("action", action);
     if (emailSearch.trim()) params.set("email", emailSearch.trim());
     if (ipSearch.trim()) params.set("ip", ipSearch.trim());
@@ -134,10 +137,10 @@ export default function AuditLogViewer({ initialItems, initialCursor }: Props) {
       if (res.ok) {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `audit-${new Date().toISOString().slice(0, 10)}.csv`;
-        a.click();
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `audit-${new Date().toISOString().slice(0, 10)}.csv`;
+        anchor.click();
         URL.revokeObjectURL(url);
       }
     } finally {
@@ -156,201 +159,197 @@ export default function AuditLogViewer({ initialItems, initialCursor }: Props) {
   const hasFilters = from || to || action || emailSearch || ipSearch;
 
   return (
-    <div className="space-y-4">
-      {/* ─── Filters ──────────────────────────────────────────────── */}
-      <div className="p-4 bg-slate-800 border border-slate-700 rounded-lg space-y-3">
-        <div className="flex flex-wrap gap-3 items-end">
-          {/* Email search */}
-          <div className="flex-1 min-w-[180px]">
-            <label className="block text-xs text-slate-400 mb-1">
+    <div className="space-y-6">
+      <div className="surface-card-soft rounded-[1.25rem] p-5">
+        <div className="grid gap-4 xl:grid-cols-5">
+          <div className="xl:col-span-2">
+            <label className="mb-2 block text-sm font-medium text-white/86">
               User Email
             </label>
             <input
               type="text"
               value={emailSearch}
               onChange={(e) => setEmailSearch(e.target.value)}
-              placeholder="Search by email\u2026"
-              className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Search by email..."
+              className="ops-input"
             />
           </div>
-
-          {/* IP search */}
-          <div className="min-w-[140px]">
-            <label className="block text-xs text-slate-400 mb-1">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-white/86">
               IP Address
             </label>
             <input
               type="text"
               value={ipSearch}
               onChange={(e) => setIpSearch(e.target.value)}
-              placeholder="e.g. 192.168\u2026"
-              className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g. 192.168.1.10"
+              className="ops-input"
             />
           </div>
-
-          {/* Date range */}
           <div>
-            <label className="block text-xs text-slate-400 mb-1">From</label>
+            <label className="mb-2 block text-sm font-medium text-white/86">
+              From
+            </label>
             <input
               type="date"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
-              className="px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="ops-input"
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-400 mb-1">To</label>
+            <label className="mb-2 block text-sm font-medium text-white/86">
+              To
+            </label>
             <input
               type="date"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              className="px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="ops-input"
             />
           </div>
+        </div>
 
-          {/* Action filter — grouped */}
-          <div className="min-w-[180px]">
-            <label className="block text-xs text-slate-400 mb-1">Action</label>
+        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-white/86">
+              Action
+            </label>
             <select
               value={action}
               onChange={(e) => setAction(e.target.value)}
-              className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="ops-select"
             >
               <option value="">All actions</option>
               {Object.entries(ACTION_GROUPS).map(([group, actions]) => (
                 <optgroup key={group} label={group}>
-                  {actions.map((a) => (
-                    <option key={a} value={a}>
-                      {formatAction(a)}
+                  {actions.map((item) => (
+                    <option key={item} value={item}>
+                      {formatAction(item)}
                     </option>
                   ))}
                 </optgroup>
               ))}
             </select>
           </div>
-        </div>
 
-        {/* Action buttons */}
-        <div className="flex gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => fetchLogs(true)}
-            disabled={loading}
-            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm rounded transition-colors"
-          >
-            {loading ? "Searching\u2026" : "Search"}
-          </button>
-          {hasFilters && (
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
             <button
               type="button"
-              onClick={() => {
-                handleClearFilters();
-                // Refetch unfiltered after clearing
-                setTimeout(() => fetchLogs(true), 0);
-              }}
-              className="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm rounded transition-colors"
+              onClick={() => fetchLogs(true)}
+              disabled={loading}
+              className="ops-button"
             >
-              Clear Filters
+              {loading ? "Searching..." : "Search"}
             </button>
-          )}
-          <button
-            type="button"
-            onClick={handleExportCsv}
-            disabled={exporting}
-            className="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm rounded transition-colors ml-auto"
-          >
-            {exporting ? "Exporting\u2026" : "Export CSV"}
-          </button>
+            {hasFilters ? (
+              <button
+                type="button"
+                onClick={() => {
+                  handleClearFilters();
+                  setTimeout(() => fetchLogs(true), 0);
+                }}
+                className="ops-button-secondary"
+              >
+                Clear Filters
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              disabled={exporting}
+              className="ops-button-secondary"
+            >
+              {exporting ? "Exporting..." : "Export CSV"}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* ─── Results count ─────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
-        <p className="text-slate-500 text-xs">
-          {items.length} entries{cursor ? " (more available)" : ""}
+        <p className="chip">
+          Loaded Events
+          <strong>{items.length}</strong>
         </p>
+        {cursor ? <p className="ops-muted text-sm">More events available</p> : null}
       </div>
 
-      {/* ─── Table ─────────────────────────────────────────────────── */}
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="ops-table text-sm">
           <thead>
-            <tr className="text-left text-slate-400 border-b border-slate-700">
-              <th className="pb-2 font-medium pr-3">Timestamp</th>
-              <th className="pb-2 font-medium pr-3">User</th>
-              <th className="pb-2 font-medium pr-3">Action</th>
-              <th className="pb-2 font-medium pr-3">IP Address</th>
-              <th className="pb-2 font-medium">Details</th>
+            <tr>
+              <th>Timestamp</th>
+              <th>User</th>
+              <th>Action</th>
+              <th>IP Address</th>
+              <th>Details</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800">
+          <tbody>
             {items.map((log) => (
-              <tr key={log.id} className="group hover:bg-slate-800/50">
-                <td className="py-2.5 pr-3 text-slate-400 whitespace-nowrap">
+              <tr key={log.id}>
+                <td className="ops-muted whitespace-nowrap">
                   {new Date(log.timestamp).toLocaleString()}
                 </td>
-                <td className="py-2.5 pr-3 text-white">
+                <td className="text-white">
                   <button
                     type="button"
                     onClick={() => {
                       setEmailSearch(log.userEmail);
                       fetchLogs(true);
                     }}
-                    className="hover:text-blue-300 transition-colors text-left"
-                    title={`Filter by ${log.userEmail}`}
+                    className="text-left hover:text-[#d9f6ff]"
                   >
                     {log.userEmail}
                   </button>
                 </td>
-                <td className="py-2.5 pr-3">
-                  <span
-                    className={`px-1.5 py-0.5 rounded text-xs ${actionColor(log.action)}`}
-                  >
+                <td>
+                  <span className={`ops-badge ${actionColor(log.action)}`}>
                     {formatAction(log.action)}
                   </span>
                 </td>
-                <td className="py-2.5 pr-3 text-slate-400 whitespace-nowrap">
+                <td className="ops-code ops-muted whitespace-nowrap">
                   <button
                     type="button"
                     onClick={() => {
                       setIpSearch(log.ipAddress);
                       fetchLogs(true);
                     }}
-                    className="hover:text-blue-300 transition-colors font-mono"
-                    title={`Filter by ${log.ipAddress}`}
+                    className="hover:text-[#d9f6ff]"
                   >
                     {log.ipAddress}
                   </button>
                 </td>
-                <td className="py-2.5 text-slate-500 max-w-[300px]">
+                <td className="ops-muted max-w-[300px]">
                   <span className="block truncate" title={JSON.stringify(log.detail)}>
                     {formatDetail(log.detail)}
                   </span>
                 </td>
               </tr>
             ))}
-            {items.length === 0 && !loading && (
+            {items.length === 0 && !loading ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-slate-500">
-                  No audit logs found.
+                <td colSpan={5}>
+                  <div className="ops-empty">No audit logs found.</div>
                 </td>
               </tr>
-            )}
+            ) : null}
           </tbody>
         </table>
       </div>
 
-      {/* ─── Pagination ────────────────────────────────────────────── */}
-      {cursor && (
-        <button
-          type="button"
-          onClick={() => fetchLogs(false)}
-          disabled={loading}
-          className="w-full py-2 text-sm text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded transition-colors"
-        >
-          {loading ? "Loading\u2026" : "Load more"}
-        </button>
-      )}
+      {cursor ? (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => fetchLogs(false)}
+            disabled={loading}
+            className="ops-button-secondary"
+          >
+            {loading ? "Loading..." : "Load More"}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

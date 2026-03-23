@@ -1,20 +1,43 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import HealthStatus from "@/components/ui/HealthStatus";
+import CuiBanner from "@/components/ui/CuiBanner";
 import { TenantPublicItem } from "@/types";
 
-// Sentinel used when signing in as a platform admin (no org context)
 const PLATFORM_ADMIN_TENANT: TenantPublicItem = {
   id: "__platform_admin__",
   name: "Platform Administration",
   slug: "",
 };
 
-// ─── Tenant selection step ─────────────────────────────────────────────────
+type TenantPickState = "loading" | "idle" | "checking";
+type MagicState = "idle" | "submitting" | "sent" | "error";
+type PasswordState = "idle" | "submitting" | "error";
+type Tab = "magic" | "password";
+type Step = "select-tenant" | "sign-in";
 
-type TenantPickState = "loading" | "idle" | "checking" | "error";
+function TenantPill({ tenant }: { tenant: TenantPublicItem }) {
+  if (tenant.logoUrl) {
+    return (
+      <img
+        src={tenant.logoUrl}
+        alt={tenant.name}
+        className="h-10 w-10 rounded-2xl border border-white/10 bg-slate-950/40 object-contain p-2"
+      />
+    );
+  }
+
+  return (
+    <div
+      className="flex h-10 w-10 items-center justify-center rounded-2xl text-sm font-bold text-white"
+      style={{ backgroundColor: tenant.brandColor ?? "#1e3a5f" }}
+    >
+      {tenant.name.charAt(0).toUpperCase()}
+    </div>
+  );
+}
 
 function TenantSelector({
   onSelect,
@@ -39,17 +62,20 @@ function TenantSelector({
       .catch(() => setState("idle"));
   }, []);
 
-  async function handlePrivateSlug(e: React.BaseSyntheticEvent) {
+  async function handlePrivateSlug(e: FormEvent) {
     e.preventDefault();
-    if (!privateSlug.trim()) { return; }
+    if (!privateSlug.trim()) return;
+
     setState("checking");
     setSlugError("");
+
     try {
       const res = await fetch("/api/tenants/lookup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug: privateSlug.trim().toLowerCase() }),
       });
+
       if (res.ok) {
         const tenant: TenantPublicItem = await res.json();
         onSelect(tenant);
@@ -64,86 +90,79 @@ function TenantSelector({
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-slate-500 text-sm">
-        Select your organization to continue.
+    <div className="space-y-5">
+      <p className="section-copy text-sm">
+        Select your organization to continue into the secured media platform.
       </p>
 
       {state === "loading" ? (
-        <div className="flex items-center justify-center py-10">
-          <div className="w-6 h-6 border-2 border-[#1e3a5f] border-t-slate-300 rounded-full animate-spin" />
+        <div className="flex items-center justify-center py-12">
+          <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
         </div>
       ) : (
         <>
-          {/* Public tenant cards */}
-          {publicTenants.length > 0 && (
-            <div className="space-y-2">
-              {publicTenants.map((t) => (
+          {publicTenants.length > 0 ? (
+            <div className="space-y-3">
+              {publicTenants.map((tenant) => (
                 <button
-                  key={t.id}
+                  key={tenant.id}
                   type="button"
-                  onClick={() => onSelect(t)}
-                  className="w-full flex items-center gap-3 p-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 rounded-lg transition-colors text-left group"
+                  onClick={() => onSelect(tenant)}
+                  className="surface-card-soft group flex w-full items-center gap-4 rounded-[1.1rem] p-4 text-left"
                 >
-                  {t.logoUrl ? (
-                    <img
-                      src={t.logoUrl}
-                      alt={t.name}
-                      className="w-9 h-9 rounded object-contain flex-shrink-0 border border-slate-200"
-                    />
-                  ) : (
-                    <div
-                      className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-white font-bold text-sm"
-                      style={{ backgroundColor: t.brandColor ?? "#1e3a5f" }}
-                    >
-                      {t.name.charAt(0).toUpperCase()}
-                    </div>
-                  )}
+                  <TenantPill tenant={tenant} />
                   <div className="min-w-0 flex-1">
-                    <div className="text-slate-800 font-medium group-hover:text-[#1e3a5f] transition-colors truncate">
-                      {t.name}
+                    <div className="truncate text-base font-semibold tracking-[-0.02em] text-white">
+                      {tenant.name}
                     </div>
-                    {t.description && (
-                      <div className="text-slate-400 text-xs truncate mt-0.5">{t.description}</div>
-                    )}
+                    {tenant.description ? (
+                      <div className="mt-1 truncate text-xs text-[var(--text-muted)]">
+                        {tenant.description}
+                      </div>
+                    ) : null}
                   </div>
                   <svg
-                    className="w-4 h-4 text-slate-400 group-hover:text-[#1e3a5f] flex-shrink-0 transition-colors"
+                    className="h-4 w-4 flex-shrink-0 text-[var(--text-muted)]"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
                   </svg>
                 </button>
               ))}
             </div>
-          )}
+          ) : null}
 
-          {/* Divider when both public and private options exist */}
-          {publicTenants.length > 0 && (
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-600" />
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="bg-white px-3 text-slate-400">or</span>
-              </div>
+          {publicTenants.length > 0 ? (
+            <div className="flex items-center gap-4">
+              <div className="ops-divider" />
+              <span className="text-xs uppercase tracking-[0.22em] text-[var(--text-subtle)]">
+                or
+              </span>
+              <div className="ops-divider" />
             </div>
-          )}
+          ) : null}
 
-          {/* Private org code */}
           {!showPrivateInput ? (
             <button
               type="button"
               onClick={() => setShowPrivateInput(true)}
-              className="w-full py-3 px-4 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 text-slate-600 hover:text-slate-800 text-sm rounded-lg transition-colors"
+              className="ops-button-secondary w-full justify-center"
             >
-              Enter a private organization code
+              Enter a Private Organization Code
             </button>
           ) : (
             <form onSubmit={handlePrivateSlug} className="space-y-3">
-              <label htmlFor="private-slug" className="block text-sm font-medium text-slate-700">
+              <label
+                htmlFor="private-slug"
+                className="block text-sm font-medium text-white/86"
+              >
                 Organization code
               </label>
               <input
@@ -153,21 +172,28 @@ function TenantSelector({
                 onChange={(e) => setPrivateSlug(e.target.value)}
                 placeholder="e.g. my-organization"
                 disabled={state === "checking"}
-                className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-[#1e3a5f] disabled:opacity-50 transition-colors"
+                className="ops-input disabled:opacity-50"
               />
-              {slugError && <p className="text-red-600 text-sm">{slugError}</p>}
-              <div className="flex gap-2">
+              {slugError ? (
+                <p className="text-sm text-[#ffb7b7]">{slugError}</p>
+              ) : null}
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <button
                   type="submit"
                   disabled={state === "checking" || !privateSlug.trim()}
-                  className="flex-1 py-2.5 px-4 bg-[#1e3a5f] hover:bg-[#16304f] disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
+                  className="ops-button flex-1"
                 >
-                  {state === "checking" ? "Checking…" : "Continue"}
+                  {state === "checking" ? "Checking..." : "Continue"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setShowPrivateInput(false); setPrivateSlug(""); setSlugError(""); setState("idle"); }}
-                  className="py-2.5 px-4 bg-white hover:bg-slate-50 text-slate-600 text-sm rounded-lg transition-colors border border-slate-300"
+                  onClick={() => {
+                    setShowPrivateInput(false);
+                    setPrivateSlug("");
+                    setSlugError("");
+                    setState("idle");
+                  }}
+                  className="ops-button-secondary"
                 >
                   Cancel
                 </button>
@@ -175,14 +201,13 @@ function TenantSelector({
             </form>
           )}
 
-          {/* Platform admin sign-in link */}
-          <div className="mt-6 pt-4 border-t border-slate-200 text-center">
+          <div className="border-t border-[rgba(140,172,197,0.14)] pt-5 text-center">
             <button
               type="button"
               onClick={onPlatformAdmin}
-              className="text-slate-400 hover:text-slate-600 text-xs transition-colors"
+              className="ops-button-ghost mx-auto text-xs uppercase tracking-[0.18em]"
             >
-              Platform administrator sign-in
+              Platform Administrator Sign-In
             </button>
           </div>
         </>
@@ -190,10 +215,6 @@ function TenantSelector({
     </div>
   );
 }
-
-// ─── Magic Link form ───────────────────────────────────────────────────────
-
-type MagicState = "idle" | "submitting" | "sent" | "error";
 
 function MagicLinkForm({
   tenant,
@@ -205,7 +226,7 @@ function MagicLinkForm({
   const [email, setEmail] = useState("");
   const [state, setState] = useState<MagicState>("idle");
 
-  async function handleSubmit(e: React.BaseSyntheticEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setState("submitting");
     try {
@@ -215,7 +236,9 @@ function MagicLinkForm({
         body: JSON.stringify({
           email,
           tenantSlug: tenant.slug,
-          ...(tenant.id === PLATFORM_ADMIN_TENANT.id && { mode: "platform-admin" }),
+          ...(tenant.id === PLATFORM_ADMIN_TENANT.id && {
+            mode: "platform-admin",
+          }),
         }),
       });
       setState(res.ok ? "sent" : "error");
@@ -226,23 +249,38 @@ function MagicLinkForm({
 
   if (state === "sent") {
     return (
-      <div className="text-center py-4">
-        <div className="w-14 h-14 rounded-full bg-green-50 border-2 border-green-200 flex items-center justify-center mx-auto mb-4">
-          <svg className="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+      <div className="py-4 text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-[rgba(88,215,176,0.22)] bg-[rgba(88,215,176,0.16)]">
+          <svg
+            className="h-7 w-7 text-[var(--success)]"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M5 13l4 4L19 7"
+            />
           </svg>
         </div>
-        <h3 className="text-slate-800 font-semibold text-lg mb-2">Check your email</h3>
-        <p className="text-slate-500 text-sm leading-relaxed">
+        <h3 className="mb-2 text-xl font-semibold tracking-[-0.03em] text-white">
+          Check your email
+        </h3>
+        <p className="text-sm leading-7 text-[var(--text-muted)]">
           If your email is authorized, you will receive a login link shortly.
           The link expires in 10 minutes.
         </p>
         <button
           type="button"
-          onClick={() => { setEmail(""); setState("idle"); }}
-          className="mt-6 text-[#1e3a5f] hover:underline text-sm font-medium"
+          onClick={() => {
+            setEmail("");
+            setState("idle");
+          }}
+          className="ops-button-ghost mx-auto mt-6"
         >
-          Use a different email
+          Use a Different Email
         </button>
       </div>
     );
@@ -250,19 +288,22 @@ function MagicLinkForm({
 
   return (
     <>
-      <p className="text-slate-500 text-sm mb-5">
+      <p className="mb-5 text-sm leading-7 text-[var(--text-muted)]">
         Enter your authorized email address to receive a one-time login link.
       </p>
 
-      {hasError && state === "idle" && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+      {hasError && state === "idle" ? (
+        <div className="ops-danger-panel mb-4 rounded-[1rem] px-4 py-3 text-sm">
           That login link is invalid or has expired. Please request a new one.
         </div>
-      )}
+      ) : null}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="ml-email" className="block text-sm font-medium text-slate-700 mb-1.5">
+          <label
+            htmlFor="ml-email"
+            className="mb-1.5 block text-sm font-medium text-white/86"
+          >
             Email address
           </label>
           <input
@@ -274,29 +315,27 @@ function MagicLinkForm({
             onChange={(e) => setEmail(e.target.value)}
             disabled={state === "submitting"}
             placeholder="you@example.com"
-            className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-[#1e3a5f] disabled:opacity-50 transition-colors"
+            className="ops-input disabled:opacity-50"
           />
         </div>
 
-        {state === "error" && (
-          <p className="text-red-600 text-sm">Something went wrong. Please try again.</p>
-        )}
+        {state === "error" ? (
+          <p className="text-sm text-[#ffb7b7]">
+            Something went wrong. Please try again.
+          </p>
+        ) : null}
 
         <button
           type="submit"
           disabled={state === "submitting" || !email}
-          className="w-full py-2.5 px-4 bg-[#1e3a5f] hover:bg-[#16304f] disabled:opacity-50 text-white font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:ring-offset-2"
+          className="ops-button w-full justify-center"
         >
-          {state === "submitting" ? "Sending…" : "Send login link"}
+          {state === "submitting" ? "Sending..." : "Send Login Link"}
         </button>
       </form>
     </>
   );
 }
-
-// ─── Password form ─────────────────────────────────────────────────────────
-
-type PasswordState = "idle" | "submitting" | "error";
 
 function PasswordForm({ tenant }: { tenant: TenantPublicItem }) {
   const router = useRouter();
@@ -305,10 +344,11 @@ function PasswordForm({ tenant }: { tenant: TenantPublicItem }) {
   const [state, setState] = useState<PasswordState>("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
-  async function handleSubmit(e: React.BaseSyntheticEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setState("submitting");
     setErrorMsg("");
+
     try {
       const res = await fetch("/api/auth/password", {
         method: "POST",
@@ -317,7 +357,9 @@ function PasswordForm({ tenant }: { tenant: TenantPublicItem }) {
           email,
           password,
           tenantSlug: tenant.slug,
-          ...(tenant.id === PLATFORM_ADMIN_TENANT.id && { mode: "platform-admin" }),
+          ...(tenant.id === PLATFORM_ADMIN_TENANT.id && {
+            mode: "platform-admin",
+          }),
         }),
       });
 
@@ -342,13 +384,16 @@ function PasswordForm({ tenant }: { tenant: TenantPublicItem }) {
 
   return (
     <>
-      <p className="text-slate-500 text-sm mb-5">
+      <p className="mb-5 text-sm leading-7 text-[var(--text-muted)]">
         Sign in with your email address and password.
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="pw-email" className="block text-sm font-medium text-slate-700 mb-1.5">
+          <label
+            htmlFor="pw-email"
+            className="mb-1.5 block text-sm font-medium text-white/86"
+          >
             Email address
           </label>
           <input
@@ -360,12 +405,15 @@ function PasswordForm({ tenant }: { tenant: TenantPublicItem }) {
             onChange={(e) => setEmail(e.target.value)}
             disabled={state === "submitting"}
             placeholder="you@example.com"
-            className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-[#1e3a5f] disabled:opacity-50 transition-colors"
+            className="ops-input disabled:opacity-50"
           />
         </div>
 
         <div>
-          <label htmlFor="pw-password" className="block text-sm font-medium text-slate-700 mb-1.5">
+          <label
+            htmlFor="pw-password"
+            className="mb-1.5 block text-sm font-medium text-white/86"
+          >
             Password
           </label>
           <input
@@ -376,43 +424,41 @@ function PasswordForm({ tenant }: { tenant: TenantPublicItem }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={state === "submitting"}
-            className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:border-[#1e3a5f] disabled:opacity-50 transition-colors"
+            className="ops-input disabled:opacity-50"
           />
         </div>
 
-        {state === "error" && errorMsg && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        {state === "error" && errorMsg ? (
+          <div className="ops-danger-panel rounded-[1rem] px-4 py-3 text-sm">
             {errorMsg}
           </div>
-        )}
+        ) : null}
 
         <button
           type="submit"
           disabled={state === "submitting" || !email || !password}
-          className="w-full py-2.5 px-4 bg-[#1e3a5f] hover:bg-[#16304f] disabled:opacity-50 text-white font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#1e3a5f] focus:ring-offset-2"
+          className="ops-button w-full justify-center"
         >
-          {state === "submitting" ? "Signing in…" : "Sign in"}
+          {state === "submitting" ? "Signing in..." : "Sign In"}
         </button>
       </form>
     </>
   );
 }
 
-// ─── Login page ────────────────────────────────────────────────────────────
-
-type Tab = "magic" | "password";
-type Step = "select-tenant" | "sign-in";
-
 export default function LoginPage() {
   const searchParams = useSearchParams();
   const hasError = searchParams.get("error") === "invalid";
   const tenantSlugParam = searchParams.get("tenant") ?? "";
 
-  const [step, setStep] = useState<Step>(tenantSlugParam ? "sign-in" : "select-tenant");
-  const [selectedTenant, setSelectedTenant] = useState<TenantPublicItem | null>(null);
+  const [step, setStep] = useState<Step>(
+    tenantSlugParam ? "sign-in" : "select-tenant"
+  );
+  const [selectedTenant, setSelectedTenant] = useState<TenantPublicItem | null>(
+    null
+  );
   const [tab, setTab] = useState<Tab>("magic");
 
-  // If a slug was passed via URL, resolve it immediately
   const resolveSlugFromUrl = useCallback(async (slug: string) => {
     try {
       const res = await fetch("/api/tenants/lookup", {
@@ -420,6 +466,7 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug }),
       });
+
       if (res.ok) {
         const tenant: TenantPublicItem = await res.json();
         setSelectedTenant(tenant);
@@ -452,130 +499,221 @@ export default function LoginPage() {
   const isPlatformAdmin = selectedTenant?.id === PLATFORM_ADMIN_TENANT.id;
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center px-4 py-10">
+    <>
+      <CuiBanner />
 
-      {/* Card */}
-      <div className="w-full max-w-md bg-white rounded-xl shadow-lg overflow-hidden border border-slate-200">
-
-        {/* Branded header bar */}
-        <div className="bg-[#1e3a5f] px-6 py-5 flex items-center gap-3">
-          {/* Shield / lock icon */}
-          <div className="w-10 h-10 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-white font-semibold text-lg leading-tight">
-              Aleut Federal Media Gallery
-            </h1>
-            <p className="text-blue-200 text-xs mt-0.5">
-              Tenant Selection
-            </p>
-          </div>
-        </div>
-
-        {/* Selected tenant / platform-admin badge (sign-in step) */}
-        {step === "sign-in" && selectedTenant && (
-          <div className="flex items-center gap-3 px-6 py-3 bg-slate-50 border-b border-slate-200">
-            {isPlatformAdmin ? (
-              <div className="w-7 h-7 rounded-lg bg-amber-100 border border-amber-200 flex items-center justify-center flex-shrink-0">
-                <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
+      <div className="app-shell flex min-h-[calc(100vh-44px)] items-center px-4 py-10">
+        <div className="mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[1.15fr_0.95fr]">
+          <section className="surface-card hidden rounded-[2rem] p-8 lg:block xl:p-10">
+            <div className="space-y-6">
+              <p className="hero-kicker">Secure Media Platform</p>
+              <div className="space-y-4">
+                <h1 className="hero-title">
+                  Modern media operations built for controlled environments.
+                </h1>
+                <p className="hero-subtitle">
+                  Route users into the correct tenant boundary, verify identity
+                  with password or one-time link, and keep access scoped to the
+                  organization that owns the media.
+                </p>
               </div>
-            ) : selectedTenant.logoUrl ? (
-              <img src={selectedTenant.logoUrl} alt={selectedTenant.name} className="w-7 h-7 rounded object-contain border border-slate-200" />
-            ) : (
-              <div
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                style={{ backgroundColor: selectedTenant.brandColor ?? "#1e3a5f" }}
-              >
-                {selectedTenant.name.charAt(0).toUpperCase()}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="metric-card">
+                  <p className="metric-label">Tenant Isolation</p>
+                  <p className="metric-value">Scoped</p>
+                  <p className="metric-subtext">
+                    Organization-aware authentication and session routing.
+                  </p>
+                </div>
+                <div className="metric-card">
+                  <p className="metric-label">Access Patterns</p>
+                  <p className="metric-value">Dual Mode</p>
+                  <p className="metric-subtext">
+                    Password login for managed users and email-link recovery
+                    paths.
+                  </p>
+                </div>
               </div>
-            )}
-            <span className={`text-sm font-medium truncate flex-1 ${isPlatformAdmin ? "text-amber-700" : "text-slate-700"}`}>
-              {selectedTenant.name}
-            </span>
-            {!tenantSlugParam && (
-              <button
-                type="button"
-                onClick={() => { setStep("select-tenant"); setSelectedTenant(null); }}
-                className="text-slate-400 hover:text-slate-600 text-xs underline flex-shrink-0 transition-colors"
-              >
-                Change
-              </button>
-            )}
-          </div>
-        )}
 
-        {/* Tabs (sign-in step only) */}
-        {step === "sign-in" && (
-          <div className="flex border-b border-slate-200">
-            <button
-              type="button"
-              onClick={() => setTab("magic")}
-              className={`flex-1 py-3 text-sm font-medium transition-colors focus:outline-none ${
-                tab === "magic"
-                  ? "text-[#1e3a5f] border-b-2 border-[#1e3a5f] bg-white"
-                  : "text-slate-400 hover:text-slate-600 bg-slate-50"
-              }`}
-            >
-              Email link
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab("password")}
-              className={`flex-1 py-3 text-sm font-medium transition-colors focus:outline-none ${
-                tab === "password"
-                  ? "text-[#1e3a5f] border-b-2 border-[#1e3a5f] bg-white"
-                  : "text-slate-400 hover:text-slate-600 bg-slate-50"
-              }`}
-            >
-              Password
-            </button>
-          </div>
-        )}
-
-        {/* Content */}
-        <div className="px-6 py-6">
-          {step === "select-tenant" && (
-            <>
-              <h2 className="text-slate-800 font-semibold text-base mb-4">Select your organization</h2>
-              <TenantSelector onSelect={handleTenantSelected} onPlatformAdmin={handlePlatformAdmin} />
-            </>
-          )}
-
-          {step === "sign-in" && selectedTenant && (
-            <>
-              {tab === "magic" ? (
-                <MagicLinkForm tenant={selectedTenant} hasError={hasError} />
-              ) : (
-                <PasswordForm tenant={selectedTenant} />
-              )}
-            </>
-          )}
-
-          {/* Resolving slug from URL param — show spinner */}
-          {step === "sign-in" && !selectedTenant && (
-            <div className="flex items-center justify-center py-10">
-              <div className="w-6 h-6 border-2 border-[#1e3a5f] border-t-transparent rounded-full animate-spin" />
+              <div className="surface-card-soft rounded-[1.4rem] p-5">
+                <p className="hero-kicker">Platform Notes</p>
+                <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--text-muted)]">
+                  <li>
+                    Authorized users are routed into tenant-specific media
+                    workspaces.
+                  </li>
+                  <li>
+                    Public and private organizations can be selected without
+                    exposing tenant internals.
+                  </li>
+                  <li>
+                    Platform administrators can sign in directly for cross-tenant
+                    control tasks.
+                  </li>
+                </ul>
+              </div>
             </div>
-          )}
+          </section>
+
+          <section className="surface-card overflow-hidden rounded-[2rem]">
+            <div className="border-b border-[rgba(140,172,197,0.14)] bg-[linear-gradient(135deg,rgba(23,58,87,0.98),rgba(10,33,49,0.98))] px-6 py-6 sm:px-8">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/12 bg-white/8">
+                  <svg
+                    className="h-5 w-5 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.75}
+                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <p className="hero-kicker text-[rgba(214,245,255,0.82)] before:bg-[linear-gradient(135deg,#dff7ff,rgba(214,245,255,0.2))]">
+                    Access Gateway
+                  </p>
+                  <h1 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white">
+                    myMedia Platform
+                  </h1>
+                  <p className="mt-1 text-sm text-[rgba(214,245,255,0.74)]">
+                    Tenant-aware authentication and controlled media access.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {step === "sign-in" && selectedTenant ? (
+              <div className="border-b border-[rgba(140,172,197,0.14)] bg-[rgba(7,18,28,0.58)] px-6 py-4 sm:px-8">
+                <div className="flex items-center gap-3">
+                  {isPlatformAdmin ? (
+                    <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-[rgba(241,197,108,0.24)] bg-[rgba(241,197,108,0.14)]">
+                      <svg
+                        className="h-4 w-4 text-[var(--warning)]"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                        />
+                      </svg>
+                    </div>
+                  ) : (
+                    <TenantPill tenant={selectedTenant} />
+                  )}
+
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
+                      Active Tenant Context
+                    </p>
+                    <span
+                      className={`block truncate text-sm font-medium ${
+                        isPlatformAdmin ? "text-[var(--warning)]" : "text-white"
+                      }`}
+                    >
+                      {selectedTenant.name}
+                    </span>
+                  </div>
+
+                  {!tenantSlugParam ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStep("select-tenant");
+                        setSelectedTenant(null);
+                      }}
+                      className="ops-button-ghost text-xs uppercase tracking-[0.18em]"
+                    >
+                      Change
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
+            {step === "sign-in" ? (
+              <div className="flex border-b border-[rgba(140,172,197,0.14)] bg-[rgba(5,16,25,0.7)]">
+                <button
+                  type="button"
+                  onClick={() => setTab("magic")}
+                  className={`flex-1 px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] ${
+                    tab === "magic"
+                      ? "bg-[rgba(105,211,255,0.12)] text-white"
+                      : "text-[var(--text-muted)]"
+                  }`}
+                >
+                  Email Link
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab("password")}
+                  className={`flex-1 px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] ${
+                    tab === "password"
+                      ? "bg-[rgba(105,211,255,0.12)] text-white"
+                      : "text-[var(--text-muted)]"
+                  }`}
+                >
+                  Password
+                </button>
+              </div>
+            ) : null}
+
+            <div className="px-6 py-6 sm:px-8 sm:py-8">
+              {step === "select-tenant" ? (
+                <>
+                  <p className="hero-kicker">Tenant Selection</p>
+                  <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">
+                    Choose your organization
+                  </h2>
+                  <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
+                    Public organizations are listed below. If your tenant is
+                    private, use its organization code to continue.
+                  </p>
+                  <div className="mt-6">
+                    <TenantSelector
+                      onSelect={handleTenantSelected}
+                      onPlatformAdmin={handlePlatformAdmin}
+                    />
+                  </div>
+                </>
+              ) : null}
+
+              {step === "sign-in" && selectedTenant ? (
+                tab === "magic" ? (
+                  <MagicLinkForm tenant={selectedTenant} hasError={hasError} />
+                ) : (
+                  <PasswordForm tenant={selectedTenant} />
+                )
+              ) : null}
+
+              {step === "sign-in" && !selectedTenant ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+                </div>
+              ) : null}
+            </div>
+          </section>
+        </div>
+
+        <div className="mx-auto mt-6 flex w-full max-w-6xl flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="w-full max-w-md">
+            <HealthStatus />
+          </div>
+          <p className="max-w-xl text-xs uppercase tracking-[0.18em] text-[var(--text-subtle)]">
+            Authorized use only. Access attempts and administrative actions are
+            subject to monitoring and audit.
+          </p>
         </div>
       </div>
-
-      {/* Health status */}
-      <div className="w-full max-w-md mt-4">
-        <HealthStatus />
-      </div>
-
-      <p className="mt-4 text-slate-400 text-xs text-center max-w-sm leading-relaxed">
-        Access to this system is restricted to authorized personnel only.
-        Unauthorized access is prohibited and may be subject to criminal prosecution.
-      </p>
-    </div>
+    </>
   );
 }

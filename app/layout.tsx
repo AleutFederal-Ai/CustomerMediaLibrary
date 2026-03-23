@@ -3,8 +3,8 @@ import { headers } from "next/headers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Media Gallery",
-  description: "Secure media library",
+  title: "myMedia Platform",
+  description: "Secure multi-tenant media operations platform",
 };
 
 export default async function RootLayout({
@@ -19,7 +19,7 @@ export default async function RootLayout({
 
   return (
     <html lang="en">
-      <body nonce={nonce}>
+      <body nonce={nonce} className="antialiased">
         {children}
       </body>
     </html>

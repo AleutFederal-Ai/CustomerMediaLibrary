@@ -13,7 +13,7 @@ class GcchCosmosCredential implements TokenCredential {
   }
 }
 
-const DB_NAME = "mymedia";
+const DB_NAME = process.env.COSMOS_DB_NAME ?? "mymedia";
 
 export const CONTAINERS = {
   SESSIONS: "sessions",

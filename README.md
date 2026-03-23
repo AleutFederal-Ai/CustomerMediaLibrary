@@ -93,8 +93,8 @@ az login
 ### Step 1 — Set Variables
 ```bash
 LOCATION="usgovvirginia"
-RG="rg-mediagallery-prod"
-PREFIX="mediagallery"
+RG="rg-mymedia-prod"
+PREFIX="mymedia"
 ```
 
 ### Steps 2–15 — Run Infrastructure Setup
@@ -112,7 +112,7 @@ Follow `docs/infrastructure-guide.md` steps 2 through 15 in sequence:
 | 9 | Entra ID app registration for Graph email sending |
 | 10 | Virtual Network + subnets |
 | 11 | Application Gateway v2 + WAF policy (Prevention mode, OWASP 3.2) |
-| 12 | Entra ID security group (MediaGallery-Admins) |
+| 12 | Entra ID security group (myMedia-Admins) |
 | 13 | Secrets stored in Key Vault |
 | 14 | App Service environment variable configuration |
 | 15 | Azure Monitor alerts |
@@ -392,7 +392,7 @@ AzureDiagnostics
 
 ### "Access Denied" on Admin Pages
 
-1. Confirm the user's email is a member of the `MediaGallery-Admins` Entra ID group
+1. Confirm the user's email is a member of the `myMedia-Admins` Entra ID group
 2. Confirm `AdminGroupObjectId` in Key Vault matches the group's actual Object ID
 3. Check that the Graph app has permission to read group members
 

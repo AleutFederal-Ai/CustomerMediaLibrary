@@ -1,10 +1,16 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { canAccessAdmin } from "@/lib/auth/admin";
+import { isTenantAdmin } from "@/lib/auth/permissions";
 import { memberships } from "@/lib/azure/cosmos";
 import { MembershipRecord, TenantPublicItem } from "@/types";
 import MemberManager from "@/components/admin/MemberManager";
+import {
+  AppShell,
+  BackLink,
+  HeroSection,
+  PageWidth,
+  TopBar,
+} from "@/components/ui/AppFrame";
 
 async function getMembers(tenantId: string): Promise<MembershipRecord[]> {
   const container = await memberships();
@@ -29,7 +35,8 @@ export default async function AdminMembersPage() {
   const proto = headerStore.get("x-forwarded-proto") ?? "http";
 
   if (!email) redirect("/login");
-  const isAdmin = await canAccessAdmin(email);
+  if (!tenantId) redirect("/admin");
+  const isAdmin = await isTenantAdmin(email, tenantId);
   if (!isAdmin) redirect("/");
 
   const [memberList, activeTenant] = await Promise.all([
@@ -38,29 +45,41 @@ export default async function AdminMembersPage() {
       headers: { cookie: headerStore.get("cookie") ?? "" },
       cache: "no-store",
     })
-      .then((r) =>
-        r.ok ? (r.json() as Promise<TenantPublicItem>) : null
-      )
+      .then((r) => (r.ok ? (r.json() as Promise<TenantPublicItem>) : null))
       .catch(() => null),
   ]);
 
   return (
-    <div className="min-h-screen bg-slate-900">
-      <header className="bg-slate-800 border-b border-slate-700 px-6 py-3 flex items-center gap-4">
-        <Link
-          href="/admin"
-          className="text-slate-400 hover:text-white text-sm transition-colors"
-        >
-          &larr; Admin
-        </Link>
-        <h1 className="text-white font-semibold">
-          Members{activeTenant ? ` \u2014 ${activeTenant.name}` : ""}
-        </h1>
-      </header>
+    <AppShell>
+      <TopBar accentColor={activeTenant?.brandColor}>
+        <div className="flex items-center gap-3">
+          <BackLink href="/admin">Return to Admin</BackLink>
+          <div>
+            <p className="hero-kicker">Tenant Membership</p>
+            <p className="text-sm text-[var(--text-muted)]">
+              {activeTenant?.name ?? "Active tenant"}
+            </p>
+          </div>
+        </div>
+      </TopBar>
 
-      <main className="max-w-4xl mx-auto px-6 py-8">
-        <MemberManager initialMembers={memberList} tenantId={tenantId} />
-      </main>
-    </div>
+      <PageWidth className="space-y-6 py-8 sm:space-y-8 sm:py-10">
+        <HeroSection
+          eyebrow="Membership Control"
+          title={`Manage access inside ${activeTenant?.name ?? "this tenant"}.`}
+          description="Invite members, update contributor and admin roles, and keep tenant access aligned with operational need."
+          meta={
+            <span className="chip chip-accent">
+              Active Members
+              <strong>{memberList.filter((member) => member.isActive).length}</strong>
+            </span>
+          }
+        />
+
+        <div className="surface-card rounded-[1.5rem] p-5 sm:p-6">
+          <MemberManager initialMembers={memberList} tenantId={tenantId} />
+        </div>
+      </PageWidth>
+    </AppShell>
   );
 }
