@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api-fetch";
 
 interface Props {
   initialAlbums: AlbumRecord[];
+  tenantId: string;
 }
 
 // ─── Cover image picker modal ──────────────────────────────────────────────
@@ -260,7 +261,7 @@ function AlbumRow({
 
 // ─── Main AlbumManager ─────────────────────────────────────────────────────
 
-export default function AlbumManager({ initialAlbums }: Props) {
+export default function AlbumManager({ initialAlbums, tenantId }: Props) {
   const [albums, setAlbums] = useState(initialAlbums);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -279,7 +280,9 @@ export default function AlbumManager({ initialAlbums }: Props) {
     setError("");
 
     try {
-      const res = await apiFetch("/api/admin/albums", {
+      const res = await apiFetch(
+        `/api/admin/albums?tenantId=${encodeURIComponent(tenantId)}`,
+        {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -287,7 +290,8 @@ export default function AlbumManager({ initialAlbums }: Props) {
           description: newDesc.trim(),
           order: activeAlbums.length,
         }),
-      });
+        }
+      );
 
       if (res.ok) {
         const created: AlbumRecord = await res.json();
@@ -313,11 +317,14 @@ export default function AlbumManager({ initialAlbums }: Props) {
     changes: Partial<AlbumRecord>
   ): Promise<boolean> {
     try {
-      const res = await apiFetch(`/api/admin/albums?id=${id}`, {
+      const res = await apiFetch(
+        `/api/admin/albums?tenantId=${encodeURIComponent(tenantId)}&id=${id}`,
+        {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(changes),
-      });
+        }
+      );
       if (res.ok) {
         const updated: AlbumRecord = await res.json();
         setAlbums((prev) => prev.map((a) => (a.id === id ? updated : a)));
@@ -340,9 +347,12 @@ export default function AlbumManager({ initialAlbums }: Props) {
       return;
 
     try {
-      const res = await apiFetch(`/api/admin/albums?id=${id}`, {
+      const res = await apiFetch(
+        `/api/admin/albums?tenantId=${encodeURIComponent(tenantId)}&id=${id}`,
+        {
         method: "DELETE",
-      });
+        }
+      );
       if (res.ok) {
         setAlbums((prev) => prev.filter((a) => a.id !== id));
       } else {
@@ -371,16 +381,22 @@ export default function AlbumManager({ initialAlbums }: Props) {
 
     // Persist both order changes
     await Promise.all([
-      apiFetch(`/api/admin/albums?id=${current.id}`, {
+      apiFetch(
+        `/api/admin/albums?tenantId=${encodeURIComponent(tenantId)}&id=${current.id}`,
+        {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ order: swap.order }),
-      }),
-      apiFetch(`/api/admin/albums?id=${swap.id}`, {
+        }
+      ),
+      apiFetch(
+        `/api/admin/albums?tenantId=${encodeURIComponent(tenantId)}&id=${swap.id}`,
+        {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ order: current.order }),
-      }),
+        }
+      ),
     ]);
   }
 

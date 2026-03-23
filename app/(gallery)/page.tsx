@@ -1,7 +1,6 @@
 import { headers } from "next/headers";
 import Link from "next/link";
-import AlbumCard from "@/components/gallery/AlbumCard";
-import CreateAlbumCard from "@/components/gallery/CreateAlbumCard";
+import GalleryAlbumWorkspace from "@/components/gallery/GalleryAlbumWorkspace";
 import { canAccessAdmin } from "@/lib/auth/admin";
 import { isTenantAdmin } from "@/lib/auth/permissions";
 import { AlbumListItem, TenantPublicItem } from "@/types";
@@ -226,24 +225,11 @@ export default async function GalleryHomePage() {
             </div>
           </div>
 
-          {albums.length === 0 && !isTenantAdm ? (
-            <div className="ops-empty">
-              <p className="text-lg font-semibold text-white">
-                No albums are currently available.
-              </p>
-              <p className="mx-auto mt-2 max-w-xl text-sm">
-                This tenant does not have any published content yet. Contact a
-                tenant administrator if you expected to see media here.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {isTenantAdm ? <CreateAlbumCard /> : null}
-              {albums.map((album) => (
-                <AlbumCard key={album.id} album={album} />
-              ))}
-            </div>
-          )}
+          <GalleryAlbumWorkspace
+            initialAlbums={albums}
+            canCreate={isTenantAdm}
+            tenantId={activeTenantId}
+          />
         </section>
       </PageWidth>
     </AppShell>

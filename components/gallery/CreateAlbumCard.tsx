@@ -1,10 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { startTransition, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-fetch";
+import { AlbumListItem, AlbumRecord } from "@/types";
 
-export default function CreateAlbumCard() {
+interface Props {
+  tenantId: string;
+  onCreated?: (album: AlbumListItem) => void;
+}
+
+export default function CreateAlbumCard({ tenantId, onCreated }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -19,20 +25,41 @@ export default function CreateAlbumCard() {
     setError("");
 
     try {
-      const res = await apiFetch("/api/admin/albums", {
+      const res = await apiFetch(
+        `/api/admin/albums?tenantId=${encodeURIComponent(tenantId)}`,
+        {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim(),
         }),
-      });
+        }
+      );
 
       if (res.ok) {
+        const created = (await res
+          .json()
+          .catch(() => null)) as AlbumRecord | null;
+
+        if (created && onCreated) {
+          onCreated({
+            id: created.id,
+            tenantId: created.tenantId,
+            name: created.name,
+            description: created.description,
+            coverThumbnailUrl: undefined,
+            mediaCount: 0,
+            order: created.order,
+          });
+        }
+
         setName("");
         setDescription("");
         setOpen(false);
-        router.refresh();
+        startTransition(() => {
+          router.refresh();
+        });
       } else {
         const data = await res.json().catch(() => ({}));
         console.error("Album creation failed", data);

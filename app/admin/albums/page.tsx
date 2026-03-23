@@ -77,7 +77,7 @@ export default async function AdminAlbumsPage() {
         />
 
         <div className="surface-card rounded-[1.5rem] p-5 sm:p-6">
-          <AlbumManager initialAlbums={albumList} />
+          <AlbumManager initialAlbums={albumList} tenantId={tenantId} />
         </div>
       </PageWidth>
     </AppShell>
