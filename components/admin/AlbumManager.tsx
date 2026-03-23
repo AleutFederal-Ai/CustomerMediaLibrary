@@ -297,9 +297,11 @@ export default function AlbumManager({ initialAlbums }: Props) {
         setCreating(false);
       } else {
         const data = await res.json().catch(() => ({}));
+        console.error("Album creation failed", data);
         setError(data.error ?? "Failed to create album");
       }
-    } catch {
+    } catch (error) {
+      console.error("Album creation request failed", error);
       setError("Network error");
     } finally {
       setSaving(false);

@@ -50,13 +50,21 @@ function withSecurityHeaders(response: NextResponse, nonce: string): NextRespons
 const DEV_BYPASS_EMAIL = "dev@aleutfederal.com";
 const DEV_BYPASS_TENANT = "tenant-aleutfederal";
 
-function injectDevSession(response: NextResponse): NextResponse {
-  response.headers.set("x-session-id", "dev-bypass-session");
-  response.headers.set("x-session-email", DEV_BYPASS_EMAIL);
-  response.headers.set("x-client-ip", "127.0.0.1");
-  response.headers.set("x-active-tenant-id", DEV_BYPASS_TENANT);
-  response.headers.set("x-tenant-ids", DEV_BYPASS_TENANT);
-  return response;
+function applySessionHeaders(
+  headers: Headers,
+  session: {
+    sessionId: string;
+    email: string;
+    activeTenantId: string | null | undefined;
+    tenantIds: string[];
+    ipAddress: string;
+  }
+): void {
+  headers.set("x-session-id", session.sessionId);
+  headers.set("x-session-email", session.email);
+  headers.set("x-client-ip", session.ipAddress);
+  headers.set("x-active-tenant-id", session.activeTenantId ?? "");
+  headers.set("x-tenant-ids", session.tenantIds.join(","));
 }
 
 // Routes that do NOT require authentication
@@ -107,7 +115,14 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     const hasBypassCookie = request.cookies.get("dev_bypass")?.value === "1";
     const hasBypassHeader = request.headers.get("x-dev-bypass") === "1";
     if (hasBypassCookie || hasBypassHeader) {
-      const response = injectDevSession(nextWithNonce());
+      applySessionHeaders(requestHeaders, {
+        sessionId: "dev-bypass-session",
+        email: DEV_BYPASS_EMAIL,
+        ipAddress: "127.0.0.1",
+        activeTenantId: DEV_BYPASS_TENANT,
+        tenantIds: [DEV_BYPASS_TENANT],
+      });
+      const response = nextWithNonce();
       response.headers.set("x-request-id", requestId);
       logWarn("proxy.request.dev_bypass", {
         requestId,
@@ -205,12 +220,15 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   }
 
   // Attach session context to request headers for downstream route handlers
+  applySessionHeaders(requestHeaders, {
+    sessionId: session.sessionId,
+    email: session.email,
+    ipAddress: ip,
+    activeTenantId: session.activeTenantId,
+    tenantIds: session.tenantIds,
+  });
+
   const response = nextWithNonce();
-  response.headers.set("x-session-id", session.sessionId);
-  response.headers.set("x-session-email", session.email);
-  response.headers.set("x-client-ip", ip);
-  response.headers.set("x-active-tenant-id", session.activeTenantId ?? "");
-  response.headers.set("x-tenant-ids", session.tenantIds.join(","));
   response.headers.set("x-request-id", requestId);
 
   logInfo("proxy.request.authorized", {
