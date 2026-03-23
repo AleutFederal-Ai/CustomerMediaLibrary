@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { canAccessAdmin } from "@/lib/auth/admin";
 import { switchActiveTenant } from "@/lib/auth/session";
+import { getTenantById } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { AuditAction } from "@/types";
 
@@ -33,11 +35,29 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "tenantId is required" }, { status: 400 });
   }
 
+  let allowedTenantIds = tenantIds;
   if (!tenantIds.includes(targetTenantId)) {
-    return NextResponse.json({ error: "Not a member of that tenant" }, { status: 403 });
+    const isPlatformAdmin = await canAccessAdmin(email);
+    if (!isPlatformAdmin) {
+      return NextResponse.json(
+        { error: "Not a member of that tenant" },
+        { status: 403 }
+      );
+    }
+
+    const targetTenant = await getTenantById(targetTenantId);
+    if (!targetTenant) {
+      return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+    }
+
+    allowedTenantIds = [...new Set([...tenantIds, targetTenantId])];
   }
 
-  const switched = await switchActiveTenant(sessionId, targetTenantId, tenantIds);
+  const switched = await switchActiveTenant(
+    sessionId,
+    targetTenantId,
+    allowedTenantIds
+  );
 
   if (!switched) {
     return NextResponse.json({ error: "Failed to switch tenant" }, { status: 500 });

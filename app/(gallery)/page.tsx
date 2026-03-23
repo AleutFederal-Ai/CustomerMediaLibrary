@@ -1,43 +1,16 @@
 import { headers } from "next/headers";
 import Link from "next/link";
 import GalleryAlbumWorkspace from "@/components/gallery/GalleryAlbumWorkspace";
+import TenantScopeRibbon from "@/components/gallery/TenantScopeRibbon";
 import { canAccessAdmin } from "@/lib/auth/admin";
 import { isTenantAdmin } from "@/lib/auth/permissions";
-import { AlbumListItem, TenantPublicItem } from "@/types";
+import { tenants as tenantsContainer } from "@/lib/azure/cosmos";
+import { AlbumListItem, TenantPublicItem, TenantRecord } from "@/types";
 import {
   AppShell,
-  HeroSection,
-  Metric,
   PageWidth,
   TopBar,
 } from "@/components/ui/AppFrame";
-
-function TenantIdentity({
-  tenant,
-  fallbackColor,
-}: {
-  tenant: TenantPublicItem | null;
-  fallbackColor: string;
-}) {
-  if (tenant?.logoUrl) {
-    return (
-      <img
-        src={tenant.logoUrl}
-        alt={tenant.name}
-        className="h-11 w-11 rounded-2xl border border-white/10 bg-slate-950/50 object-contain p-2"
-      />
-    );
-  }
-
-  return (
-    <div
-      className="flex h-11 w-11 items-center justify-center rounded-2xl text-sm font-bold text-white shadow-[0_10px_30px_rgba(0,0,0,0.22)]"
-      style={{ backgroundColor: fallbackColor }}
-    >
-      {(tenant?.name ?? "M").charAt(0).toUpperCase()}
-    </div>
-  );
-}
 
 export default async function GalleryHomePage() {
   const headerStore = await headers();
@@ -71,28 +44,68 @@ export default async function GalleryHomePage() {
     return res.json();
   }
 
-  async function getUserTenants(): Promise<TenantPublicItem[]> {
-    if (tenantIds.length <= 1) return [];
-    const res = await fetch(`${proto}://${host}/api/tenants`, {
-      headers: baseHeaders,
-      cache: "no-store",
-    });
-    if (!res.ok) return [];
-    return res.json();
+  async function getTenantOptions(
+    isPlatformAdmin: boolean
+  ): Promise<TenantPublicItem[]> {
+    try {
+      const container = await tenantsContainer();
+
+      if (isPlatformAdmin) {
+        const { resources } = await container.items
+          .query<TenantRecord>({
+            query: "SELECT * FROM c WHERE c.isActive = true ORDER BY c.name ASC",
+          })
+          .fetchAll();
+
+        return resources.map((tenant) => ({
+          id: tenant.id,
+          name: tenant.name,
+          slug: tenant.slug,
+          ...(tenant.description && { description: tenant.description }),
+          ...(tenant.logoUrl && { logoUrl: tenant.logoUrl }),
+          ...(tenant.brandColor && { brandColor: tenant.brandColor }),
+        }));
+      }
+
+      if (tenantIds.length <= 1) return [];
+
+      const { resources } = await container.items
+        .query<TenantRecord>({
+          query: `SELECT * FROM c WHERE c.id IN (${tenantIds
+            .map((_, index) => `@tenant${index}`)
+            .join(", ")}) AND c.isActive = true ORDER BY c.name ASC`,
+          parameters: tenantIds.map((tenantId, index) => ({
+            name: `@tenant${index}`,
+            value: tenantId,
+          })),
+        })
+        .fetchAll();
+
+      return resources.map((tenant) => ({
+        id: tenant.id,
+        name: tenant.name,
+        slug: tenant.slug,
+        ...(tenant.description && { description: tenant.description }),
+        ...(tenant.logoUrl && { logoUrl: tenant.logoUrl }),
+        ...(tenant.brandColor && { brandColor: tenant.brandColor }),
+      }));
+    } catch {
+      return [];
+    }
   }
 
   const activeTenantId = headerStore.get("x-active-tenant-id") ?? "";
 
-  const [albums, isPlatformAdmin, isTenantAdm, activeTenant, userTenants] =
-    await Promise.all([
-      getAlbums(),
-      canAccessAdmin(email),
-      activeTenantId
-        ? isTenantAdmin(email, activeTenantId)
-        : Promise.resolve(false),
-      getActiveTenant(),
-      getUserTenants(),
-    ]);
+  const [albums, isPlatformAdmin, activeTenant] = await Promise.all([
+    getAlbums(),
+    canAccessAdmin(email),
+    getActiveTenant(),
+  ]);
+
+  const [isTenantAdm, userTenants] = await Promise.all([
+    activeTenantId ? isTenantAdmin(email, activeTenantId) : Promise.resolve(false),
+    getTenantOptions(isPlatformAdmin),
+  ]);
 
   const brandColor = activeTenant?.brandColor ?? "#174365";
   const canManage = isPlatformAdmin || isTenantAdm;
@@ -106,12 +119,17 @@ export default async function GalleryHomePage() {
     <AppShell>
       <TopBar accentColor={activeTenant?.brandColor}>
         <div className="flex items-center gap-4">
-          <TenantIdentity tenant={activeTenant} fallbackColor={brandColor} />
+          <div
+            className="flex h-11 w-11 items-center justify-center rounded-2xl text-sm font-bold text-white shadow-[0_10px_30px_rgba(0,0,0,0.22)]"
+            style={{ backgroundColor: brandColor }}
+          >
+            M
+          </div>
           <div className="space-y-1">
             <p className="hero-kicker">myMedia Operations</p>
             <div>
               <h1 className="text-xl font-semibold tracking-[-0.03em] text-white">
-                {activeTenant?.name ?? "myMedia Platform"}
+                myMedia Platform
               </h1>
               <p className="ops-muted text-sm">
                 Secure tenant media workspace
@@ -121,11 +139,6 @@ export default async function GalleryHomePage() {
         </div>
 
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-          {userTenants.length > 1 ? (
-            <Link href="/select-tenant" className="ops-button-secondary">
-              Switch Organization
-            </Link>
-          ) : null}
           {canManage ? (
             <Link href="/admin" className="ops-button-secondary">
               Open Admin Console
@@ -138,69 +151,12 @@ export default async function GalleryHomePage() {
       </TopBar>
 
       <PageWidth className="space-y-8 py-8 sm:space-y-10 sm:py-10">
-        <HeroSection
-          eyebrow="Tenant Media Operations"
-          title={
-            <>
-              Centralized mission media for{" "}
-              <span className="text-[#d8f7ff]">{activeTenant?.name ?? "your team"}</span>
-            </>
-          }
-          description={
-            activeTenant?.description ??
-            "Review, publish, and administer operational imagery and video inside a secure multi-tenant workspace."
-          }
-          actions={
-            <>
-              {isTenantAdm ? (
-                <Link href="/admin/upload" className="ops-button">
-                  Upload Media
-                </Link>
-              ) : null}
-              {canManage ? (
-                <Link href="/admin" className="ops-button-secondary">
-                  Administrative Controls
-                </Link>
-              ) : null}
-            </>
-          }
-          meta={
-            <>
-              <span className="chip chip-accent">
-                <strong>{albums.length}</strong>
-                {albums.length === 1 ? "Album" : "Albums"}
-              </span>
-              <span className="chip">
-                Access Mode
-                <strong>{roleLabel}</strong>
-              </span>
-              {tenantIds.length > 1 ? (
-                <span className="chip">
-                  Multi-Tenant
-                  <strong>{tenantIds.length} Orgs</strong>
-                </span>
-              ) : null}
-            </>
-          }
+        <TenantScopeRibbon
+          activeTenant={activeTenant}
+          tenants={userTenants}
+          roleLabel={roleLabel}
+          albumCount={albums.length}
         />
-
-        <section className="grid gap-4 md:grid-cols-3">
-          <Metric
-            label="Published Collections"
-            value={albums.length.toLocaleString()}
-            subtext="Album workspaces available to this tenant context"
-          />
-          <Metric
-            label="Access Boundary"
-            value={activeTenant?.slug ?? "platform"}
-            subtext="Current routing and tenant isolation scope"
-          />
-          <Metric
-            label="Session Identity"
-            value={email || "Unknown"}
-            subtext="Authenticated principal operating in this workspace"
-          />
-        </section>
 
         <section className="space-y-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
