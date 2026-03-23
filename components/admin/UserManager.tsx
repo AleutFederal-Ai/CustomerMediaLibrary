@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { UserRecord } from "@/types";
+import { apiFetch } from "@/lib/api-fetch";
 
 interface Props {
   initialUsers: UserRecord[];
@@ -26,7 +27,7 @@ export default function UserManager({ initialUsers, initialCursor }: Props) {
       const params = new URLSearchParams();
       if (searchTerm) params.set("search", searchTerm);
       if (appendCursor) params.set("cursor", appendCursor);
-      const res = await fetch(`/api/admin/users?${params}`);
+      const res = await apiFetch(`/api/admin/users?${params}`);
       if (res.ok) {
         const data = await res.json();
         if (appendCursor) {
@@ -60,7 +61,7 @@ export default function UserManager({ initialUsers, initialCursor }: Props) {
     if (!confirm(confirmMsg)) return;
 
     try {
-      const res = await fetch("/api/admin/users", {
+      const res = await apiFetch("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: user.email, action }),
@@ -89,7 +90,7 @@ export default function UserManager({ initialUsers, initialCursor }: Props) {
     if (!confirm(msg)) return;
 
     try {
-      const res = await fetch("/api/admin/users", {
+      const res = await apiFetch("/api/admin/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -122,7 +123,7 @@ export default function UserManager({ initialUsers, initialCursor }: Props) {
     setPasswordError("");
 
     try {
-      const res = await fetch("/api/admin/users/set-password", {
+      const res = await apiFetch("/api/admin/users/set-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: passwordTarget, password }),

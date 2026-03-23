@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AlbumRecord, MediaListItem } from "@/types";
+import { apiFetch } from "@/lib/api-fetch";
 
 interface Props {
   initialAlbums: AlbumRecord[];
@@ -26,7 +27,7 @@ function CoverPicker({
   useState(() => {
     (async () => {
       try {
-        const res = await fetch(
+        const res = await apiFetch(
           `/api/search?albumId=${albumId}&type=image&pageSize=50`
         );
         if (res.ok) {
@@ -280,7 +281,7 @@ export default function AlbumManager({ initialAlbums }: Props) {
     setError("");
 
     try {
-      const res = await fetch("/api/admin/albums", {
+      const res = await apiFetch("/api/admin/albums", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -312,7 +313,7 @@ export default function AlbumManager({ initialAlbums }: Props) {
     changes: Partial<AlbumRecord>
   ): Promise<boolean> {
     try {
-      const res = await fetch(`/api/admin/albums?id=${id}`, {
+      const res = await apiFetch(`/api/admin/albums?id=${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(changes),
@@ -339,7 +340,7 @@ export default function AlbumManager({ initialAlbums }: Props) {
       return;
 
     try {
-      const res = await fetch(`/api/admin/albums?id=${id}`, {
+      const res = await apiFetch(`/api/admin/albums?id=${id}`, {
         method: "DELETE",
       });
       if (res.ok) {
@@ -370,12 +371,12 @@ export default function AlbumManager({ initialAlbums }: Props) {
 
     // Persist both order changes
     await Promise.all([
-      fetch(`/api/admin/albums?id=${current.id}`, {
+      apiFetch(`/api/admin/albums?id=${current.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ order: swap.order }),
       }),
-      fetch(`/api/admin/albums?id=${swap.id}`, {
+      apiFetch(`/api/admin/albums?id=${swap.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ order: current.order }),

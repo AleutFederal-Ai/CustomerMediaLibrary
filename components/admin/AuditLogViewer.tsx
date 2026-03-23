@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AuditLogRecord, AuditAction } from "@/types";
+import { apiFetch } from "@/lib/api-fetch";
 
 interface Props {
   initialItems: AuditLogRecord[];
@@ -113,7 +114,7 @@ export default function AuditLogViewer({ initialItems, initialCursor }: Props) {
     setLoading(true);
     try {
       const params = buildParams(reset);
-      const res = await fetch(`/api/admin/audit?${params.toString()}`);
+      const res = await apiFetch(`/api/admin/audit?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setItems(reset ? data.items : [...items, ...data.items]);
@@ -129,7 +130,7 @@ export default function AuditLogViewer({ initialItems, initialCursor }: Props) {
     try {
       const params = buildParams(true);
       params.set("format", "csv");
-      const res = await fetch(`/api/admin/audit?${params.toString()}`);
+      const res = await apiFetch(`/api/admin/audit?${params.toString()}`);
       if (res.ok) {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);

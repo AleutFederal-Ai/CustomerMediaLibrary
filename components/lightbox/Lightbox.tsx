@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback } from "react";
 import VideoPlayer from "@/components/video-player/VideoPlayer";
+import { apiFetch } from "@/lib/api-fetch";
 
 interface MediaDetail {
   id: string;
@@ -57,7 +58,7 @@ export default function Lightbox({
   }, [handleKey]);
 
   const handleDownload = async () => {
-    const res = await fetch(
+    const res = await apiFetch(
       `/api/media/download?id=${item.id}&albumId=${item.albumId}`
     );
     if (!res.ok) return;

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { TenantPublicItem } from "@/types";
+import { apiFetch } from "@/lib/api-fetch";
 
 interface TenantSummary {
   id: string;
@@ -53,7 +54,6 @@ export default function AdminTenantSection({
   const router = useRouter();
   const [activeTenant, setActiveTenant] = useState(initialTenant);
   const [switching, setSwitching] = useState<string | null>(null);
-  const [showPicker, setShowPicker] = useState(!initialTenant);
 
   // If tenantSummaries is empty (stats didn't load), fetch user's tenants
   const [fallbackTenants, setFallbackTenants] = useState<TenantPublicItem[]>(
@@ -61,7 +61,7 @@ export default function AdminTenantSection({
   );
   useEffect(() => {
     if (tenantSummaries.length === 0) {
-      fetch("/api/tenants")
+      apiFetch("/api/tenants")
         .then((r) => (r.ok ? r.json() : []))
         .then((data) =>
           setFallbackTenants(Array.isArray(data) ? data : [])
@@ -97,7 +97,7 @@ export default function AdminTenantSection({
   async function switchToTenant(tenantId: string) {
     setSwitching(tenantId);
     try {
-      const res = await fetch("/api/sessions/current", {
+      const res = await apiFetch("/api/sessions/current", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tenantId }),
@@ -115,7 +115,6 @@ export default function AdminTenantSection({
             logoUrl: match.logoUrl,
           });
         }
-        setShowPicker(false);
         router.refresh();
       } else {
         const data = await res.json().catch(() => ({}));
@@ -129,163 +128,73 @@ export default function AdminTenantSection({
   }
 
   const brandColor = activeTenant?.brandColor ?? "#1e3a5f";
+  const activeTenants = pickerTenants.filter((t) => t.isActive);
 
   return (
     <section className="space-y-4">
       {/* ─── Divider ──────────────────────────────────────────────── */}
       <div className="border-t border-slate-700 pt-6">
-        <h2 className="text-slate-400 text-xs font-medium uppercase tracking-wider mb-4">
-          Tenant Administration
-        </h2>
-      </div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-slate-400 text-xs font-medium uppercase tracking-wider">
+            Tenant Administration
+          </h2>
 
-      {/* ─── Tenant Context Banner ────────────────────────────────── */}
-      {activeTenant ? (
-        <div
-          className="flex items-center justify-between p-4 rounded-lg border-l-4"
-          style={{
-            borderLeftColor: brandColor,
-            backgroundColor: "rgb(30 41 59)",
-          }}
-        >
-          <div className="flex items-center gap-3">
-            {activeTenant.logoUrl ? (
-              <img
-                src={activeTenant.logoUrl}
-                alt={activeTenant.name}
-                className="w-8 h-8 rounded object-contain"
-              />
-            ) : (
-              <div
-                className="w-8 h-8 rounded flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-                style={{ backgroundColor: brandColor }}
-              >
-                {activeTenant.name.charAt(0).toUpperCase()}
-              </div>
-            )}
-            <div>
-              <p className="text-white font-medium">{activeTenant.name}</p>
-              <p className="text-slate-400 text-xs">
-                Managing this organization&apos;s content, members, and domains
-              </p>
-            </div>
-          </div>
-          {pickerTenants.length > 1 && (
-            <button
-              type="button"
-              onClick={() => setShowPicker(!showPicker)}
-              className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm rounded transition-colors flex-shrink-0"
-            >
-              {showPicker ? "Cancel" : "Switch Tenant"}
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="p-4 bg-amber-900/30 border border-amber-700 rounded-lg flex items-start gap-3">
-          <span className="text-amber-400 text-lg flex-shrink-0 mt-0.5">
-            &#9888;
-          </span>
-          <div>
-            <p className="text-amber-200 font-medium text-sm">
-              No tenant selected
-            </p>
-            <p className="text-amber-300/70 text-xs mt-0.5">
-              Select a tenant below to manage its albums, members, and domains.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ─── Tenant Picker (inline) ───────────────────────────────── */}
-      {showPicker && pickerTenants.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {pickerTenants
-            .filter((t) => t.isActive)
-            .map((t) => {
-              const isCurrent = activeTenant?.id === t.id;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => {
-                    if (!isCurrent) switchToTenant(t.id);
-                  }}
-                  disabled={switching !== null}
-                  className={`p-4 rounded-lg border text-left transition-all disabled:opacity-60 ${
-                    isCurrent
-                      ? "border-blue-500 bg-blue-900/20 ring-1 ring-blue-500/50"
-                      : "border-slate-700 bg-slate-800 hover:border-slate-500 cursor-pointer"
-                  }`}
+          {/* ─── Tenant Dropdown Selector ──────────────────────────── */}
+          {activeTenants.length > 0 ? (
+            <div className="flex items-center gap-3">
+              {switching && (
+                <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+              )}
+              {activeTenant && (
+                <div
+                  className="w-5 h-5 rounded flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
+                  style={{ backgroundColor: brandColor }}
                 >
-                  <div className="flex items-center gap-2 mb-2">
-                    {t.logoUrl ? (
-                      <img
-                        src={t.logoUrl}
-                        alt={t.name}
-                        className="w-6 h-6 rounded object-contain"
-                      />
-                    ) : (
-                      <div
-                        className="w-6 h-6 rounded flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                        style={{
-                          backgroundColor: t.brandColor ?? "#1e3a5f",
-                        }}
-                      >
-                        {t.name.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <span className="text-white font-medium text-sm truncate">
-                      {t.name}
-                    </span>
-                    {isCurrent && (
-                      <span className="text-xs px-1.5 py-0.5 bg-blue-900/50 text-blue-300 border border-blue-700 rounded ml-auto flex-shrink-0">
-                        Active
-                      </span>
-                    )}
-                    {switching === t.id && (
-                      <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin ml-auto flex-shrink-0" />
-                    )}
-                  </div>
-                  {"albumCount" in t && (
-                    <div className="grid grid-cols-3 gap-1 text-center text-xs">
-                      <div>
-                        <p className="text-white font-medium">
-                          {t.albumCount}
-                        </p>
-                        <p className="text-slate-500">Albums</p>
-                      </div>
-                      <div>
-                        <p className="text-white font-medium">
-                          {t.mediaCount}
-                        </p>
-                        <p className="text-slate-500">Media</p>
-                      </div>
-                      <div>
-                        <p className="text-white font-medium">
-                          {t.memberCount}
-                        </p>
-                        <p className="text-slate-500">Members</p>
-                      </div>
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-        </div>
-      )}
-
-      {/* No tenants at all */}
-      {showPicker && pickerTenants.length === 0 && (
-        <div className="p-6 bg-slate-800 border border-slate-700 rounded-lg text-center">
-          <p className="text-slate-400 text-sm">
-            No organizations available. Create one from{" "}
+                  {activeTenant.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <select
+                value={activeTenant?.id ?? ""}
+                onChange={(e) => {
+                  if (e.target.value) switchToTenant(e.target.value);
+                }}
+                disabled={switching !== null}
+                className="bg-slate-800 border border-slate-600 text-white text-sm rounded-md px-3 py-1.5 pr-8 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:opacity-60 cursor-pointer appearance-none"
+                style={{
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M3 5l3 3 3-3'/%3E%3C/svg%3E")`,
+                  backgroundRepeat: "no-repeat",
+                  backgroundPosition: "right 8px center",
+                }}
+              >
+                {!activeTenant && (
+                  <option value="" disabled>
+                    Select a tenant...
+                  </option>
+                )}
+                {activeTenants.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
             <Link
               href="/admin/tenants"
-              className="text-blue-400 hover:text-blue-300 underline"
+              className="text-blue-400 hover:text-blue-300 text-xs transition-colors"
             >
-              Organizations
-            </Link>{" "}
-            first.
+              Create organization &rarr;
+            </Link>
+          )}
+        </div>
+      </div>
+
+      {/* ─── No tenant selected hint ─────────────────────────────── */}
+      {!activeTenant && activeTenants.length > 0 && (
+        <div className="p-3 bg-amber-900/30 border border-amber-700 rounded-lg flex items-center gap-2">
+          <span className="text-amber-400 text-sm flex-shrink-0">&#9888;</span>
+          <p className="text-amber-200 text-sm">
+            Select a tenant from the dropdown above to manage its content.
           </p>
         </div>
       )}

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { TenantListItem } from "@/types";
+import { apiFetch } from "@/lib/api-fetch";
 
 const SLUG_RE = /^[a-z0-9][a-z0-9\-]{0,62}[a-z0-9]$/;
 
@@ -35,7 +36,7 @@ function CreateTenantForm({ onCreated }: { onCreated: () => void }) {
     setSaving(true);
     setError("");
     try {
-      const res = await fetch("/api/admin/tenants", {
+      const res = await apiFetch("/api/admin/tenants", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -352,7 +353,7 @@ export default function AdminTenantsPage() {
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/tenants");
+      const res = await apiFetch("/api/admin/tenants");
       if (res.status === 403) {
         setError("Super-admin access required.");
         setLoading(false);
@@ -370,7 +371,7 @@ export default function AdminTenantsPage() {
   useEffect(() => { load(); }, []);
 
   async function handleUpdate(id: string, changes: Partial<TenantListItem>) {
-    const res = await fetch(`/api/admin/tenants?id=${id}`, {
+    const res = await apiFetch(`/api/admin/tenants?id=${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(changes),
@@ -379,7 +380,7 @@ export default function AdminTenantsPage() {
   }
 
   async function handleDeactivate(id: string) {
-    const res = await fetch(`/api/admin/tenants?id=${id}`, { method: "DELETE" });
+    const res = await apiFetch(`/api/admin/tenants?id=${id}`, { method: "DELETE" });
     if (res.ok) await load();
   }
 

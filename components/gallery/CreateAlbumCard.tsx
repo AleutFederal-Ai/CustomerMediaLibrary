@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api-fetch";
 
 export default function CreateAlbumCard() {
   const router = useRouter();
@@ -18,7 +19,7 @@ export default function CreateAlbumCard() {
     setError("");
 
     try {
-      const res = await fetch("/api/admin/albums", {
+      const res = await apiFetch("/api/admin/albums", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim(), description: description.trim() }),

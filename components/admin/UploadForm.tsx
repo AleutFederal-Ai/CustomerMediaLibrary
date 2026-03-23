@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, FormEvent } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 
 interface Album {
   id: string;
@@ -39,7 +40,7 @@ export default function UploadForm({ albums, onSuccess }: Props) {
       form.append("tags", tags);
 
       try {
-        const res = await fetch("/api/admin/upload", {
+        const res = await apiFetch("/api/admin/upload", {
           method: "POST",
           body: form,
         });

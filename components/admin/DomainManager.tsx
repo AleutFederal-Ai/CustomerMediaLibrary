@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { DomainRecord } from "@/types";
+import { apiFetch } from "@/lib/api-fetch";
 
 interface Props {
   initialDomains: DomainRecord[];
@@ -21,7 +22,7 @@ export default function DomainManager({ initialDomains, tenantId }: Props) {
     setError(null);
 
     try {
-      const res = await fetch(`/api/admin/domains?tenantId=${tenantId}`, {
+      const res = await apiFetch(`/api/admin/domains?tenantId=${tenantId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ domain: newDomain.trim().toLowerCase() }),

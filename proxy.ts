@@ -119,7 +119,16 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   const session = await validateSession(request);
 
   if (!session) {
-    // Clear potentially stale cookie
+    // API routes: return 401 JSON so client-side fetch() gets a proper error
+    // instead of a redirect that silently clears the cookie.
+    if (pathname.startsWith("/api/")) {
+      return withSecurityHeaders(
+        NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+        nonce
+      );
+    }
+
+    // Page navigations: redirect to login and clear stale cookie
     const response = NextResponse.redirect(new URL("/login", getPublicBaseUrl(request)));
     response.cookies.set(SESSION_COOKIE_NAME, "", { maxAge: 0, path: "/" });
     return response;

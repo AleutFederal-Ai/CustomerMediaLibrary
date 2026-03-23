@@ -6,6 +6,7 @@ import Link from "next/link";
 import MediaGrid from "@/components/gallery/MediaGrid";
 import Lightbox from "@/components/lightbox/Lightbox";
 import { MediaListItem } from "@/types";
+import { apiFetch } from "@/lib/api-fetch";
 
 interface MediaDetail {
   id: string;
@@ -38,7 +39,7 @@ export default function AlbumPage() {
 
   // Fetch current user's permissions once on mount
   useEffect(() => {
-    fetch("/api/me")
+    apiFetch("/api/me")
       .then((r) => r.ok ? r.json() : null)
       .then((data) => { if (data?.canContribute) setCanContribute(true); })
       .catch(() => {});
@@ -55,7 +56,7 @@ export default function AlbumPage() {
           ...(cursor && !reset && { cursor }),
         });
 
-        const res = await fetch(`/api/search?${params.toString()}`);
+        const res = await apiFetch(`/api/search?${params.toString()}`);
         if (!res.ok) return;
         const data = await res.json();
         setItems((prev) => (reset ? data.items : [...prev, ...data.items]));
@@ -76,7 +77,7 @@ export default function AlbumPage() {
     const idx = items.findIndex((i) => i.id === item.id);
     setLightboxIndex(idx);
 
-    const res = await fetch(`/api/media/${item.id}?albumId=${item.albumId}`);
+    const res = await apiFetch(`/api/media/${item.id}?albumId=${item.albumId}`);
     if (!res.ok) return;
     const data = await res.json();
     setLightboxItem(data);
@@ -87,7 +88,7 @@ export default function AlbumPage() {
     if (newIdx < 0 || newIdx >= items.length) return;
     setLightboxIndex(newIdx);
     const item = items[newIdx];
-    const res = await fetch(`/api/media/${item.id}?albumId=${item.albumId}`);
+    const res = await apiFetch(`/api/media/${item.id}?albumId=${item.albumId}`);
     if (!res.ok) return;
     const data = await res.json();
     setLightboxItem(data);
@@ -96,7 +97,7 @@ export default function AlbumPage() {
   async function handleBulkDownload(ids: string[]) {
     setBulkDownloading(true);
     try {
-      const res = await fetch("/api/download/bulk", {
+      const res = await apiFetch("/api/download/bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mediaIds: ids, albumId }),
@@ -122,7 +123,7 @@ export default function AlbumPage() {
   async function handleDelete(item: MediaListItem) {
     if (!confirm(`Delete "${item.fileName}"? This cannot be undone.`)) return;
 
-    const res = await fetch(`/api/media/${item.id}?albumId=${item.albumId}`, {
+    const res = await apiFetch(`/api/media/${item.id}?albumId=${item.albumId}`, {
       method: "DELETE",
     });
 
@@ -147,7 +148,7 @@ export default function AlbumPage() {
       form.append("file", file);
       form.append("albumId", albumId);
 
-      const res = await fetch("/api/admin/upload", { method: "POST", body: form });
+      const res = await apiFetch("/api/admin/upload", { method: "POST", body: form });
       if (!res.ok) failed++;
     }
 

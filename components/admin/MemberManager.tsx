@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { MembershipRecord, MemberRole } from "@/types";
+import { apiFetch } from "@/lib/api-fetch";
 
 interface Props {
   initialMembers: MembershipRecord[];
@@ -33,7 +34,7 @@ export default function MemberManager({ initialMembers, tenantId }: Props) {
     setError(null);
 
     try {
-      const res = await fetch(`/api/admin/members?tenantId=${tenantId}`, {
+      const res = await apiFetch(`/api/admin/members?tenantId=${tenantId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userEmail: email, role }),
@@ -88,7 +89,7 @@ export default function MemberManager({ initialMembers, tenantId }: Props) {
     );
 
     try {
-      const res = await fetch(`/api/admin/members?tenantId=${tenantId}`, {
+      const res = await apiFetch(`/api/admin/members?tenantId=${tenantId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: member.userEmail, role: newRole }),
