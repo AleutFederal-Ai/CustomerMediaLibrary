@@ -471,7 +471,7 @@ export default function LoginPage() {
               Aleut Federal Media Gallery
             </h1>
             <p className="text-blue-200 text-xs mt-0.5">
-              Controlled Unclassified Information
+              Tenant Selection
             </p>
           </div>
         </div>
