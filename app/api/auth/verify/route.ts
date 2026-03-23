@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateMagicLinkToken } from "@/lib/auth/magic-link";
-import { createSession } from "@/lib/auth/session";
+import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { getTenantBySlug } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { getPublicBaseUrl } from "@/lib/auth/base-url";
@@ -53,8 +53,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   // Create session — returns tenant membership info needed for redirect logic
-  const tempResponse = new NextResponse();
-  const { tenantIds, activeTenantId } = await createSession(email, ip, tempResponse, preferredTenantId);
+  const { tenantIds, activeTenantId, signedCookieValue } =
+    await createSession(email, ip, preferredTenantId);
 
   await writeAuditLog({
     userEmail: email,
@@ -66,7 +66,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // Determine redirect destination now that we know tenant membership
   let redirectPath: string;
   if (isPlatformAdminMode || tenantIds.length === 0) {
-    // Platform admin intent, or no tenant memberships — go to admin console
     redirectPath = "/admin";
   } else if (!activeTenantId && tenantIds.length > 1) {
     redirectPath = "/select-tenant";
@@ -74,11 +73,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     redirectPath = "/";
   }
 
-  // Build final redirect response and copy the session cookie set by createSession
   const response = NextResponse.redirect(new URL(redirectPath, publicBase));
-  tempResponse.cookies.getAll().forEach((cookie) => {
-    response.cookies.set(cookie);
-  });
-
+  setSessionCookie(response, signedCookieValue);
   return response;
 }

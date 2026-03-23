@@ -73,22 +73,36 @@ async function verifySignedCookie(
 // ============================================================
 
 /**
+ * Session cookie options — defined once, used by createSession and
+ * setSessionCookie to guarantee the exact same attributes every time.
+ */
+const SESSION_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: true,
+  sameSite: "strict" as const,
+  path: "/",
+  maxAge: ABSOLUTE_TIMEOUT_HOURS * 60 * 60,
+};
+
+/**
  * Create a new session after successful authentication.
  * Resolves tenant memberships for the user and stores them on the session.
- * Sets the session cookie on the response.
  *
- * @param preferredTenantId - If provided and the user is a member, this tenant
- *   becomes the active tenant. Falls back to tenantIds[0] otherwise.
- *
- * @returns Object with sessionId and resolved tenantIds so the caller can
- *   decide where to redirect (e.g. /select-tenant if multiple and no preferred).
+ * Does NOT set the cookie — returns the signed cookie value so the caller
+ * can set it directly on their final response using `setSessionCookie()`.
+ * This avoids the fragile temp-response cookie-copying pattern where
+ * attributes (httpOnly, secure, sameSite) could be lost during round-trip.
  */
 export async function createSession(
   email: string,
   ipAddress: string,
-  response: NextResponse,
   preferredTenantId?: string
-): Promise<{ sessionId: string; tenantIds: string[]; activeTenantId: string | undefined }> {
+): Promise<{
+  sessionId: string;
+  tenantIds: string[];
+  activeTenantId: string | undefined;
+  signedCookieValue: string;
+}> {
   const sessionId = uuidv4();
   const now = new Date();
   const idleExpiresAt = new Date(now.getTime() + IDLE_TIMEOUT_MINUTES * 60 * 1000);
@@ -128,17 +142,17 @@ export async function createSession(
   // Update user record (upsert)
   await updateUserRecord(email, now);
 
-  const signedCookie = await signCookiePayload(sessionId, email.toLowerCase());
+  const signedCookieValue = await signCookiePayload(sessionId, email.toLowerCase());
 
-  response.cookies.set(COOKIE_NAME, signedCookie, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "strict",
-    path: "/",
-    maxAge: ABSOLUTE_TIMEOUT_HOURS * 60 * 60,
-  });
+  return { sessionId, tenantIds, activeTenantId, signedCookieValue };
+}
 
-  return { sessionId, tenantIds, activeTenantId };
+/**
+ * Set the session cookie on a response. Always use this instead of
+ * copying cookies between responses — it guarantees the exact attributes.
+ */
+export function setSessionCookie(response: NextResponse, signedCookieValue: string): void {
+  response.cookies.set(COOKIE_NAME, signedCookieValue, SESSION_COOKIE_OPTIONS);
 }
 
 /**
@@ -157,22 +171,29 @@ export async function validateSession(
   request: NextRequest
 ): Promise<SessionContext | null | "error"> {
   const cookieValue = request.cookies.get(COOKIE_NAME)?.value;
-  if (!cookieValue) return null;
+  if (!cookieValue) {
+    console.warn("[session] no cookie present");
+    return null;
+  }
 
   let parsed: { sessionId: string; email: string } | null;
   try {
     parsed = await verifySignedCookie(cookieValue);
-  } catch {
-    // Key Vault failure during HMAC verification — infrastructure error
+  } catch (err) {
+    console.error("[session] Key Vault / HMAC error:", err);
     return "error";
   }
-  if (!parsed) return null;
+  if (!parsed) {
+    console.warn("[session] cookie signature invalid");
+    return null;
+  }
   const { sessionId } = parsed;
 
   let container;
   try {
     container = await sessions();
-  } catch {
+  } catch (err) {
+    console.error("[session] Cosmos sessions() error:", err);
     return "error";
   }
 
@@ -182,11 +203,15 @@ export async function validateSession(
       .item(sessionId, sessionId)
       .read<SessionRecord>();
     record = result.resource;
-  } catch {
+  } catch (err) {
+    console.error("[session] Cosmos read error:", err);
     return "error";
   }
 
-  if (!record || record.type !== "session") return null;
+  if (!record || record.type !== "session") {
+    console.warn("[session] record not found or wrong type, id:", sessionId);
+    return null;
+  }
 
   const now = new Date();
 

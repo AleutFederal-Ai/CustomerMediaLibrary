@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { users } from "@/lib/azure/cosmos";
 import { verifyPassword } from "@/lib/auth/password";
-import { createSession } from "@/lib/auth/session";
+import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { getTenantBySlug } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { AuditAction, UserRecord } from "@/types";
@@ -100,10 +100,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (tenant) preferredTenantId = tenant.id;
     }
 
-    // Use a temp response so createSession can set the cookie, then copy it
-    // to the final JSON response. Returning a new response would drop the cookie.
-    const tempResponse = new NextResponse();
-    const { tenantIds, activeTenantId } = await createSession(email, ip, tempResponse, preferredTenantId);
+    const { tenantIds, activeTenantId, signedCookieValue } =
+      await createSession(email, ip, preferredTenantId);
 
     await writeAuditLog({
       userEmail: email,
@@ -115,8 +113,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Determine where to redirect after login
     let redirectTo: string;
     if (isPlatformAdminMode || tenantIds.length === 0) {
-      // Platform admin intent, or no tenant memberships at all — go to admin console.
-      // /admin will redirect non-admins back to / gracefully.
       redirectTo = "/admin";
     } else if (!activeTenantId && tenantIds.length > 1) {
       redirectTo = "/select-tenant";
@@ -125,7 +121,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const response = NextResponse.json({ ok: true, redirectTo });
-    tempResponse.cookies.getAll().forEach((cookie) => response.cookies.set(cookie));
+    setSessionCookie(response, signedCookieValue);
     return response;
   } catch (err) {
     console.error("[auth/password] error:", err);
