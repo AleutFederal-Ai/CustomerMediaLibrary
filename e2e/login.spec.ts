@@ -45,7 +45,6 @@ test("login page renders secure tenant entry flow", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /Choose your organization/i })).toBeVisible();
   await expect(page.getByRole("button", { name: /Acme Mission Group/i })).toBeVisible();
   await expect(page.getByText(/Cosmos DB/i)).toBeVisible();
-  await expect(page.getByText(/Authorized, monitored, and tenant-scoped access/i)).toBeVisible();
 });
 
 test("login page stays mobile-friendly without horizontal overflow", async ({
@@ -56,16 +55,9 @@ test("login page stays mobile-friendly without horizontal overflow", async ({
 
   await page.goto("/login");
 
-  await expect(
-    page.getByRole("heading", {
-      name: /Controlled media access with tenant-safe sign-in/i,
-    })
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: /myMedia Platform/i })).toBeVisible();
   await expect(page.getByRole("heading", { name: /Choose your organization/i })).toBeVisible();
   await expect(page.getByText(/Platform Health/i)).toBeVisible();
-  await expect(
-    page.getByText(/Authorized, monitored, and tenant-scoped access/i)
-  ).toBeVisible();
 
   const hasHorizontalOverflow = await page.evaluate(() => {
     return document.documentElement.scrollWidth > window.innerWidth;

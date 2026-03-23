@@ -502,267 +502,157 @@ export default function LoginPage() {
     <>
       <CuiBanner />
 
-      <div className="app-shell flex min-h-[calc(100vh-44px)] items-start px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
-        <div className="mx-auto w-full max-w-[1480px]">
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,440px)] xl:grid-cols-[minmax(320px,0.98fr)_minmax(380px,440px)_minmax(300px,0.8fr)]">
-            <section className="surface-card rounded-[1.8rem] p-5 sm:p-6 lg:hidden">
-              <p className="hero-kicker">Secure Media Platform</p>
-              <h1 className="mt-4 text-[clamp(2.25rem,11vw,3.6rem)] font-semibold leading-[0.96] tracking-[-0.07em] text-white">
-                Controlled media access with tenant-safe sign-in.
-              </h1>
-              <p className="mt-4 text-sm leading-7 text-[var(--text-muted)]">
-                Enter the correct organization boundary, authenticate with a
-                password or one-time link, and keep every session scoped to the
-                media owner.
-              </p>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <div className="metric-card">
-                  <p className="metric-label">Tenant Routing</p>
-                  <p className="metric-value">Scoped</p>
-                  <p className="metric-subtext">
-                    Each sign-in is pinned to the selected organization.
+      <div className="app-shell flex min-h-[calc(100vh-44px)] items-center px-4 py-8 sm:px-6 sm:py-10">
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+          <section className="surface-card overflow-hidden rounded-[2rem]">
+            <div className="border-b border-[rgba(140,172,197,0.14)] bg-[linear-gradient(135deg,rgba(23,58,87,0.98),rgba(10,33,49,0.98))] px-5 py-5 sm:px-8 sm:py-6">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/12 bg-white/8">
+                  <svg
+                    className="h-5 w-5 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.75}
+                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <p className="hero-kicker text-[rgba(214,245,255,0.82)] before:bg-[linear-gradient(135deg,#dff7ff,rgba(214,245,255,0.2))]">
+                    Access Gateway
+                  </p>
+                  <h1 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white">
+                    myMedia Platform
+                  </h1>
+                  <p className="mt-1 text-sm text-[rgba(214,245,255,0.74)]">
+                    Tenant-aware authentication and controlled media access.
                   </p>
                 </div>
-                <div className="metric-card">
-                  <p className="metric-label">Access Modes</p>
-                  <p className="metric-value">Dual</p>
-                  <p className="metric-subtext">
-                    Password and one-time email-link access are both supported.
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            <section className="surface-card hidden rounded-[2rem] p-8 lg:block xl:p-10">
-            <div className="space-y-6">
-              <p className="hero-kicker">Secure Media Platform</p>
-              <div className="space-y-4">
-                <h1 className="hero-title">
-                  Modern media operations built for controlled environments.
-                </h1>
-                <p className="hero-subtitle">
-                  Route users into the correct tenant boundary, verify identity
-                  with password or one-time link, and keep access scoped to the
-                  organization that owns the media.
-                </p>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="metric-card">
-                  <p className="metric-label">Tenant Isolation</p>
-                  <p className="metric-value">Scoped</p>
-                  <p className="metric-subtext">
-                    Organization-aware authentication and session routing.
-                  </p>
-                </div>
-                <div className="metric-card">
-                  <p className="metric-label">Access Patterns</p>
-                  <p className="metric-value">Dual Mode</p>
-                  <p className="metric-subtext">
-                    Password login for managed users and email-link recovery
-                    paths.
-                  </p>
-                </div>
-              </div>
-
-              <div className="surface-card-soft rounded-[1.4rem] p-5">
-                <p className="hero-kicker">Platform Notes</p>
-                <ul className="mt-4 space-y-3 text-sm leading-7 text-[var(--text-muted)]">
-                  <li>
-                    Authorized users are routed into tenant-specific media
-                    workspaces.
-                  </li>
-                  <li>
-                    Public and private organizations can be selected without
-                    exposing tenant internals.
-                  </li>
-                  <li>
-                    Platform administrators can sign in directly for cross-tenant
-                    control tasks.
-                  </li>
-                </ul>
               </div>
             </div>
-            </section>
 
-            <section className="surface-card overflow-hidden rounded-[2rem]">
-              <div className="border-b border-[rgba(140,172,197,0.14)] bg-[linear-gradient(135deg,rgba(23,58,87,0.98),rgba(10,33,49,0.98))] px-5 py-5 sm:px-8 sm:py-6">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/12 bg-white/8">
-                    <svg
-                      className="h-5 w-5 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+            {step === "sign-in" && selectedTenant ? (
+              <div className="border-b border-[rgba(140,172,197,0.14)] bg-[rgba(7,18,28,0.58)] px-5 py-4 sm:px-8">
+                <div className="flex items-center gap-3">
+                  {isPlatformAdmin ? (
+                    <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-[rgba(241,197,108,0.24)] bg-[rgba(241,197,108,0.14)]">
+                      <svg
+                        className="h-4 w-4 text-[var(--warning)]"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                        />
+                      </svg>
+                    </div>
+                  ) : (
+                    <TenantPill tenant={selectedTenant} />
+                  )}
+
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
+                      Active Tenant Context
+                    </p>
+                    <span
+                      className={`block truncate text-sm font-medium ${
+                        isPlatformAdmin ? "text-[var(--warning)]" : "text-white"
+                      }`}
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.75}
-                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                      />
-                    </svg>
+                      {selectedTenant.name}
+                    </span>
                   </div>
-                  <div>
-                    <p className="hero-kicker text-[rgba(214,245,255,0.82)] before:bg-[linear-gradient(135deg,#dff7ff,rgba(214,245,255,0.2))]">
-                      Access Gateway
-                    </p>
-                    <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white">
-                      myMedia Platform
-                    </h2>
-                    <p className="mt-1 text-sm text-[rgba(214,245,255,0.74)]">
-                      Tenant-aware authentication and controlled media access.
-                    </p>
-                  </div>
+
+                  {!tenantSlugParam ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStep("select-tenant");
+                        setSelectedTenant(null);
+                      }}
+                      className="ops-button-ghost !w-auto text-xs uppercase tracking-[0.18em]"
+                    >
+                      Change
+                    </button>
+                  ) : null}
                 </div>
               </div>
+            ) : null}
+
+            {step === "sign-in" ? (
+              <div className="flex border-b border-[rgba(140,172,197,0.14)] bg-[rgba(5,16,25,0.7)]">
+                <button
+                  type="button"
+                  onClick={() => setTab("magic")}
+                  className={`flex-1 px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] ${
+                    tab === "magic"
+                      ? "bg-[rgba(105,211,255,0.12)] text-white"
+                      : "text-[var(--text-muted)]"
+                  }`}
+                >
+                  Email Link
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab("password")}
+                  className={`flex-1 px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] ${
+                    tab === "password"
+                      ? "bg-[rgba(105,211,255,0.12)] text-white"
+                      : "text-[var(--text-muted)]"
+                  }`}
+                >
+                  Password
+                </button>
+              </div>
+            ) : null}
+
+            <div className="px-5 py-6 sm:px-8 sm:py-8">
+              {step === "select-tenant" ? (
+                <>
+                  <p className="hero-kicker">Tenant Selection</p>
+                  <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">
+                    Choose your organization
+                  </h2>
+                  <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
+                    Public organizations are listed below. If your tenant is
+                    private, use its organization code to continue.
+                  </p>
+                  <div className="mt-6">
+                    <TenantSelector
+                      onSelect={handleTenantSelected}
+                      onPlatformAdmin={handlePlatformAdmin}
+                    />
+                  </div>
+                </>
+              ) : null}
 
               {step === "sign-in" && selectedTenant ? (
-                <div className="border-b border-[rgba(140,172,197,0.14)] bg-[rgba(7,18,28,0.58)] px-5 py-4 sm:px-8">
-                  <div className="flex items-center gap-3">
-                    {isPlatformAdmin ? (
-                      <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-[rgba(241,197,108,0.24)] bg-[rgba(241,197,108,0.14)]">
-                        <svg
-                          className="h-4 w-4 text-[var(--warning)]"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                          />
-                        </svg>
-                      </div>
-                    ) : (
-                      <TenantPill tenant={selectedTenant} />
-                    )}
-
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                        Active Tenant Context
-                      </p>
-                      <span
-                        className={`block truncate text-sm font-medium ${
-                          isPlatformAdmin ? "text-[var(--warning)]" : "text-white"
-                        }`}
-                      >
-                        {selectedTenant.name}
-                      </span>
-                    </div>
-
-                    {!tenantSlugParam ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setStep("select-tenant");
-                          setSelectedTenant(null);
-                        }}
-                        className="ops-button-ghost !w-auto text-xs uppercase tracking-[0.18em]"
-                      >
-                        Change
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
+                tab === "magic" ? (
+                  <MagicLinkForm tenant={selectedTenant} hasError={hasError} />
+                ) : (
+                  <PasswordForm tenant={selectedTenant} />
+                )
               ) : null}
 
-              {step === "sign-in" ? (
-                <div className="flex border-b border-[rgba(140,172,197,0.14)] bg-[rgba(5,16,25,0.7)]">
-                  <button
-                    type="button"
-                    onClick={() => setTab("magic")}
-                    className={`flex-1 px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] ${
-                      tab === "magic"
-                        ? "bg-[rgba(105,211,255,0.12)] text-white"
-                        : "text-[var(--text-muted)]"
-                    }`}
-                  >
-                    Email Link
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTab("password")}
-                    className={`flex-1 px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] ${
-                      tab === "password"
-                        ? "bg-[rgba(105,211,255,0.12)] text-white"
-                        : "text-[var(--text-muted)]"
-                    }`}
-                  >
-                    Password
-                  </button>
+              {step === "sign-in" && !selectedTenant ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
                 </div>
               ) : null}
+            </div>
+          </section>
 
-              <div className="px-5 py-6 sm:px-8 sm:py-8">
-                {step === "select-tenant" ? (
-                  <>
-                    <p className="hero-kicker">Tenant Selection</p>
-                    <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">
-                      Choose your organization
-                    </h2>
-                    <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
-                      Public organizations are listed below. If your tenant is
-                      private, use its organization code to continue.
-                    </p>
-                    <div className="mt-6">
-                      <TenantSelector
-                        onSelect={handleTenantSelected}
-                        onPlatformAdmin={handlePlatformAdmin}
-                      />
-                    </div>
-                  </>
-                ) : null}
-
-                {step === "sign-in" && selectedTenant ? (
-                  tab === "magic" ? (
-                    <MagicLinkForm tenant={selectedTenant} hasError={hasError} />
-                  ) : (
-                    <PasswordForm tenant={selectedTenant} />
-                  )
-                ) : null}
-
-                {step === "sign-in" && !selectedTenant ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
-                  </div>
-                ) : null}
-              </div>
-            </section>
-
-            <aside className="space-y-4 lg:col-span-2 xl:col-span-1">
-              <HealthStatus />
-
-              <div className="surface-card-soft rounded-[1.45rem] p-5 sm:p-6">
-                <p className="hero-kicker">Use Policy</p>
-                <h2 className="mt-3 text-xl font-semibold tracking-[-0.03em] text-white">
-                  Authorized, monitored, and tenant-scoped access.
-                </h2>
-                <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
-                  Access attempts and administrative actions are logged for
-                  review. Tenant selection controls session scope before media
-                  access is granted.
-                </p>
-
-                <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                  <div className="rounded-[1rem] border border-[rgba(140,172,197,0.12)] bg-[rgba(7,18,28,0.44)] px-4 py-3">
-                    <p className="metric-label">Administrative Audit</p>
-                    <p className="mt-2 text-sm leading-6 text-white/88">
-                      Privileged actions and access changes are tracked.
-                    </p>
-                  </div>
-                  <div className="rounded-[1rem] border border-[rgba(140,172,197,0.12)] bg-[rgba(7,18,28,0.44)] px-4 py-3">
-                    <p className="metric-label">Session Boundary</p>
-                    <p className="mt-2 text-sm leading-6 text-white/88">
-                      Authentication is anchored to the selected organization.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </aside>
+          <div className="mx-auto w-full max-w-3xl">
+            <HealthStatus />
           </div>
         </div>
       </div>
