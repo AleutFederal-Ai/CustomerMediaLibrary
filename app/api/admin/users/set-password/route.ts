@@ -71,7 +71,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const passwordHash = await hashPassword(password);
 
     await container.item(user.id, user.id).patch([
-      { op: "replace", path: "/passwordHash", value: passwordHash },
+      { op: "add", path: "/passwordHash", value: passwordHash },
     ]);
 
     await writeAuditLog({
