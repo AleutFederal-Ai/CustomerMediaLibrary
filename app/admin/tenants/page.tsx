@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import AccountMenu from "@/components/account/AccountMenu";
 import { TenantListItem } from "@/types";
 import { apiFetch } from "@/lib/api-fetch";
 
@@ -349,6 +350,18 @@ export default function AdminTenantsPage() {
   const [tenants, setTenants] = useState<TenantListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [sessionEmail, setSessionEmail] = useState("");
+
+  useEffect(() => {
+    apiFetch("/api/me")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (data?.email) {
+          setSessionEmail(data.email);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   async function load() {
     setLoading(true);
@@ -386,11 +399,17 @@ export default function AdminTenantsPage() {
 
   return (
     <div className="min-h-screen bg-slate-900">
-      <header className="bg-slate-800 border-b border-slate-700 px-6 py-3 flex items-center justify-between">
+      <header className="bg-slate-800 border-b border-slate-700 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-4">
           <a href="/admin" className="text-slate-400 hover:text-white text-sm transition-colors">← Admin</a>
           <h1 className="text-white font-semibold">Organizations</h1>
         </div>
+        {sessionEmail ? (
+          <AccountMenu
+            email={sessionEmail}
+            activeScopeLabel="Platform"
+          />
+        ) : null}
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-8">

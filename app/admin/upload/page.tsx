@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import AccountMenu from "@/components/account/AccountMenu";
 import { getAdminTenantPageContext } from "@/lib/auth/admin-tenant-page";
 import { buildAdminTenantPath } from "@/lib/admin-scope";
 import { isMediaContributor } from "@/lib/auth/permissions";
@@ -66,6 +67,12 @@ export default async function UploadPage({
               {activeTenant?.name ?? "Active tenant"}
             </p>
           </div>
+        </div>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <AccountMenu
+            email={email}
+            activeScopeLabel={activeTenant?.name ?? "Tenant"}
+          />
         </div>
       </TopBar>
 

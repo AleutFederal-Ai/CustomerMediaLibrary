@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useDeferredValue } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import AccountMenu from "@/components/account/AccountMenu";
 import MediaGrid from "@/components/gallery/MediaGrid";
 import Lightbox from "@/components/lightbox/Lightbox";
 import UploadForm from "@/components/admin/UploadForm";
@@ -32,6 +33,7 @@ export default function AlbumPage() {
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [bulkDownloading, setBulkDownloading] = useState(false);
   const [canContribute, setCanContribute] = useState(false);
+  const [sessionEmail, setSessionEmail] = useState("");
 
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
@@ -39,6 +41,7 @@ export default function AlbumPage() {
     apiFetch("/api/me")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
+        if (data?.email) setSessionEmail(data.email);
         if (data?.canContribute) setCanContribute(true);
       })
       .catch(() => {});
@@ -162,6 +165,12 @@ export default function AlbumPage() {
             <a href="#album-upload" className="ops-button">
               Upload Media
             </a>
+          ) : null}
+          {sessionEmail ? (
+            <AccountMenu
+              email={sessionEmail}
+              activeScopeLabel="Album Workspace"
+            />
           ) : null}
         </div>
       </TopBar>

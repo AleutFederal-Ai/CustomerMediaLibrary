@@ -12,3 +12,10 @@ export function buildAdminTenantPath(
   scopedUrl.searchParams.set("tenant", normalizedSlug);
   return `${scopedUrl.pathname}${scopedUrl.search}`;
 }
+
+export function buildGalleryWorkspacePath(
+  tenantSlug?: string | null
+): string {
+  const normalizedSlug = tenantSlug?.trim().toLowerCase();
+  return normalizedSlug ? `/t/${normalizedSlug}` : "/select-tenant";
+}

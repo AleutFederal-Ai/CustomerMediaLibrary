@@ -66,6 +66,11 @@ export interface UserRecord {
   isBlocked: boolean;
   blockedAt?: string;
   blockedBy?: string;
+  displayName?: string;
+  jobTitle?: string;
+  organization?: string;
+  phoneNumber?: string;
+  officeLocation?: string;
   /** PBKDF2-SHA256 hash — only set when an admin assigns a password */
   passwordHash?: string;
   /** True for platform super-admins who can access /admin without Entra ID group membership */
@@ -146,6 +151,7 @@ export enum AuditAction {
   PASSWORD_LOGIN_SUCCESS = "password_login_success",
   PASSWORD_LOGIN_FAILED = "password_login_failed",
   PASSWORD_SET = "password_set",
+  PROFILE_UPDATED = "profile_updated",
   SESSION_CREATED = "session_created",
   SESSION_EXPIRED = "session_expired",
   SESSION_REVOKED = "session_revoked",
@@ -254,6 +260,32 @@ export interface MediaListItem {
   thumbnailUrl: string;
   tags: string[];
   uploadedAt: string;
+}
+
+export interface UserProfileSummary {
+  email: string;
+  displayName?: string;
+  jobTitle?: string;
+  organization?: string;
+  phoneNumber?: string;
+  officeLocation?: string;
+  lastLoginAt?: string;
+  loginCount: number;
+  hasPassword: boolean;
+  isPlatformAdmin: boolean;
+}
+
+export interface OwnedMediaSummary {
+  id: string;
+  albumId: string;
+  tenantId: string;
+  tenantName: string;
+  tenantSlug: string;
+  albumName: string;
+  fileName: string;
+  fileType: FileType;
+  uploadedAt: string;
+  sizeBytes: number;
 }
 
 export interface PaginatedResponse<T> {

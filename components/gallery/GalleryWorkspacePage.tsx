@@ -2,8 +2,10 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import GalleryAlbumWorkspace from "@/components/gallery/GalleryAlbumWorkspace";
+import AccountMenu from "@/components/account/AccountMenu";
 import TenantScopeRibbon from "@/components/gallery/TenantScopeRibbon";
 import { canAccessAdmin } from "@/lib/auth/admin";
+import { buildAdminTenantPath } from "@/lib/admin-scope";
 import { isTenantAdmin } from "@/lib/auth/permissions";
 import { getTenantBySlug } from "@/lib/auth/tenant";
 import { AlbumListItem, TenantPublicItem } from "@/types";
@@ -129,13 +131,17 @@ export default async function GalleryWorkspacePage({
 
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
           {canManage ? (
-            <Link href="/admin" className="ops-button-secondary">
+            <Link
+              href={buildAdminTenantPath("/admin", activeTenant.slug)}
+              className="ops-button-secondary"
+            >
               Open Admin Console
             </Link>
           ) : null}
-          <Link href="/api/auth/signout" className="ops-button-ghost">
-            Sign Out
-          </Link>
+          <AccountMenu
+            email={email}
+            activeScopeLabel={activeTenant.name}
+          />
         </div>
       </TopBar>
 

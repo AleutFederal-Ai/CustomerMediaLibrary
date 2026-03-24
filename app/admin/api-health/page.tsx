@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { canAccessAdmin } from "@/lib/auth/admin";
+import AccountMenu from "@/components/account/AccountMenu";
 import { buildAdminTenantPath } from "@/lib/admin-scope";
 import { isTenantAdmin } from "@/lib/auth/permissions";
 import { TenantPublicItem, ApiHealthSnapshot } from "@/types";
@@ -85,6 +86,12 @@ export default async function ApiHealthPage() {
               Operator health, smoke tests, and manual route validation
             </p>
           </div>
+        </div>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <AccountMenu
+            email={email}
+            activeScopeLabel={activeTenant?.name ?? "Platform"}
+          />
         </div>
       </TopBar>
 

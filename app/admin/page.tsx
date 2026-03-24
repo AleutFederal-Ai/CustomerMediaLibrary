@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { canAccessAdmin } from "@/lib/auth/admin";
 import { getAdminTenantPageContext } from "@/lib/auth/admin-tenant-page";
-import { buildAdminTenantPath } from "@/lib/admin-scope";
+import AccountMenu from "@/components/account/AccountMenu";
+import { buildAdminTenantPath, buildGalleryWorkspacePath } from "@/lib/admin-scope";
 import { isTenantAdmin } from "@/lib/auth/permissions";
 import { TenantPublicItem, AuditLogRecord } from "@/types";
 import AdminTenantSection from "./AdminTenantSection";
@@ -123,7 +124,7 @@ export default async function AdminDashboard({
     <AppShell>
       <TopBar accentColor={activeTenant?.brandColor}>
         <div className="flex items-center gap-3">
-          <BackLink href={activeTenant?.slug ? `/t/${activeTenant.slug}` : "/"}>
+          <BackLink href={buildGalleryWorkspacePath(activeTenant?.slug)}>
             Return to Gallery
           </BackLink>
           <div>
@@ -134,13 +135,17 @@ export default async function AdminDashboard({
           </div>
         </div>
 
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           {isPlatformAdmin ? (
             <span className="chip chip-accent">Platform Administrator</span>
           ) : null}
           {isTenantAdm && !isPlatformAdmin ? (
             <span className="chip">Tenant Administrator</span>
           ) : null}
+          <AccountMenu
+            email={email}
+            activeScopeLabel={activeTenant?.name ?? "Platform"}
+          />
         </div>
       </TopBar>
 

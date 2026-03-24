@@ -78,6 +78,38 @@ export const API_ENDPOINTS: ApiEndpointDefinition[] = [
     verificationMode: "automated",
   },
   {
+    id: "me-profile",
+    category: "Session",
+    method: "GET",
+    pathTemplate: "/api/me/profile",
+    description: "Returns the signed-in user's safe profile details.",
+    authScope: "authenticated",
+    verificationMode: "automated",
+  },
+  {
+    id: "me-profile-update",
+    category: "Session",
+    method: "PATCH",
+    pathTemplate: "/api/me/profile",
+    description: "Updates the signed-in user's self-service profile fields.",
+    authScope: "authenticated",
+    verificationMode: "manual",
+    sampleBody:
+      '{\n  "displayName": "Operator Example",\n  "jobTitle": "Program Manager",\n  "organization": "Aleut Federal"\n}',
+  },
+  {
+    id: "me-password",
+    category: "Session",
+    method: "POST",
+    pathTemplate: "/api/me/password",
+    description: "Resets the signed-in user's password.",
+    authScope: "authenticated",
+    verificationMode: "manual",
+    destructive: true,
+    sampleBody:
+      '{\n  "currentPassword": "redacted-current",\n  "nextPassword": "redacted-new-password"\n}',
+  },
+  {
     id: "sessions-current",
     category: "Session",
     method: "PATCH",
