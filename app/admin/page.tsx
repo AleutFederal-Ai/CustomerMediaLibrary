@@ -2,11 +2,12 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { canAccessAdmin } from "@/lib/auth/admin";
+import { getPlatformStats } from "@/lib/admin/stats";
 import { getAdminTenantPageContext } from "@/lib/auth/admin-tenant-page";
 import AccountMenu from "@/components/account/AccountMenu";
 import { buildAdminTenantPath, buildGalleryWorkspacePath } from "@/lib/admin-scope";
 import { isTenantAdmin } from "@/lib/auth/permissions";
-import { TenantPublicItem, AuditLogRecord } from "@/types";
+import { getActiveTenantPublicItem } from "@/lib/tenant-data";
 import AdminTenantSection from "./AdminTenantSection";
 import {
   AppShell,
@@ -15,33 +16,6 @@ import {
   SectionHeader,
   TopBar,
 } from "@/components/ui/AppFrame";
-
-interface TenantSummary {
-  id: string;
-  name: string;
-  slug: string;
-  brandColor?: string;
-  logoUrl?: string;
-  isActive: boolean;
-  albumCount: number;
-  mediaCount: number;
-  memberCount: number;
-  storageMB: number;
-}
-
-interface StatsResponse {
-  totals: {
-    tenants: number;
-    activeTenants: number;
-    users: number;
-    media: number;
-    albums: number;
-    storageMB: number;
-    activeSessions: number;
-  };
-  recentActivity: AuditLogRecord[];
-  tenantSummaries: TenantSummary[];
-}
 
 function formatRelativeTime(timestamp: string): string {
   const diff = Date.now() - new Date(timestamp).getTime();
@@ -90,7 +64,7 @@ export default async function AdminDashboard({
   searchParams: Promise<{ tenant?: string }>;
 }) {
   const { tenant: requestedTenantSlug } = await searchParams;
-  const { email, activeTenantId, host, proto, cookieHeader } =
+  const { email, activeTenantId } =
     await getAdminTenantPageContext({
       currentPath: "/admin",
       requestedTenantSlug,
@@ -104,20 +78,8 @@ export default async function AdminDashboard({
   if (!isPlatformAdmin && !isTenantAdm) redirect("/");
 
   const [activeTenant, stats] = await Promise.all([
-    fetch(`${proto}://${host}/api/tenants/current`, {
-      headers: { cookie: cookieHeader },
-      cache: "no-store",
-    })
-      .then((r) => (r.ok ? (r.json() as Promise<TenantPublicItem>) : null))
-      .catch(() => null),
-    isPlatformAdmin
-      ? fetch(`${proto}://${host}/api/admin/stats`, {
-          headers: { cookie: cookieHeader },
-          cache: "no-store",
-        })
-          .then((r) => (r.ok ? (r.json() as Promise<StatsResponse>) : null))
-          .catch(() => null)
-      : Promise.resolve(null),
+    getActiveTenantPublicItem(activeTenantId),
+    isPlatformAdmin ? getPlatformStats().catch(() => null) : Promise.resolve(null),
   ]);
 
   return (

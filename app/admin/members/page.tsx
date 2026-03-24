@@ -4,8 +4,9 @@ import AccountMenu from "@/components/account/AccountMenu";
 import { getAdminTenantPageContext } from "@/lib/auth/admin-tenant-page";
 import { buildAdminTenantPath } from "@/lib/admin-scope";
 import { isTenantAdmin } from "@/lib/auth/permissions";
+import { getActiveTenantPublicItem } from "@/lib/tenant-data";
 import { memberships } from "@/lib/azure/cosmos";
-import { MembershipRecord, TenantPublicItem } from "@/types";
+import { MembershipRecord } from "@/types";
 import MemberManager from "@/components/admin/MemberManager";
 import {
   AppShell,
@@ -33,7 +34,7 @@ export default async function AdminMembersPage({
   searchParams: Promise<{ tenant?: string }>;
 }) {
   const { tenant: requestedTenantSlug } = await searchParams;
-  const { email, activeTenantId: tenantId, host, proto, cookieHeader } =
+  const { email, activeTenantId: tenantId } =
     await getAdminTenantPageContext({
       currentPath: "/admin/members",
       requestedTenantSlug,
@@ -45,12 +46,7 @@ export default async function AdminMembersPage({
 
   const [memberList, activeTenant] = await Promise.all([
     getMembers(tenantId),
-    fetch(`${proto}://${host}/api/tenants/current`, {
-      headers: { cookie: cookieHeader },
-      cache: "no-store",
-    })
-      .then((r) => (r.ok ? (r.json() as Promise<TenantPublicItem>) : null))
-      .catch(() => null),
+    getActiveTenantPublicItem(tenantId),
   ]);
 
   return (

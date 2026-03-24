@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canAccessAdmin } from "@/lib/auth/admin";
-import { isMediaContributor, isTenantAdmin } from "@/lib/auth/permissions";
-import { API_ENDPOINTS } from "@/lib/api/registry";
-import { runAutomatedApiProbeSuite } from "@/lib/api/probe";
-import { getDependencyHealthReport } from "@/lib/health/checks";
-import { ApiHealthSnapshot } from "@/types";
+import {
+  buildApiHealthSnapshot,
+  getApiHealthAuthorization,
+} from "@/lib/api/health-snapshot";
 import { getRequestLogContext, logError, logInfo } from "@/lib/logging/structured";
 
 export const dynamic = "force-dynamic";
@@ -19,47 +17,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const [isPlatformAdmin, isTenantAdm, canContribute] = await Promise.all([
-    canAccessAdmin(email),
-    activeTenantId ? isTenantAdmin(email, activeTenantId) : Promise.resolve(false),
-    activeTenantId
-      ? isMediaContributor(email, activeTenantId)
-      : Promise.resolve(false),
-  ]);
+  const authorization = await getApiHealthAuthorization(email, activeTenantId);
 
-  if (!isPlatformAdmin && !isTenantAdm) {
+  if (!authorization.isPlatformAdmin && !authorization.isTenantAdmin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {
-    const [dependencyHealth, probes] = await Promise.all([
-      getDependencyHealthReport(),
-      runAutomatedApiProbeSuite({
-        requestHeaders: request.headers,
-        authorization: {
-          isPlatformAdmin,
-          isTenantAdmin: isTenantAdm,
-          canContribute,
-        },
-      }),
-    ]);
-
-    const snapshot: ApiHealthSnapshot = {
-      generatedAt: new Date().toISOString(),
-      dependencyHealth,
-      probes: {
-        summary: probes.summary,
-        results: probes.results,
-      },
-      endpoints: API_ENDPOINTS,
-      samples: probes.samples,
-    };
+    const snapshot = await buildApiHealthSnapshot({
+      requestHeaders: request.headers,
+      authorization,
+    });
 
     logInfo("api.admin.api_health.completed", {
       ...context,
       durationMs: Date.now() - startedAt,
-      probeSummary: probes.summary,
-      dependencyStatus: dependencyHealth.status,
+      probeSummary: snapshot.probes.summary,
+      dependencyStatus: snapshot.dependencyHealth.status,
     });
 
     return NextResponse.json(snapshot, {

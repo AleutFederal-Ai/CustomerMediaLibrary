@@ -8,7 +8,11 @@ import { canAccessAdmin } from "@/lib/auth/admin";
 import { buildAdminTenantPath } from "@/lib/admin-scope";
 import { isTenantAdmin } from "@/lib/auth/permissions";
 import { getTenantBySlug } from "@/lib/auth/tenant";
-import { AlbumListItem, TenantPublicItem } from "@/types";
+import { listAlbumItemsForTenant } from "@/lib/gallery/albums";
+import {
+  getActiveTenantPublicItem,
+  listVisibleTenantsForSession,
+} from "@/lib/tenant-data";
 import { AppShell, PageWidth, TopBar } from "@/components/ui/AppFrame";
 
 interface Props {
@@ -21,39 +25,10 @@ export default async function GalleryWorkspacePage({
   const headerStore = await headers();
   const email = headerStore.get("x-session-email") ?? "";
   const activeTenantId = headerStore.get("x-active-tenant-id") ?? "";
-  const host =
-    headerStore.get("x-forwarded-host") ??
-    headerStore.get("host") ??
-    "localhost:3000";
-  const proto = headerStore.get("x-forwarded-proto") ?? "http";
-  const baseHeaders = { cookie: headerStore.get("cookie") ?? "" };
-
-  async function getAlbums(): Promise<AlbumListItem[]> {
-    const res = await fetch(`${proto}://${host}/api/albums`, {
-      headers: baseHeaders,
-      cache: "no-store",
-    });
-    if (!res.ok) return [];
-    return res.json();
-  }
-
-  async function getActiveTenant(): Promise<TenantPublicItem | null> {
-    const res = await fetch(`${proto}://${host}/api/tenants/current`, {
-      headers: baseHeaders,
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    return res.json();
-  }
-
-  async function getTenantOptions(): Promise<TenantPublicItem[]> {
-    const res = await fetch(`${proto}://${host}/api/tenants`, {
-      headers: baseHeaders,
-      cache: "no-store",
-    });
-    if (!res.ok) return [];
-    return res.json();
-  }
+  const tenantIds = (headerStore.get("x-tenant-ids") ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
 
   if (requestedSlug) {
     const normalizedSlug = requestedSlug.toLowerCase();
@@ -70,11 +45,10 @@ export default async function GalleryWorkspacePage({
     }
   }
 
-  const [albums, isPlatformAdmin, activeTenant, userTenants] = await Promise.all([
-    getAlbums(),
+  const [activeTenant, isPlatformAdmin, userTenants] = await Promise.all([
+    getActiveTenantPublicItem(activeTenantId),
     canAccessAdmin(email),
-    getActiveTenant(),
-    getTenantOptions(),
+    listVisibleTenantsForSession({ email, tenantIds }),
   ]);
 
   if (!activeTenant) {
@@ -97,6 +71,7 @@ export default async function GalleryWorkspacePage({
     redirect(`/t/${activeTenant.slug}`);
   }
 
+  const albums = await listAlbumItemsForTenant(activeTenant.id);
   const isTenantAdm = await isTenantAdmin(email, activeTenant.id);
   const brandColor = activeTenant.brandColor ?? "#174365";
   const canManage = isPlatformAdmin || isTenantAdm;

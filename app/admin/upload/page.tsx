@@ -5,8 +5,9 @@ import AccountMenu from "@/components/account/AccountMenu";
 import { getAdminTenantPageContext } from "@/lib/auth/admin-tenant-page";
 import { buildAdminTenantPath } from "@/lib/admin-scope";
 import { isMediaContributor } from "@/lib/auth/permissions";
+import { getActiveTenantPublicItem } from "@/lib/tenant-data";
 import { albums } from "@/lib/azure/cosmos";
-import { AlbumRecord, TenantPublicItem } from "@/types";
+import { AlbumRecord } from "@/types";
 import UploadForm from "@/components/admin/UploadForm";
 import {
   AppShell,
@@ -34,7 +35,7 @@ export default async function UploadPage({
   searchParams: Promise<{ tenant?: string }>;
 }) {
   const { tenant: requestedTenantSlug } = await searchParams;
-  const { email, activeTenantId: tenantId, host, proto, cookieHeader } =
+  const { email, activeTenantId: tenantId } =
     await getAdminTenantPageContext({
       currentPath: "/admin/upload",
       requestedTenantSlug,
@@ -46,12 +47,7 @@ export default async function UploadPage({
 
   const [albumList, activeTenant] = await Promise.all([
     getActiveAlbums(tenantId),
-    fetch(`${proto}://${host}/api/tenants/current`, {
-      headers: { cookie: cookieHeader },
-      cache: "no-store",
-    })
-      .then((r) => (r.ok ? (r.json() as Promise<TenantPublicItem>) : null))
-      .catch(() => null),
+    getActiveTenantPublicItem(tenantId),
   ]);
 
   return (

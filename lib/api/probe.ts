@@ -110,6 +110,11 @@ async function getSampleData(activeTenantId: string | null): Promise<ProbeSample
 }
 
 function getBaseUrlFromHeaders(headers: Headers): string {
+  const localPort = process.env.WEBSITES_PORT ?? process.env.PORT;
+  if (process.env.NODE_ENV === "production" && localPort) {
+    return `http://127.0.0.1:${localPort}`;
+  }
+
   const host = headers.get("x-forwarded-host") ?? headers.get("host") ?? "localhost:3000";
   const proto = headers.get("x-forwarded-proto") ?? "http";
   return `${proto}://${host}`;

@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 import { canAccessAdmin } from "@/lib/auth/admin";
 import AccountMenu from "@/components/account/AccountMenu";
 import { buildAdminTenantPath } from "@/lib/admin-scope";
+import { getActiveTenantPublicItem } from "@/lib/tenant-data";
 import { auditLogs } from "@/lib/azure/cosmos";
-import { AuditLogRecord, TenantPublicItem } from "@/types";
+import { AuditLogRecord } from "@/types";
 import AuditLogViewer from "@/components/admin/AuditLogViewer";
 import {
   AppShell,
@@ -32,11 +33,7 @@ async function getRecentAuditLogs(): Promise<{
 export default async function AuditLogsPage() {
   const headerStore = await headers();
   const email = headerStore.get("x-session-email");
-  const host =
-    headerStore.get("x-forwarded-host") ??
-    headerStore.get("host") ??
-    "localhost:3000";
-  const proto = headerStore.get("x-forwarded-proto") ?? "http";
+  const activeTenantId = headerStore.get("x-active-tenant-id") ?? "";
 
   if (!email) redirect("/login");
   const isAdmin = await canAccessAdmin(email);
@@ -44,12 +41,7 @@ export default async function AuditLogsPage() {
 
   const [{ items, cursor }, activeTenant] = await Promise.all([
     getRecentAuditLogs(),
-    fetch(`${proto}://${host}/api/tenants/current`, {
-      headers: { cookie: headerStore.get("cookie") ?? "" },
-      cache: "no-store",
-    })
-      .then((r) => (r.ok ? (r.json() as Promise<TenantPublicItem>) : null))
-      .catch(() => null),
+    getActiveTenantPublicItem(activeTenantId),
   ]);
 
   return (

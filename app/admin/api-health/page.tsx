@@ -1,10 +1,13 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { canAccessAdmin } from "@/lib/auth/admin";
 import AccountMenu from "@/components/account/AccountMenu";
+import {
+  buildApiHealthSnapshot,
+  getApiHealthAuthorization,
+} from "@/lib/api/health-snapshot";
 import { buildAdminTenantPath } from "@/lib/admin-scope";
-import { isTenantAdmin } from "@/lib/auth/permissions";
-import { TenantPublicItem, ApiHealthSnapshot } from "@/types";
+import { getActiveTenantPublicItem } from "@/lib/tenant-data";
+import { ApiHealthSnapshot } from "@/types";
 import { API_ENDPOINTS } from "@/lib/api/registry";
 import ApiHealthPortal from "@/components/admin/ApiHealthPortal";
 import {
@@ -41,35 +44,19 @@ export default async function ApiHealthPage() {
   const headerStore = await headers();
   const email = headerStore.get("x-session-email");
   const activeTenantId = headerStore.get("x-active-tenant-id") ?? "";
-  const host =
-    headerStore.get("x-forwarded-host") ??
-    headerStore.get("host") ??
-    "localhost:3000";
-  const proto = headerStore.get("x-forwarded-proto") ?? "http";
 
   if (!email) redirect("/login");
 
-  const [isPlatformAdmin, isTenantAdm] = await Promise.all([
-    canAccessAdmin(email),
-    activeTenantId ? isTenantAdmin(email, activeTenantId) : Promise.resolve(false),
-  ]);
+  const authorization = await getApiHealthAuthorization(email, activeTenantId);
 
-  if (!isPlatformAdmin && !isTenantAdm) redirect("/");
+  if (!authorization.isPlatformAdmin && !authorization.isTenantAdmin) redirect("/");
 
   const [activeTenant, initialSnapshot] = await Promise.all([
-    fetch(`${proto}://${host}/api/tenants/current`, {
-      headers: { cookie: headerStore.get("cookie") ?? "" },
-      cache: "no-store",
+    getActiveTenantPublicItem(activeTenantId),
+    buildApiHealthSnapshot({
+      requestHeaders: new Headers(headerStore),
+      authorization,
     })
-      .then((r) => (r.ok ? (r.json() as Promise<TenantPublicItem>) : null))
-      .catch(() => null),
-    fetch(`${proto}://${host}/api/admin/api-health`, {
-      headers: { cookie: headerStore.get("cookie") ?? "" },
-      cache: "no-store",
-    })
-      .then((r) =>
-        r.ok ? (r.json() as Promise<ApiHealthSnapshot>) : getFallbackSnapshot()
-      )
       .catch(() => getFallbackSnapshot()),
   ]);
 
