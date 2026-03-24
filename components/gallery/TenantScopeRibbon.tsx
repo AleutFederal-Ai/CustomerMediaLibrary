@@ -71,6 +71,12 @@ export default function TenantScopeRibbon({
         return;
       }
 
+      const targetTenant = availableTenants.find((tenant) => tenant.id === tenantId);
+      if (targetTenant?.slug) {
+        router.push(`/t/${targetTenant.slug}`);
+        return;
+      }
+
       router.refresh();
     } catch {
       setError("Network error while changing tenant.");

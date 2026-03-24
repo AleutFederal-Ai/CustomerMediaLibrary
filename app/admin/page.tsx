@@ -99,7 +99,9 @@ export default async function AdminDashboard() {
     <AppShell>
       <TopBar accentColor={activeTenant?.brandColor}>
         <div className="flex items-center gap-3">
-          <BackLink href="/">Return to Gallery</BackLink>
+          <BackLink href={activeTenant?.slug ? `/t/${activeTenant.slug}` : "/"}>
+            Return to Gallery
+          </BackLink>
           <div>
             <p className="hero-kicker">Administrative Control Plane</p>
             <p className="text-sm text-[var(--text-muted)]">

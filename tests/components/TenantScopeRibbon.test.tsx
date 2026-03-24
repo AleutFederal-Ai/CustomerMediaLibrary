@@ -4,16 +4,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import TenantScopeRibbon from "@/components/gallery/TenantScopeRibbon";
 
 const refreshMock = vi.fn();
+const pushMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     refresh: refreshMock,
+    push: pushMock,
   }),
 }));
 
 describe("TenantScopeRibbon", () => {
   beforeEach(() => {
     refreshMock.mockReset();
+    pushMock.mockReset();
     global.fetch = vi.fn();
   });
 
@@ -60,6 +63,6 @@ describe("TenantScopeRibbon", () => {
       );
     });
 
-    expect(refreshMock).toHaveBeenCalled();
+    expect(pushMock).toHaveBeenCalledWith("/t/bravo");
   });
 });

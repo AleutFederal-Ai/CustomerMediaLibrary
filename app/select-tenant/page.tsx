@@ -46,7 +46,7 @@ export default function SelectTenantPage() {
         if (!data) return;
         setTenants(Array.isArray(data) ? data : []);
         if (Array.isArray(data) && data.length === 1) {
-          selectTenant(data[0].id);
+          selectTenant(data[0]);
         } else {
           setLoading(false);
         }
@@ -58,17 +58,17 @@ export default function SelectTenantPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function selectTenant(tenantId: string) {
-    setSwitching(tenantId);
+  async function selectTenant(tenant: TenantPublicItem) {
+    setSwitching(tenant.id);
     setError("");
     try {
       const res = await fetch("/api/sessions/current", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tenantId }),
+        body: JSON.stringify({ tenantId: tenant.id }),
       });
       if (res.ok) {
-        router.push("/");
+        router.push(`/t/${tenant.slug}`);
       } else {
         const data = await res.json().catch(() => ({}));
         setError(
@@ -144,7 +144,7 @@ export default function SelectTenantPage() {
                     <button
                       key={tenant.id}
                       type="button"
-                      onClick={() => selectTenant(tenant.id)}
+                      onClick={() => selectTenant(tenant)}
                       disabled={switching !== null}
                       className="surface-card-soft group flex w-full items-center gap-4 rounded-[1.2rem] p-4 text-left disabled:opacity-60"
                     >

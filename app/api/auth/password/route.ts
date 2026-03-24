@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { users } from "@/lib/azure/cosmos";
 import { verifyPassword } from "@/lib/auth/password";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
-import { getTenantBySlug } from "@/lib/auth/tenant";
+import { getTenantById, getTenantBySlug } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { AuditAction, UserRecord } from "@/types";
 
@@ -95,9 +95,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Resolve preferred tenant from slug (if provided)
     let preferredTenantId: string | undefined;
+    let preferredTenantSlug: string | undefined;
     if (tenantSlug) {
       const tenant = await getTenantBySlug(tenantSlug);
-      if (tenant) preferredTenantId = tenant.id;
+      if (tenant) {
+        preferredTenantId = tenant.id;
+        preferredTenantSlug = tenant.slug;
+      }
     }
 
     const { tenantIds, activeTenantId, signedCookieValue } =
@@ -117,7 +121,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     } else if (!activeTenantId && tenantIds.length > 1) {
       redirectTo = "/select-tenant";
     } else {
-      redirectTo = "/";
+      const activeTenant =
+        preferredTenantSlug
+          ? { slug: preferredTenantSlug }
+          : activeTenantId
+            ? await getTenantById(activeTenantId)
+            : null;
+      redirectTo = activeTenant?.slug ? `/t/${activeTenant.slug}` : "/";
     }
 
     const response = NextResponse.json({ ok: true, redirectTo });

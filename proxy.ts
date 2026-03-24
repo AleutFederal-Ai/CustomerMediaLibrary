@@ -71,7 +71,6 @@ function applySessionHeaders(
 const PUBLIC_PATHS = [
   "/login",
   "/select-tenant",
-  "/t",                          // /t/[slug] — direct tenant landing pages
   "/api/auth/request-link",
   "/api/auth/verify",
   "/api/auth/password",
@@ -208,7 +207,12 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     }
 
     // Page navigations: redirect to login and clear stale cookie
-    const response = NextResponse.redirect(new URL("/login", getPublicBaseUrl(request)));
+    const loginUrl = new URL("/login", getPublicBaseUrl(request));
+    const tenantMatch = pathname.match(/^\/t\/([^/]+)\/?$/);
+    if (tenantMatch?.[1]) {
+      loginUrl.searchParams.set("tenant", tenantMatch[1]);
+    }
+    const response = NextResponse.redirect(loginUrl);
     response.cookies.set(SESSION_COOKIE_NAME, "", { maxAge: 0, path: "/" });
     response.headers.set("x-request-id", requestId);
     logWarn("proxy.request.redirect_login", {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateMagicLinkToken } from "@/lib/auth/magic-link";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
-import { getTenantBySlug } from "@/lib/auth/tenant";
+import { getTenantById, getTenantBySlug } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { getPublicBaseUrl } from "@/lib/auth/base-url";
 import { AuditAction } from "@/types";
@@ -47,9 +47,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   // Resolve preferred tenant from slug (if provided in the magic link URL)
   let preferredTenantId: string | undefined;
+  let preferredTenantSlug: string | undefined;
   if (tenantSlug) {
     const tenant = await getTenantBySlug(tenantSlug);
-    if (tenant) preferredTenantId = tenant.id;
+    if (tenant) {
+      preferredTenantId = tenant.id;
+      preferredTenantSlug = tenant.slug;
+    }
   }
 
   // Create session — returns tenant membership info needed for redirect logic
@@ -70,7 +74,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   } else if (!activeTenantId && tenantIds.length > 1) {
     redirectPath = "/select-tenant";
   } else {
-    redirectPath = "/";
+    const activeTenant =
+      preferredTenantSlug
+        ? { slug: preferredTenantSlug }
+        : activeTenantId
+          ? await getTenantById(activeTenantId)
+          : null;
+    redirectPath = activeTenant?.slug ? `/t/${activeTenant.slug}` : "/";
   }
 
   const response = NextResponse.redirect(new URL(redirectPath, publicBase));
