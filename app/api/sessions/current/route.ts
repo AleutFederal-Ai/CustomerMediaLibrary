@@ -5,13 +5,18 @@ import { getTenantById } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { AuditAction } from "@/types";
 
-/**
- * PATCH /api/sessions/current
- * Body: { tenantId: string }
- * Switches the active tenant for the current session.
- * The tenantId must be in the user's existing tenant membership list.
- */
-export async function PATCH(request: NextRequest): Promise<NextResponse> {
+async function resolveTenantSwitch(
+  request: NextRequest
+): Promise<
+  | {
+      sessionId: string;
+      email: string;
+      ip: string;
+      targetTenantId: string;
+      allowedTenantIds: string[];
+    }
+  | NextResponse
+> {
   const sessionId = request.headers.get("x-session-id");
   const email = request.headers.get("x-session-email") ?? "unknown";
   const ip = request.headers.get("x-client-ip") ?? "unknown";
@@ -22,15 +27,20 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
   }
 
   const tenantIds = tenantIdsHeader.split(",").map((s) => s.trim()).filter(Boolean);
+  let targetTenantId = "";
 
-  let body: { tenantId?: string };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  if (request.method === "GET") {
+    targetTenantId = request.nextUrl.searchParams.get("tenantId")?.trim() ?? "";
+  } else {
+    let body: { tenantId?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+    }
+    targetTenantId = (body.tenantId ?? "").trim();
   }
 
-  const targetTenantId = (body.tenantId ?? "").trim();
   if (!targetTenantId) {
     return NextResponse.json({ error: "tenantId is required" }, { status: 400 });
   }
@@ -53,6 +63,22 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     allowedTenantIds = [...new Set([...tenantIds, targetTenantId])];
   }
 
+  return {
+    sessionId,
+    email,
+    ip,
+    targetTenantId,
+    allowedTenantIds,
+  };
+}
+
+async function performTenantSwitch(
+  sessionId: string,
+  email: string,
+  ip: string,
+  targetTenantId: string,
+  allowedTenantIds: string[]
+): Promise<boolean> {
   const switched = await switchActiveTenant(
     sessionId,
     targetTenantId,
@@ -60,7 +86,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
   );
 
   if (!switched) {
-    return NextResponse.json({ error: "Failed to switch tenant" }, { status: 500 });
+    return false;
   }
 
   await writeAuditLog({
@@ -71,5 +97,64 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     detail: { tenantId: targetTenantId },
   });
 
-  return NextResponse.json({ activeTenantId: targetTenantId });
+  return true;
+}
+
+/**
+ * PATCH /api/sessions/current
+ * Body: { tenantId: string }
+ * Switches the active tenant for the current session.
+ * The tenantId must be in the user's existing tenant membership list.
+ */
+export async function PATCH(request: NextRequest): Promise<NextResponse> {
+  const resolved = await resolveTenantSwitch(request);
+  if (resolved instanceof NextResponse) {
+    return resolved;
+  }
+
+  const switched = await performTenantSwitch(
+    resolved.sessionId,
+    resolved.email,
+    resolved.ip,
+    resolved.targetTenantId,
+    resolved.allowedTenantIds
+  );
+
+  if (!switched) {
+    return NextResponse.json({ error: "Failed to switch tenant" }, { status: 500 });
+  }
+
+  return NextResponse.json({ activeTenantId: resolved.targetTenantId });
+}
+
+/**
+ * GET /api/sessions/current?tenantId=<id>&next=/t/<slug>
+ * Switches the active tenant and redirects to the provided safe local path.
+ */
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const resolved = await resolveTenantSwitch(request);
+  const fallbackUrl = new URL("/select-tenant", request.url);
+
+  if (resolved instanceof NextResponse) {
+    if (resolved.status >= 400) {
+      return NextResponse.redirect(fallbackUrl);
+    }
+    return resolved;
+  }
+
+  const switched = await performTenantSwitch(
+    resolved.sessionId,
+    resolved.email,
+    resolved.ip,
+    resolved.targetTenantId,
+    resolved.allowedTenantIds
+  );
+
+  if (!switched) {
+    return NextResponse.redirect(fallbackUrl);
+  }
+
+  const nextPath = request.nextUrl.searchParams.get("next") ?? "";
+  const safeNextPath = nextPath.startsWith("/") ? nextPath : "/select-tenant";
+  return NextResponse.redirect(new URL(safeNextPath, request.url));
 }

@@ -19,7 +19,6 @@ export default async function GalleryWorkspacePage({
   const headerStore = await headers();
   const email = headerStore.get("x-session-email") ?? "";
   const activeTenantId = headerStore.get("x-active-tenant-id") ?? "";
-  const sessionId = headerStore.get("x-session-id") ?? "";
   const host =
     headerStore.get("x-forwarded-host") ??
     headerStore.get("host") ??
@@ -62,26 +61,10 @@ export default async function GalleryWorkspacePage({
       redirect("/select-tenant");
     }
 
-    if (!sessionId) {
-      redirect(`/login?tenant=${encodeURIComponent(normalizedSlug)}`);
-    }
-
     if (activeTenantId !== targetTenant.id) {
-      const response = await fetch(`${proto}://${host}/api/sessions/current`, {
-        method: "PATCH",
-        headers: {
-          ...baseHeaders,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ tenantId: targetTenant.id }),
-        cache: "no-store",
-      });
-
-      if (!response.ok) {
-        redirect("/select-tenant");
-      }
-
-      redirect(`/t/${normalizedSlug}`);
+      redirect(
+        `/api/sessions/current?tenantId=${encodeURIComponent(targetTenant.id)}&next=${encodeURIComponent(`/t/${normalizedSlug}`)}`
+      );
     }
   }
 

@@ -17,7 +17,7 @@ vi.mock("@/lib/audit/logger", () => ({
   writeAuditLog: vi.fn(),
 }));
 
-import { PATCH } from "@/app/api/sessions/current/route";
+import { GET, PATCH } from "@/app/api/sessions/current/route";
 import { canAccessAdmin } from "@/lib/auth/admin";
 import { switchActiveTenant } from "@/lib/auth/session";
 import { getTenantById } from "@/lib/auth/tenant";
@@ -120,5 +120,30 @@ describe("/api/sessions/current", () => {
     expect(response.status).toBe(403);
     expect(body.error).toMatch(/Not a member/i);
     expect(switchActiveTenant).not.toHaveBeenCalled();
+  });
+
+  it("switches tenant context and redirects for slug-route handoff", async () => {
+    const request = new NextRequest(
+      "http://localhost:3000/api/sessions/current?tenantId=tenant-2&next=%2Ft%2Fbravo",
+      {
+        method: "GET",
+        headers: {
+          "x-session-id": "session-1",
+          "x-session-email": "viewer@example.com",
+          "x-tenant-ids": "tenant-1,tenant-2",
+          "x-client-ip": "127.0.0.1",
+        },
+      }
+    );
+
+    const response = await GET(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe("http://localhost:3000/t/bravo");
+    expect(switchActiveTenant).toHaveBeenCalledWith(
+      "session-1",
+      "tenant-2",
+      ["tenant-1", "tenant-2"]
+    );
   });
 });
