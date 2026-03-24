@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { canAccessAdmin } from "@/lib/auth/admin";
+import { buildAdminTenantPath } from "@/lib/admin-scope";
 import { isTenantAdmin } from "@/lib/auth/permissions";
 import { TenantPublicItem, ApiHealthSnapshot } from "@/types";
 import { API_ENDPOINTS } from "@/lib/api/registry";
@@ -75,7 +76,9 @@ export default async function ApiHealthPage() {
     <AppShell>
       <TopBar accentColor={activeTenant?.brandColor}>
         <div className="flex items-center gap-3">
-          <BackLink href="/admin">Return to Admin</BackLink>
+          <BackLink href={buildAdminTenantPath("/admin", activeTenant?.slug)}>
+            Return to Admin
+          </BackLink>
           <div>
             <p className="hero-kicker">API Verification Console</p>
             <p className="text-sm text-[var(--text-muted)]">

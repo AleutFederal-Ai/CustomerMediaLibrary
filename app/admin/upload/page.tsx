@@ -1,6 +1,8 @@
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getAdminTenantPageContext } from "@/lib/auth/admin-tenant-page";
+import { buildAdminTenantPath } from "@/lib/admin-scope";
 import { isMediaContributor } from "@/lib/auth/permissions";
 import { albums } from "@/lib/azure/cosmos";
 import { AlbumRecord, TenantPublicItem } from "@/types";
@@ -25,17 +27,18 @@ async function getActiveAlbums(tenantId: string): Promise<{ id: string; name: st
   return resources;
 }
 
-export default async function UploadPage() {
-  const headerStore = await headers();
-  const email = headerStore.get("x-session-email");
-  const tenantId = headerStore.get("x-active-tenant-id") ?? "";
-  const host =
-    headerStore.get("x-forwarded-host") ??
-    headerStore.get("host") ??
-    "localhost:3000";
-  const proto = headerStore.get("x-forwarded-proto") ?? "http";
+export default async function UploadPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tenant?: string }>;
+}) {
+  const { tenant: requestedTenantSlug } = await searchParams;
+  const { email, activeTenantId: tenantId, host, proto, cookieHeader } =
+    await getAdminTenantPageContext({
+      currentPath: "/admin/upload",
+      requestedTenantSlug,
+    });
 
-  if (!email) redirect("/login");
   if (!tenantId) redirect("/admin");
   const canUpload = await isMediaContributor(email, tenantId);
   if (!canUpload) redirect("/");
@@ -43,7 +46,7 @@ export default async function UploadPage() {
   const [albumList, activeTenant] = await Promise.all([
     getActiveAlbums(tenantId),
     fetch(`${proto}://${host}/api/tenants/current`, {
-      headers: { cookie: headerStore.get("cookie") ?? "" },
+      headers: { cookie: cookieHeader },
       cache: "no-store",
     })
       .then((r) => (r.ok ? (r.json() as Promise<TenantPublicItem>) : null))
@@ -54,7 +57,9 @@ export default async function UploadPage() {
     <AppShell>
       <TopBar accentColor={activeTenant?.brandColor}>
         <div className="flex items-center gap-3">
-          <BackLink href="/admin">Return to Admin</BackLink>
+          <BackLink href={buildAdminTenantPath("/admin", activeTenant?.slug)}>
+            Return to Admin
+          </BackLink>
           <div>
             <p className="hero-kicker">Media Intake</p>
             <p className="text-sm text-[var(--text-muted)]">
@@ -87,7 +92,10 @@ export default async function UploadPage() {
                 Create an album first so uploaded media can be routed into an
                 approved collection.
               </p>
-              <Link href="/admin/albums" className="ops-button mt-6 inline-flex">
+              <Link
+                href={buildAdminTenantPath("/admin/albums", activeTenant?.slug)}
+                className="ops-button mt-6 inline-flex"
+              >
                 Create an Album
               </Link>
             </div>

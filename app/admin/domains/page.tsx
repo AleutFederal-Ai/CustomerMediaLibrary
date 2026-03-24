@@ -1,5 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { getAdminTenantPageContext } from "@/lib/auth/admin-tenant-page";
+import { buildAdminTenantPath } from "@/lib/admin-scope";
 import { isTenantAdmin } from "@/lib/auth/permissions";
 import { domains } from "@/lib/azure/cosmos";
 import { DomainRecord, TenantPublicItem } from "@/types";
@@ -24,17 +26,18 @@ async function getDomains(tenantId: string): Promise<DomainRecord[]> {
   return resources;
 }
 
-export default async function AdminDomainsPage() {
-  const headerStore = await headers();
-  const email = headerStore.get("x-session-email");
-  const tenantId = headerStore.get("x-active-tenant-id") ?? "";
-  const host =
-    headerStore.get("x-forwarded-host") ??
-    headerStore.get("host") ??
-    "localhost:3000";
-  const proto = headerStore.get("x-forwarded-proto") ?? "http";
+export default async function AdminDomainsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tenant?: string }>;
+}) {
+  const { tenant: requestedTenantSlug } = await searchParams;
+  const { email, activeTenantId: tenantId, host, proto, cookieHeader } =
+    await getAdminTenantPageContext({
+      currentPath: "/admin/domains",
+      requestedTenantSlug,
+    });
 
-  if (!email) redirect("/login");
   if (!tenantId) redirect("/admin");
   const isAdmin = await isTenantAdmin(email, tenantId);
   if (!isAdmin) redirect("/");
@@ -42,7 +45,7 @@ export default async function AdminDomainsPage() {
   const [domainList, activeTenant] = await Promise.all([
     getDomains(tenantId),
     fetch(`${proto}://${host}/api/tenants/current`, {
-      headers: { cookie: headerStore.get("cookie") ?? "" },
+      headers: { cookie: cookieHeader },
       cache: "no-store",
     })
       .then((r) => (r.ok ? (r.json() as Promise<TenantPublicItem>) : null))
@@ -53,7 +56,9 @@ export default async function AdminDomainsPage() {
     <AppShell>
       <TopBar accentColor={activeTenant?.brandColor}>
         <div className="flex items-center gap-3">
-          <BackLink href="/admin">Return to Admin</BackLink>
+          <BackLink href={buildAdminTenantPath("/admin", activeTenant?.slug)}>
+            Return to Admin
+          </BackLink>
           <div>
             <p className="hero-kicker">Domain Governance</p>
             <p className="text-sm text-[var(--text-muted)]">

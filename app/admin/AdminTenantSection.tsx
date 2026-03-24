@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TenantPublicItem } from "@/types";
 import { apiFetch } from "@/lib/api-fetch";
+import { buildAdminTenantPath } from "@/lib/admin-scope";
 import { SectionHeader } from "@/components/ui/AppFrame";
 
 interface TenantSummary {
@@ -142,6 +143,8 @@ export default function AdminTenantSection({
             brandColor: match.brandColor,
             logoUrl: match.logoUrl,
           });
+          router.replace(buildAdminTenantPath("/admin", match.slug));
+          return;
         }
         router.refresh();
       } else {
@@ -156,21 +159,22 @@ export default function AdminTenantSection({
   }
 
   const activeTenants = pickerTenants.filter((tenant) => tenant.isActive);
+  const activeTenantSlug = activeTenant?.slug;
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-4">
       <SectionHeader
         eyebrow="Tenant Administration"
         title="Operate within the current tenant boundary"
         description="Switch organizations, review current tenant posture, and move directly into scoped content and access workflows."
       />
 
-      <div className="surface-card rounded-[1.5rem] p-5 sm:p-6">
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)]">
-          <div className="space-y-5">
+      <div className="surface-card rounded-[1.25rem] p-4 sm:p-5">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(260px,0.82fr)]">
+          <div className="space-y-4">
             {activeTenant ? (
-              <div className="surface-card-soft rounded-[1.25rem] p-5">
-                <div className="flex items-center gap-4">
+              <div className="surface-card-soft rounded-[1.1rem] p-4">
+                <div className="flex items-center gap-3">
                   <TenantIdentity
                     name={activeTenant.name}
                     logoUrl={activeTenant.logoUrl}
@@ -178,7 +182,7 @@ export default function AdminTenantSection({
                   />
                   <div className="min-w-0">
                     <p className="hero-kicker">Selected Tenant</p>
-                    <h3 className="mt-2 truncate text-xl font-semibold tracking-[-0.03em] text-white">
+                    <h3 className="mt-1.5 truncate text-lg font-semibold tracking-[-0.03em] text-white">
                       {activeTenant.name}
                     </h3>
                     <p className="ops-code mt-1 text-sm text-[var(--text-muted)]">
@@ -195,35 +199,35 @@ export default function AdminTenantSection({
             )}
 
             {activeTenant ? (
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2">
                 {TENANT_LINKS.map((item) => (
                   <Link
                     key={item.href}
-                    href={item.href}
-                    className="surface-card-soft rounded-[1.2rem] p-5"
+                    href={buildAdminTenantPath(item.href, activeTenantSlug)}
+                    className="surface-card-soft rounded-[1.05rem] p-4"
                   >
                     <p className="hero-kicker">{item.label}</p>
-                    <h3 className="mt-3 text-lg font-semibold tracking-[-0.03em] text-white">
+                    <h3 className="mt-2 text-base font-semibold tracking-[-0.03em] text-white">
                       {item.label}
                     </h3>
-                    <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                       {item.description}
                     </p>
                   </Link>
                 ))}
               </div>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2 opacity-50">
+              <div className="grid gap-3 sm:grid-cols-2 opacity-50">
                 {TENANT_LINKS.map((item) => (
                   <div
                     key={item.href}
-                    className="surface-card-soft rounded-[1.2rem] p-5"
+                    className="surface-card-soft rounded-[1.05rem] p-4"
                   >
                     <p className="hero-kicker">{item.label}</p>
-                    <h3 className="mt-3 text-lg font-semibold tracking-[-0.03em] text-white">
+                    <h3 className="mt-2 text-base font-semibold tracking-[-0.03em] text-white">
                       {item.label}
                     </h3>
-                    <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                       {item.description}
                     </p>
                   </div>
@@ -232,19 +236,20 @@ export default function AdminTenantSection({
             )}
           </div>
 
-          <div className="surface-card-soft rounded-[1.25rem] p-5">
+          <div className="surface-card-soft rounded-[1.1rem] p-4">
             <p className="hero-kicker">Tenant Selector</p>
-            <h3 className="mt-3 text-lg font-semibold tracking-[-0.03em] text-white">
+            <h3 className="mt-2.5 text-base font-semibold tracking-[-0.03em] text-white sm:text-lg">
               Change active tenant
             </h3>
-            <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
+            <p className="mt-2.5 text-sm leading-6 text-[var(--text-muted)]">
               Changing the active tenant updates the administrative scope and the
               gallery routes associated with your current session.
             </p>
 
             {activeTenants.length > 0 ? (
-              <div className="mt-5 space-y-4">
+              <div className="mt-4 space-y-3">
                 <select
+                  aria-label="Select active tenant"
                   value={activeTenant?.id ?? ""}
                   onChange={(e) => {
                     if (e.target.value) switchToTenant(e.target.value);
@@ -268,17 +273,17 @@ export default function AdminTenantSection({
                   <span className="chip chip-accent">Switching tenant...</span>
                 ) : null}
 
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {activeTenants.map((tenant) => (
                     <div
                       key={tenant.id}
-                      className={`rounded-[1rem] border px-4 py-3 ${
+                      className={`rounded-[0.95rem] border px-3.5 py-3 ${
                         tenant.id === activeTenant?.id
                           ? "border-[rgba(105,211,255,0.28)] bg-[rgba(105,211,255,0.08)]"
                           : "border-[rgba(140,172,197,0.12)] bg-[rgba(7,18,28,0.48)]"
                       }`}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2.5">
                         <TenantIdentity
                           name={tenant.name}
                           logoUrl={tenant.logoUrl}
@@ -296,7 +301,7 @@ export default function AdminTenantSection({
                       {(tenant.albumCount != null ||
                         tenant.mediaCount != null ||
                         tenant.memberCount != null) && (
-                        <div className="mt-3 flex flex-wrap gap-2">
+                        <div className="mt-2.5 flex flex-wrap gap-2">
                           {tenant.albumCount != null ? (
                             <span className="chip">
                               Albums

@@ -67,9 +67,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   });
 
   // Allow magic links for users with tenant access or platform-admin access.
+  const shouldCheckPlatformAdmin =
+    mode === "platform-admin" || Boolean(tenantSlug);
+
   const [tenantIds, isPlatformAdmin] = await Promise.all([
     getUserTenantIds(email),
-    mode === "platform-admin" ? canAccessAdmin(email) : Promise.resolve(false),
+    shouldCheckPlatformAdmin
+      ? canAccessAdmin(email)
+      : Promise.resolve(false),
   ]);
   if (tenantIds.length === 0 && !isPlatformAdmin) {
     return NextResponse.json(GENERIC_RESPONSE, { status: 200 });

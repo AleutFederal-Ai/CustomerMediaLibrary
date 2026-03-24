@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateMagicLinkToken } from "@/lib/auth/magic-link";
+import { canAccessAdmin } from "@/lib/auth/admin";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { getTenantById, getTenantBySlug } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/logger";
@@ -67,20 +68,25 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     detail: { email, method: "magic-link" },
   });
 
-  // Determine redirect destination now that we know tenant membership
+  const isPlatformAdmin = await canAccessAdmin(email);
+
+  // Redirect priority:
+  // 1. Explicitly selected tenant from login
+  // 2. Active tenant resolved on the session
+  // 3. Multi-tenant selection step
+  // 4. Platform admin console
   let redirectPath: string;
-  if (isPlatformAdminMode || tenantIds.length === 0) {
-    redirectPath = "/admin";
-  } else if (!activeTenantId && tenantIds.length > 1) {
-    redirectPath = "/select-tenant";
-  } else {
-    const activeTenant =
-      preferredTenantSlug
-        ? { slug: preferredTenantSlug }
-        : activeTenantId
-          ? await getTenantById(activeTenantId)
-          : null;
+  if (preferredTenantSlug) {
+    redirectPath = `/t/${preferredTenantSlug}`;
+  } else if (activeTenantId) {
+    const activeTenant = await getTenantById(activeTenantId);
     redirectPath = activeTenant?.slug ? `/t/${activeTenant.slug}` : "/";
+  } else if (tenantIds.length > 1) {
+    redirectPath = "/select-tenant";
+  } else if (isPlatformAdminMode || isPlatformAdmin) {
+    redirectPath = "/admin";
+  } else {
+    redirectPath = "/login";
   }
 
   const response = NextResponse.redirect(new URL(redirectPath, publicBase));

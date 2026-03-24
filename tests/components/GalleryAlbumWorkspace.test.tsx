@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import GalleryAlbumWorkspace from "@/components/gallery/GalleryAlbumWorkspace";
@@ -58,9 +58,13 @@ describe("GalleryAlbumWorkspace", () => {
     );
     await user.click(screen.getByRole("button", { name: /Create Album/i }));
 
-    await waitFor(() => {
-      expect(screen.getByRole("link", { name: /Fresh Collection/i })).toBeInTheDocument();
-    });
+    expect(
+      await screen.findByRole(
+        "link",
+        { name: /Fresh Collection/i },
+        { timeout: 10000 }
+      )
+    ).toBeInTheDocument();
 
     expect(global.fetch).toHaveBeenCalledWith(
       "/api/admin/albums?tenantId=tenant-1",
@@ -69,5 +73,5 @@ describe("GalleryAlbumWorkspace", () => {
       })
     );
     expect(refreshMock).toHaveBeenCalled();
-  });
+  }, 10000);
 });

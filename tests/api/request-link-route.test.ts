@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/auth/magic-link", () => ({
   checkRateLimit: vi.fn(),
@@ -34,6 +34,10 @@ import { getPublicBaseUrl } from "@/lib/auth/base-url";
 import { getUserTenantIds } from "@/lib/auth/tenant";
 
 describe("/api/auth/request-link", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("sends a magic link for an explicitly authorized tenant member", async () => {
     vi.mocked(checkRateLimit).mockResolvedValue(true);
     vi.mocked(generateMagicLinkToken).mockResolvedValue("token-123");
@@ -58,6 +62,34 @@ describe("/api/auth/request-link", () => {
 
     expect(response.status).toBe(200);
     expect(body.message).toContain("If your email is authorized");
+    expect(sendMagicLinkEmail).toHaveBeenCalledOnce();
+  });
+
+  it("sends a magic link when a platform admin selects a tenant workspace", async () => {
+    vi.mocked(checkRateLimit).mockResolvedValue(true);
+    vi.mocked(generateMagicLinkToken).mockResolvedValue("token-456");
+    vi.mocked(sendMagicLinkEmail).mockResolvedValue(undefined);
+    vi.mocked(canAccessAdmin).mockResolvedValue(true);
+    vi.mocked(getPublicBaseUrl).mockReturnValue("http://localhost:3000");
+    vi.mocked(getUserTenantIds).mockResolvedValue([]);
+
+    const request = new NextRequest("http://localhost:3000/api/auth/request-link", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        email: "admin@example.com",
+        tenantSlug: "tenant-one",
+      }),
+    });
+
+    const response = await POST(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.message).toContain("If your email is authorized");
+    expect(canAccessAdmin).toHaveBeenCalledWith("admin@example.com");
     expect(sendMagicLinkEmail).toHaveBeenCalledOnce();
   });
 });

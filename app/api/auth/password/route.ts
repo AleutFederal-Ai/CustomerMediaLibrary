@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { users } from "@/lib/azure/cosmos";
+import { canAccessAdmin } from "@/lib/auth/admin";
 import { verifyPassword } from "@/lib/auth/password";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { getTenantById, getTenantBySlug } from "@/lib/auth/tenant";
@@ -114,20 +115,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       detail: { email, method: "password" },
     });
 
-    // Determine where to redirect after login
+    const isPlatformAdmin = await canAccessAdmin(email);
+
+    // Redirect priority:
+    // 1. Explicitly selected tenant from login
+    // 2. Active tenant resolved on the session
+    // 3. Multi-tenant selection step
+    // 4. Platform admin console
     let redirectTo: string;
-    if (isPlatformAdminMode || tenantIds.length === 0) {
-      redirectTo = "/admin";
-    } else if (!activeTenantId && tenantIds.length > 1) {
-      redirectTo = "/select-tenant";
-    } else {
-      const activeTenant =
-        preferredTenantSlug
-          ? { slug: preferredTenantSlug }
-          : activeTenantId
-            ? await getTenantById(activeTenantId)
-            : null;
+    if (preferredTenantSlug) {
+      redirectTo = `/t/${preferredTenantSlug}`;
+    } else if (activeTenantId) {
+      const activeTenant = await getTenantById(activeTenantId);
       redirectTo = activeTenant?.slug ? `/t/${activeTenant.slug}` : "/";
+    } else if (tenantIds.length > 1) {
+      redirectTo = "/select-tenant";
+    } else if (isPlatformAdminMode || isPlatformAdmin) {
+      redirectTo = "/admin";
+    } else {
+      redirectTo = "/login";
     }
 
     const response = NextResponse.json({ ok: true, redirectTo });

@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { canAccessAdmin } from "@/lib/auth/admin";
+import { buildAdminTenantPath } from "@/lib/admin-scope";
 import { users } from "@/lib/azure/cosmos";
 import { UserAdminListItem, TenantPublicItem } from "@/types";
 import UserManager from "@/components/admin/UserManager";
@@ -58,7 +59,9 @@ export default async function AdminUsersPage() {
     <AppShell>
       <TopBar accentColor={activeTenant?.brandColor}>
         <div className="flex items-center gap-3">
-          <BackLink href="/admin">Return to Admin</BackLink>
+          <BackLink href={buildAdminTenantPath("/admin", activeTenant?.slug)}>
+            Return to Admin
+          </BackLink>
           <div>
             <p className="hero-kicker">User Governance</p>
             <p className="text-sm text-[var(--text-muted)]">

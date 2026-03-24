@@ -1,5 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { getAdminTenantPageContext } from "@/lib/auth/admin-tenant-page";
+import { buildAdminTenantPath } from "@/lib/admin-scope";
 import { isTenantAdmin } from "@/lib/auth/permissions";
 import { albums } from "@/lib/azure/cosmos";
 import { AlbumRecord, TenantPublicItem } from "@/types";
@@ -24,17 +26,18 @@ async function getTenantAlbums(tenantId: string): Promise<AlbumRecord[]> {
   return resources;
 }
 
-export default async function AdminAlbumsPage() {
-  const headerStore = await headers();
-  const email = headerStore.get("x-session-email");
-  const tenantId = headerStore.get("x-active-tenant-id") ?? "";
-  const host =
-    headerStore.get("x-forwarded-host") ??
-    headerStore.get("host") ??
-    "localhost:3000";
-  const proto = headerStore.get("x-forwarded-proto") ?? "http";
+export default async function AdminAlbumsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tenant?: string }>;
+}) {
+  const { tenant: requestedTenantSlug } = await searchParams;
+  const { email, activeTenantId: tenantId, host, proto, cookieHeader } =
+    await getAdminTenantPageContext({
+      currentPath: "/admin/albums",
+      requestedTenantSlug,
+    });
 
-  if (!email) redirect("/login");
   if (!tenantId) redirect("/admin");
   const isAdmin = await isTenantAdmin(email, tenantId);
   if (!isAdmin) redirect("/");
@@ -42,7 +45,7 @@ export default async function AdminAlbumsPage() {
   const [albumList, activeTenant] = await Promise.all([
     getTenantAlbums(tenantId),
     fetch(`${proto}://${host}/api/tenants/current`, {
-      headers: { cookie: headerStore.get("cookie") ?? "" },
+      headers: { cookie: cookieHeader },
       cache: "no-store",
     })
       .then((r) => (r.ok ? (r.json() as Promise<TenantPublicItem>) : null))
@@ -53,7 +56,9 @@ export default async function AdminAlbumsPage() {
     <AppShell>
       <TopBar accentColor={activeTenant?.brandColor}>
         <div className="flex items-center gap-3">
-          <BackLink href="/admin">Return to Admin</BackLink>
+          <BackLink href={buildAdminTenantPath("/admin", activeTenant?.slug)}>
+            Return to Admin
+          </BackLink>
           <div>
             <p className="hero-kicker">Tenant Album Control</p>
             <p className="text-sm text-[var(--text-muted)]">

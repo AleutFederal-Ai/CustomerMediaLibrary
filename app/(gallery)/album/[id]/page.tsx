@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useDeferredValue, useRef } from "react";
+import { useState, useEffect, useCallback, useDeferredValue } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import MediaGrid from "@/components/gallery/MediaGrid";
 import Lightbox from "@/components/lightbox/Lightbox";
+import UploadForm from "@/components/admin/UploadForm";
 import { MediaListItem } from "@/types";
 import { apiFetch } from "@/lib/api-fetch";
 import { AppShell, HeroSection, PageWidth, TopBar } from "@/components/ui/AppFrame";
@@ -31,9 +32,6 @@ export default function AlbumPage() {
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [bulkDownloading, setBulkDownloading] = useState(false);
   const [canContribute, setCanContribute] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
@@ -138,35 +136,6 @@ export default function AlbumPage() {
     setItems((prev) => prev.filter((i) => i.id !== item.id));
   }
 
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    setUploading(true);
-    setUploadError(null);
-
-    let failed = 0;
-    for (const file of Array.from(files)) {
-      const form = new FormData();
-      form.append("file", file);
-      form.append("albumId", albumId);
-
-      const res = await apiFetch("/api/admin/upload", {
-        method: "POST",
-        body: form,
-      });
-      if (!res.ok) failed++;
-    }
-
-    if (failed > 0) {
-      setUploadError(`${failed} file(s) failed to upload.`);
-    }
-
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    await fetchItems(true);
-    setUploading(false);
-  }
-
   return (
     <AppShell>
       <TopBar>
@@ -189,28 +158,10 @@ export default function AlbumPage() {
         </div>
 
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
-          {uploading ? <span className="chip">Uploading in progress...</span> : null}
           {canContribute ? (
-            <label className="ops-button cursor-pointer">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                />
-              </svg>
+            <a href="#album-upload" className="ops-button">
               Upload Media
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept="image/*,video/*"
-                className="sr-only"
-                onChange={handleUpload}
-                disabled={uploading}
-              />
-            </label>
+            </a>
           ) : null}
         </div>
       </TopBar>
@@ -238,6 +189,30 @@ export default function AlbumPage() {
           }
         />
 
+        {canContribute ? (
+          <section id="album-upload" className="surface-card rounded-[1.5rem] p-5 sm:p-6">
+            <div className="mb-5 space-y-2">
+              <p className="hero-kicker">Album Upload Queue</p>
+              <h2 className="section-title">Add multiple files into this album</h2>
+              <p className="section-copy">
+                Drag media directly onto this panel or browse up to 20 files at
+                a time. The queue uploads items one by one and refreshes the
+                album grid when the batch completes.
+              </p>
+            </div>
+
+            <UploadForm
+              albums={[{ id: albumId, name: "Current album" }]}
+              initialAlbumId={albumId}
+              lockAlbum={true}
+              albumLabel="Current album"
+              onSuccess={() => {
+                void fetchItems(true);
+              }}
+            />
+          </section>
+        ) : null}
+
         <section className="surface-card rounded-[1.5rem] p-5 sm:p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-2">
@@ -249,7 +224,6 @@ export default function AlbumPage() {
             </div>
             <div className="flex flex-wrap gap-3">
               {bulkDownloading ? <span className="chip chip-accent">Preparing archive...</span> : null}
-              {uploadError ? <span className="chip ops-badge-danger">{uploadError}</span> : null}
             </div>
           </div>
 

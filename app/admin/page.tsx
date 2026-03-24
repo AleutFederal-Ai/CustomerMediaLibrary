@@ -2,14 +2,14 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { canAccessAdmin } from "@/lib/auth/admin";
+import { getAdminTenantPageContext } from "@/lib/auth/admin-tenant-page";
+import { buildAdminTenantPath } from "@/lib/admin-scope";
 import { isTenantAdmin } from "@/lib/auth/permissions";
 import { TenantPublicItem, AuditLogRecord } from "@/types";
 import AdminTenantSection from "./AdminTenantSection";
 import {
   AppShell,
   BackLink,
-  HeroSection,
-  Metric,
   PageWidth,
   SectionHeader,
   TopBar,
@@ -59,17 +59,41 @@ function formatAction(action: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export default async function AdminDashboard() {
-  const headerStore = await headers();
-  const email = headerStore.get("x-session-email");
-  const activeTenantId = headerStore.get("x-active-tenant-id") ?? "";
-  const host =
-    headerStore.get("x-forwarded-host") ??
-    headerStore.get("host") ??
-    "localhost:3000";
-  const proto = headerStore.get("x-forwarded-proto") ?? "http";
+function CompactMetric({
+  label,
+  value,
+  subtext,
+}: {
+  label: string;
+  value: string | number;
+  subtext?: string;
+}) {
+  return (
+    <div className="surface-card-soft rounded-[1.1rem] px-4 py-3 sm:px-5">
+      <p className="metric-label">{label}</p>
+      <p className="mt-2 text-[1.45rem] font-semibold leading-none tracking-[-0.04em] text-white">
+        {value}
+      </p>
+      {subtext ? (
+        <p className="mt-1.5 text-xs leading-5 text-[var(--text-subtle)]">
+          {subtext}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
-  if (!email) redirect("/login");
+export default async function AdminDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ tenant?: string }>;
+}) {
+  const { tenant: requestedTenantSlug } = await searchParams;
+  const { email, activeTenantId, host, proto, cookieHeader } =
+    await getAdminTenantPageContext({
+      currentPath: "/admin",
+      requestedTenantSlug,
+    });
 
   const [isPlatformAdmin, isTenantAdm] = await Promise.all([
     canAccessAdmin(email),
@@ -80,14 +104,14 @@ export default async function AdminDashboard() {
 
   const [activeTenant, stats] = await Promise.all([
     fetch(`${proto}://${host}/api/tenants/current`, {
-      headers: { cookie: headerStore.get("cookie") ?? "" },
+      headers: { cookie: cookieHeader },
       cache: "no-store",
     })
       .then((r) => (r.ok ? (r.json() as Promise<TenantPublicItem>) : null))
       .catch(() => null),
     isPlatformAdmin
       ? fetch(`${proto}://${host}/api/admin/stats`, {
-          headers: { cookie: headerStore.get("cookie") ?? "" },
+          headers: { cookie: cookieHeader },
           cache: "no-store",
         })
           .then((r) => (r.ok ? (r.json() as Promise<StatsResponse>) : null))
@@ -120,51 +144,62 @@ export default async function AdminDashboard() {
         </div>
       </TopBar>
 
-      <PageWidth className="space-y-8 py-8 sm:space-y-10 sm:py-10">
-        <HeroSection
-          eyebrow="Operations Dashboard"
-          title="Secure media administration at tenant and platform scale."
-          description="Monitor tenant posture, review recent activity, and move directly into the administrative workflows that keep media delivery governed and auditable."
-          meta={
-            <>
-              <span className="chip chip-accent">
-                Active Scope
-                <strong>{activeTenant?.name ?? "Platform"}</strong>
-              </span>
-              <span className="chip">
-                Role
-                <strong>{isPlatformAdmin ? "Platform" : "Tenant"}</strong>
-              </span>
-            </>
-          }
-          actions={
-            <>
-              <Link href="/admin/upload" className="ops-button">
+      <PageWidth className="space-y-6 py-6 sm:space-y-8 sm:py-8">
+        <section className="surface-card-soft rounded-[1.2rem] px-4 py-4 sm:px-5 sm:py-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-2">
+              <p className="hero-kicker">Administrative Scope</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-lg font-semibold tracking-[-0.03em] text-white sm:text-xl">
+                  {activeTenant?.name ?? "Platform"}
+                </h1>
+                {activeTenant?.slug ? (
+                  <span className="chip ops-code">/t/{activeTenant.slug}</span>
+                ) : null}
+                <span className="chip chip-accent">
+                  Role
+                  <strong>{isPlatformAdmin ? "Platform" : "Tenant"}</strong>
+                </span>
+              </div>
+              <p className="text-sm text-[var(--text-muted)]">
+                Use the controls below to manage tenant content, identity, and
+                audit workflows.
+              </p>
+            </div>
+
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              <Link
+                href={buildAdminTenantPath("/admin/upload", activeTenant?.slug)}
+                className="ops-button"
+              >
                 Upload Media
               </Link>
-              <Link href="/admin/albums" className="ops-button-secondary">
+              <Link
+                href={buildAdminTenantPath("/admin/albums", activeTenant?.slug)}
+                className="ops-button-secondary"
+              >
                 Manage Albums
               </Link>
-            </>
-          }
-        />
+            </div>
+          </div>
+        </section>
 
         {stats ? (
-          <section className="space-y-5">
+          <section className="space-y-4">
             <SectionHeader
               eyebrow="Platform Overview"
               title="Operational visibility across the environment"
               description="Cross-tenant totals provide a quick signal on platform growth, active usage, and current storage posture."
             />
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-              <Metric
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+              <CompactMetric
                 label="Tenants"
                 value={stats.totals.activeTenants}
                 subtext={`${stats.totals.tenants} total organizations`}
               />
-              <Metric label="Users" value={stats.totals.users} />
-              <Metric label="Media Files" value={stats.totals.media} />
-              <Metric
+              <CompactMetric label="Users" value={stats.totals.users} />
+              <CompactMetric label="Media Files" value={stats.totals.media} />
+              <CompactMetric
                 label="Storage"
                 value={
                   stats.totals.storageMB >= 1024
@@ -172,23 +207,23 @@ export default async function AdminDashboard() {
                     : `${stats.totals.storageMB} MB`
                 }
               />
-              <Metric
+              <CompactMetric
                 label="Active Sessions"
                 value={stats.totals.activeSessions}
               />
-              <Metric label="Albums" value={stats.totals.albums} />
+              <CompactMetric label="Albums" value={stats.totals.albums} />
             </div>
           </section>
         ) : null}
 
         {isPlatformAdmin ? (
-          <section className="space-y-5">
+          <section className="space-y-4">
             <SectionHeader
               eyebrow="Platform Administration"
               title="High-impact control surfaces"
               description="These workflows affect the full environment, including user control, tenant creation, and global audit visibility."
             />
-            <div className="grid gap-4 lg:grid-cols-3">
+            <div className="grid gap-3 lg:grid-cols-4">
               {[
                 {
                   href: "/admin/tenants",
@@ -218,13 +253,13 @@ export default async function AdminDashboard() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="surface-card-soft rounded-[1.3rem] p-5"
+                  className="surface-card-soft rounded-[1.15rem] p-4"
                 >
                   <p className="hero-kicker">{item.label}</p>
-                  <h3 className="mt-3 text-xl font-semibold tracking-[-0.03em] text-white">
+                  <h3 className="mt-2.5 text-lg font-semibold tracking-[-0.03em] text-white">
                     {item.label}
                   </h3>
-                  <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
+                  <p className="mt-2.5 text-sm leading-6 text-[var(--text-muted)]">
                     {item.description}
                   </p>
                 </Link>
@@ -234,7 +269,7 @@ export default async function AdminDashboard() {
         ) : null}
 
         {isPlatformAdmin && stats && stats.recentActivity.length > 0 ? (
-          <section className="space-y-5">
+          <section className="space-y-4">
             <SectionHeader
               eyebrow="Recent Activity"
               title="Latest control-plane events"
@@ -246,7 +281,7 @@ export default async function AdminDashboard() {
               }
             />
 
-            <div className="surface-card rounded-[1.5rem] overflow-hidden p-5 sm:p-6">
+            <div className="surface-card rounded-[1.25rem] overflow-hidden p-4 sm:p-5">
               <div className="overflow-x-auto">
                 <table className="ops-table text-sm">
                   <thead>
