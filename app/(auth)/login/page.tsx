@@ -3,7 +3,6 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import HealthStatus from "@/components/ui/HealthStatus";
-import CuiBanner from "@/components/ui/CuiBanner";
 import { TenantPublicItem } from "@/types";
 
 const PLATFORM_ADMIN_TENANT: TenantPublicItem = {
@@ -499,163 +498,159 @@ export default function LoginPage() {
   const isPlatformAdmin = selectedTenant?.id === PLATFORM_ADMIN_TENANT.id;
 
   return (
-    <>
-      <CuiBanner />
-
-      <div className="app-shell flex min-h-[calc(100vh-44px)] items-center px-4 py-8 sm:px-6 sm:py-10">
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-          <section className="surface-card overflow-hidden rounded-[2rem]">
-            <div className="border-b border-[rgba(140,172,197,0.14)] bg-[linear-gradient(135deg,rgba(23,58,87,0.98),rgba(10,33,49,0.98))] px-5 py-5 sm:px-8 sm:py-6">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/12 bg-white/8">
-                  <svg
-                    className="h-5 w-5 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.75}
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                    />
-                  </svg>
-                </div>
-                <div>
-                  <p className="hero-kicker text-[rgba(214,245,255,0.82)] before:bg-[linear-gradient(135deg,#dff7ff,rgba(214,245,255,0.2))]">
-                    Access Gateway
-                  </p>
-                  <h1 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white">
-                    myMedia Platform
-                  </h1>
-                  <p className="mt-1 text-sm text-[rgba(214,245,255,0.74)]">
-                    Tenant-aware authentication and controlled media access.
-                  </p>
-                </div>
+    <div className="app-shell flex min-h-[calc(100vh-44px)] items-center px-4 py-8 sm:px-6 sm:py-10">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+        <section className="surface-card overflow-hidden rounded-[2rem]">
+          <div className="border-b border-[rgba(140,172,197,0.14)] bg-[linear-gradient(135deg,rgba(23,58,87,0.98),rgba(10,33,49,0.98))] px-5 py-5 sm:px-8 sm:py-6">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/12 bg-white/8">
+                <svg
+                  className="h-5 w-5 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.75}
+                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <p className="hero-kicker text-[rgba(214,245,255,0.82)] before:bg-[linear-gradient(135deg,#dff7ff,rgba(214,245,255,0.2))]">
+                  Access Gateway
+                </p>
+                <h1 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-white">
+                  myMedia Platform
+                </h1>
+                <p className="mt-1 text-sm text-[rgba(214,245,255,0.74)]">
+                  Tenant-aware authentication and controlled media access.
+                </p>
               </div>
             </div>
+          </div>
+
+          {step === "sign-in" && selectedTenant ? (
+            <div className="border-b border-[rgba(140,172,197,0.14)] bg-[rgba(7,18,28,0.58)] px-5 py-4 sm:px-8">
+              <div className="flex items-center gap-3">
+                {isPlatformAdmin ? (
+                  <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-[rgba(241,197,108,0.24)] bg-[rgba(241,197,108,0.14)]">
+                    <svg
+                      className="h-4 w-4 text-[var(--warning)]"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                      />
+                    </svg>
+                  </div>
+                ) : (
+                  <TenantPill tenant={selectedTenant} />
+                )}
+
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
+                    Active Tenant Context
+                  </p>
+                  <span
+                    className={`block truncate text-sm font-medium ${
+                      isPlatformAdmin ? "text-[var(--warning)]" : "text-white"
+                    }`}
+                  >
+                    {selectedTenant.name}
+                  </span>
+                </div>
+
+                {!tenantSlugParam ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep("select-tenant");
+                      setSelectedTenant(null);
+                    }}
+                    className="ops-button-ghost !w-auto text-xs uppercase tracking-[0.18em]"
+                  >
+                    Change
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {step === "sign-in" ? (
+            <div className="flex border-b border-[rgba(140,172,197,0.14)] bg-[rgba(5,16,25,0.7)]">
+              <button
+                type="button"
+                onClick={() => setTab("magic")}
+                className={`flex-1 px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] ${
+                  tab === "magic"
+                    ? "bg-[rgba(105,211,255,0.12)] text-white"
+                    : "text-[var(--text-muted)]"
+                }`}
+              >
+                Email Link
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab("password")}
+                className={`flex-1 px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] ${
+                  tab === "password"
+                    ? "bg-[rgba(105,211,255,0.12)] text-white"
+                    : "text-[var(--text-muted)]"
+                }`}
+              >
+                Password
+              </button>
+            </div>
+          ) : null}
+
+          <div className="px-5 py-6 sm:px-8 sm:py-8">
+            {step === "select-tenant" ? (
+              <>
+                <p className="hero-kicker">Tenant Selection</p>
+                <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">
+                  Choose your organization
+                </h2>
+                <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
+                  Public organizations are listed below. If your tenant is
+                  private, use its organization code to continue.
+                </p>
+                <div className="mt-6">
+                  <TenantSelector
+                    onSelect={handleTenantSelected}
+                    onPlatformAdmin={handlePlatformAdmin}
+                  />
+                </div>
+              </>
+            ) : null}
 
             {step === "sign-in" && selectedTenant ? (
-              <div className="border-b border-[rgba(140,172,197,0.14)] bg-[rgba(7,18,28,0.58)] px-5 py-4 sm:px-8">
-                <div className="flex items-center gap-3">
-                  {isPlatformAdmin ? (
-                    <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-[rgba(241,197,108,0.24)] bg-[rgba(241,197,108,0.14)]">
-                      <svg
-                        className="h-4 w-4 text-[var(--warning)]"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                        />
-                      </svg>
-                    </div>
-                  ) : (
-                    <TenantPill tenant={selectedTenant} />
-                  )}
-
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
-                      Active Tenant Context
-                    </p>
-                    <span
-                      className={`block truncate text-sm font-medium ${
-                        isPlatformAdmin ? "text-[var(--warning)]" : "text-white"
-                      }`}
-                    >
-                      {selectedTenant.name}
-                    </span>
-                  </div>
-
-                  {!tenantSlugParam ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStep("select-tenant");
-                        setSelectedTenant(null);
-                      }}
-                      className="ops-button-ghost !w-auto text-xs uppercase tracking-[0.18em]"
-                    >
-                      Change
-                    </button>
-                  ) : null}
-                </div>
-              </div>
+              tab === "magic" ? (
+                <MagicLinkForm tenant={selectedTenant} hasError={hasError} />
+              ) : (
+                <PasswordForm tenant={selectedTenant} />
+              )
             ) : null}
 
-            {step === "sign-in" ? (
-              <div className="flex border-b border-[rgba(140,172,197,0.14)] bg-[rgba(5,16,25,0.7)]">
-                <button
-                  type="button"
-                  onClick={() => setTab("magic")}
-                  className={`flex-1 px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] ${
-                    tab === "magic"
-                      ? "bg-[rgba(105,211,255,0.12)] text-white"
-                      : "text-[var(--text-muted)]"
-                  }`}
-                >
-                  Email Link
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTab("password")}
-                  className={`flex-1 px-4 py-4 text-sm font-semibold uppercase tracking-[0.08em] ${
-                    tab === "password"
-                      ? "bg-[rgba(105,211,255,0.12)] text-white"
-                      : "text-[var(--text-muted)]"
-                  }`}
-                >
-                  Password
-                </button>
+            {step === "sign-in" && !selectedTenant ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
               </div>
             ) : null}
-
-            <div className="px-5 py-6 sm:px-8 sm:py-8">
-              {step === "select-tenant" ? (
-                <>
-                  <p className="hero-kicker">Tenant Selection</p>
-                  <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">
-                    Choose your organization
-                  </h2>
-                  <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
-                    Public organizations are listed below. If your tenant is
-                    private, use its organization code to continue.
-                  </p>
-                  <div className="mt-6">
-                    <TenantSelector
-                      onSelect={handleTenantSelected}
-                      onPlatformAdmin={handlePlatformAdmin}
-                    />
-                  </div>
-                </>
-              ) : null}
-
-              {step === "sign-in" && selectedTenant ? (
-                tab === "magic" ? (
-                  <MagicLinkForm tenant={selectedTenant} hasError={hasError} />
-                ) : (
-                  <PasswordForm tenant={selectedTenant} />
-                )
-              ) : null}
-
-              {step === "sign-in" && !selectedTenant ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
-                </div>
-              ) : null}
-            </div>
-          </section>
-
-          <div className="mx-auto w-full max-w-3xl">
-            <HealthStatus />
           </div>
+        </section>
+
+        <div className="mx-auto w-full max-w-3xl">
+          <HealthStatus />
         </div>
       </div>
-    </>
+    </div>
   );
 }
