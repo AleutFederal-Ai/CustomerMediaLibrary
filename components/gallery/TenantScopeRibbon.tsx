@@ -12,27 +12,6 @@ interface Props {
   albumCount: number;
 }
 
-function TenantBadge({ tenant }: { tenant: TenantPublicItem | null }) {
-  if (tenant?.logoUrl) {
-    return (
-      <img
-        src={tenant.logoUrl}
-        alt={tenant.name}
-        className="h-12 w-12 rounded-2xl border border-[color:var(--border)] bg-white object-contain p-2"
-      />
-    );
-  }
-
-  return (
-    <div
-      className="flex h-12 w-12 items-center justify-center rounded-2xl text-sm font-bold text-white"
-      style={{ backgroundColor: tenant?.brandColor ?? "#1e3a5f" }}
-    >
-      {(tenant?.name ?? "M").charAt(0).toUpperCase()}
-    </div>
-  );
-}
-
 export default function TenantScopeRibbon({
   activeTenant,
   tenants,
@@ -87,55 +66,43 @@ export default function TenantScopeRibbon({
   }
 
   return (
-    <section className="surface-card rounded-[1.5rem] px-4 py-4 sm:px-5 sm:py-5">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto_minmax(260px,320px)] xl:items-center">
-        <div className="flex min-w-0 items-center gap-4">
-          <TenantBadge tenant={activeTenant} />
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-[color:var(--text-muted)]">
-              Active tenant
-            </p>
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-lg font-semibold tracking-[-0.03em] text-[color:var(--foreground)] sm:text-xl">
-                {activeTenant?.name ?? "Platform"}
-              </h1>
-              {activeTenant?.slug ? (
-                <span className="chip ops-code">/t/{activeTenant.slug}</span>
-              ) : null}
-            </div>
-            <p className="mt-1 text-sm text-[color:var(--text-muted)]">
-              Switch tenant context here when you need to move between
-              organizations.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 xl:justify-center">
+    <section className="surface-card-quiet rounded-[1.35rem] border px-4 py-4 sm:px-5">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          {activeTenant?.slug ? (
+            <span className="chip ops-code">/t/{activeTenant.slug}</span>
+          ) : null}
           <span className="chip chip-accent">
-            Scope
+            Role
             <strong>{roleLabel}</strong>
           </span>
           <span className="chip">
-            Collections
+            Albums
             <strong>{albumCount}</strong>
           </span>
           {availableTenants.length > 1 ? (
             <span className="chip">
-              Tenants
+              Workspaces
               <strong>{availableTenants.length}</strong>
             </span>
           ) : null}
         </div>
 
-        <div className="min-w-0">
+        <div className="min-w-0 xl:w-full xl:max-w-[22rem]">
           {availableTenants.length > 1 ? (
-            <div className="space-y-2">
-              <label
-                htmlFor="tenant-switcher"
-                className="block text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--text-muted)]"
-              >
-                Switch Workspace
-              </label>
+            <div className="space-y-2 xl:text-right">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label
+                  htmlFor="tenant-switcher"
+                  className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--text-muted)]"
+                >
+                  Switch Workspace
+                </label>
+                {switching ? (
+                  <span className="chip chip-accent">Switching...</span>
+                ) : null}
+              </div>
+
               <select
                 id="tenant-switcher"
                 value={selectedTenantId}
@@ -152,14 +119,15 @@ export default function TenantScopeRibbon({
                   </option>
                 ))}
               </select>
+
               <p className="text-xs text-[color:var(--text-muted)]">
                 Change tenant context without returning to sign-in.
               </p>
             </div>
           ) : (
             <p className="text-sm text-[color:var(--text-muted)] xl:text-right">
-              Single-tenant session. No alternate tenant is available for this
-              account.
+              Single-workspace session. No alternate workspace is available for
+              this account.
             </p>
           )}
         </div>

@@ -45,8 +45,9 @@ describe("TenantScopeRibbon", () => {
       />
     );
 
-    expect(screen.getByRole("heading", { name: /Alpha Tenant/i })).toBeInTheDocument();
-    expect(screen.getByText(/Collections/i)).toBeInTheDocument();
+    expect(screen.getByText("/t/alpha")).toBeInTheDocument();
+    expect(screen.getByText(/Albums/i)).toBeInTheDocument();
+    expect(screen.getByText(/Role/i)).toBeInTheDocument();
 
     await user.selectOptions(
       screen.getByLabelText(/Switch Workspace/i),

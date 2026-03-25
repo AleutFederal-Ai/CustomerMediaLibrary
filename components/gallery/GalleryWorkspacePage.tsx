@@ -111,17 +111,6 @@ export default async function GalleryWorkspacePage({
             </div>
 
             <div className="flex flex-col gap-3 sm:items-end">
-              <div className="flex flex-wrap gap-2">
-                <span className="chip">
-                  Albums
-                  <strong>{albums.length}</strong>
-                </span>
-                <span className="chip">
-                  Role
-                  <strong>{roleLabel}</strong>
-                </span>
-              </div>
-
               <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
                 {canManage ? (
                   <Link
@@ -138,14 +127,16 @@ export default async function GalleryWorkspacePage({
               </div>
             </div>
           </div>
-        </header>
 
-        <TenantScopeRibbon
-          activeTenant={activeTenant}
-          tenants={userTenants}
-          roleLabel={roleLabel}
-          albumCount={albums.length}
-        />
+          <div className="mt-5">
+            <TenantScopeRibbon
+              activeTenant={activeTenant}
+              tenants={userTenants}
+              roleLabel={roleLabel}
+              albumCount={albums.length}
+            />
+          </div>
+        </header>
 
         <section className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
