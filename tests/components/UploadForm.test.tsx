@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import UploadForm from "@/components/admin/UploadForm";
@@ -55,5 +55,29 @@ describe("UploadForm", () => {
     );
 
     expect(await screen.findByText(/Uploaded 2 of 2 file/i)).toBeInTheDocument();
+  });
+
+  it("adds dropped files to the queue", () => {
+    render(<UploadForm albums={[{ id: "album-1", name: "Alpha Album" }]} />);
+
+    const droppedFile = new File(["dropped"], "dropped.png", {
+      type: "image/png",
+    });
+
+    fireEvent.dragEnter(screen.getByRole("region", { name: /Upload drop zone/i }), {
+      dataTransfer: {
+        files: [droppedFile],
+        types: ["Files"],
+      },
+    });
+
+    fireEvent.drop(screen.getByRole("region", { name: /Upload drop zone/i }), {
+      dataTransfer: {
+        files: [droppedFile],
+        types: ["Files"],
+      },
+    });
+
+    expect(screen.getByText("dropped.png")).toBeInTheDocument();
   });
 });

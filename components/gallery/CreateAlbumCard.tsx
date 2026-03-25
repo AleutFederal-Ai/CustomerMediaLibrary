@@ -83,19 +83,21 @@ export default function CreateAlbumCard({ tenantId, onCreated }: Props) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="group surface-card-soft flex aspect-[4/3] flex-col items-start justify-between rounded-[1.4rem] border border-dashed border-[rgba(105,211,255,0.26)] p-5 text-left"
+        className="group surface-card flex aspect-[4/3] flex-col items-start justify-between rounded-[1.5rem] border border-dashed border-[rgba(148,163,184,0.38)] p-5 text-left hover:border-slate-400"
       >
-        <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[rgba(105,211,255,0.12)] text-2xl text-[#d2f5ff]">
+        <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-2xl text-slate-700">
           +
         </div>
         <div className="space-y-2">
-          <p className="hero-kicker">Create Collection</p>
-          <h2 className="text-2xl font-semibold tracking-[-0.04em] text-white">
-            Stand up a new album workspace
+          <p className="text-sm font-medium text-[color:var(--text-muted)]">
+            Create album
+          </p>
+          <h2 className="text-2xl font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
+            Start a new album
           </h2>
-          <p className="text-sm leading-6 text-[rgba(231,238,245,0.72)]">
-            Define a collection, assign a description, and publish a new tenant
-            media surface.
+          <p className="text-sm leading-6 text-[color:var(--text-muted)]">
+            Add a name, optional description, and make a new collection
+            available in this tenant.
           </p>
         </div>
       </button>
@@ -103,11 +105,15 @@ export default function CreateAlbumCard({ tenantId, onCreated }: Props) {
   }
 
   return (
-    <div className="surface-card flex aspect-[4/3] flex-col rounded-[1.4rem] p-5">
+    <div className="surface-card flex aspect-[4/3] flex-col rounded-[1.5rem] p-5">
       <form onSubmit={handleCreate} className="flex h-full flex-col gap-3">
         <div className="space-y-2">
-          <p className="hero-kicker">New Collection</p>
-          <h2 className="section-title">Initialize album metadata</h2>
+          <p className="text-sm font-medium text-[color:var(--text-muted)]">
+            New album
+          </p>
+          <h2 className="text-xl font-semibold tracking-[-0.03em] text-[color:var(--foreground)]">
+            Enter album details
+          </h2>
         </div>
 
         <input
@@ -127,7 +133,7 @@ export default function CreateAlbumCard({ tenantId, onCreated }: Props) {
           className="ops-input"
         />
 
-        {error ? <p className="text-sm text-[#ffb7b7]">{error}</p> : null}
+        {error ? <p className="text-sm text-red-700">{error}</p> : null}
 
         <div className="mt-auto flex flex-col gap-3 sm:flex-row">
           <button

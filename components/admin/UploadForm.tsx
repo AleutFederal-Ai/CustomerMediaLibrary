@@ -1,6 +1,15 @@
 "use client";
 
-import { ChangeEvent, DragEvent, FormEvent, useMemo, useRef, useState } from "react";
+import {
+  ChangeEvent,
+  DragEvent,
+  FormEvent,
+  forwardRef,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { apiFetch } from "@/lib/api-fetch";
 
 const MAX_QUEUE_ITEMS = 20;
@@ -16,6 +25,11 @@ interface Props {
   lockAlbum?: boolean;
   albumLabel?: string;
   onSuccess?: () => void;
+}
+
+export interface UploadFormHandle {
+  queueFiles: (files: File[]) => void;
+  openFilePicker: () => void;
 }
 
 type UploadStatus = "queued" | "uploading" | "uploaded" | "failed";
@@ -73,13 +87,13 @@ function createQueueId(file: File): string {
   return `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export default function UploadForm({
+const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
   albums,
   initialAlbumId,
   lockAlbum = false,
   albumLabel,
   onSuccess,
-}: Props) {
+}: Props, ref) {
   const [albumId, setAlbumId] = useState(initialAlbumId ?? albums[0]?.id ?? "");
   const [tags, setTags] = useState("");
   const [queue, setQueue] = useState<UploadQueueItem[]>([]);
@@ -157,6 +171,23 @@ export default function UploadForm({
       return [...current, ...nextItems];
     });
   }
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      queueFiles(files: File[]) {
+        if (!uploading) {
+          addFiles(files);
+        }
+      },
+      openFilePicker() {
+        if (!uploading && queue.length < MAX_QUEUE_ITEMS) {
+          fileInputRef.current?.click();
+        }
+      },
+    }),
+    [addFiles, queue.length, uploading]
+  );
 
   function handleFileSelection(event: ChangeEvent<HTMLInputElement>) {
     addFiles(Array.from(event.target.files ?? []));
@@ -293,17 +324,17 @@ export default function UploadForm({
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="grid gap-4 lg:grid-cols-2">
         <div>
-          <label className="mb-2 block text-sm font-medium text-white/86">
+          <label className="mb-2 block text-sm font-medium text-[color:var(--foreground)]">
             Album
           </label>
           {lockAlbum && selectedAlbum ? (
             <div className="surface-card-soft rounded-[1rem] px-4 py-3">
-              <p className="text-sm font-semibold text-white">
+              <p className="text-sm font-semibold text-[color:var(--foreground)]">
                 {albumLabel ?? selectedAlbum.name}
               </p>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
+              <p className="mt-1 text-xs text-[color:var(--text-muted)]">
                 Files in this queue will be uploaded into the currently selected
-                collection.
+                album.
               </p>
             </div>
           ) : (
@@ -324,7 +355,7 @@ export default function UploadForm({
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium text-white/86">
+          <label className="mb-2 block text-sm font-medium text-[color:var(--foreground)]">
             Tags
           </label>
           <input
@@ -341,9 +372,11 @@ export default function UploadForm({
       <div
         className={`rounded-[1.2rem] border border-dashed p-5 transition ${
           dropActive
-            ? "border-[rgba(105,211,255,0.46)] bg-[rgba(105,211,255,0.08)]"
-            : "surface-card-soft border-[rgba(140,172,197,0.18)]"
+            ? "border-[rgba(37,99,235,0.4)] bg-[rgba(37,99,235,0.08)]"
+            : "surface-card-quiet border-[rgba(148,163,184,0.24)]"
         }`}
+        role="region"
+        aria-label="Upload drop zone"
         onDragOver={handleDragOver}
         onDragEnter={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -362,11 +395,13 @@ export default function UploadForm({
 
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-2">
-            <p className="hero-kicker">Upload Queue</p>
-            <h3 className="text-lg font-semibold tracking-[-0.03em] text-white">
+            <p className="text-sm font-medium text-[color:var(--text-muted)]">
+              Upload queue
+            </p>
+            <h3 className="text-lg font-semibold tracking-[-0.03em] text-[color:var(--foreground)]">
               Drag files here or browse from your desktop
             </h3>
-            <p className="text-sm leading-6 text-[var(--text-muted)]">
+            <p className="text-sm leading-6 text-[color:var(--text-muted)]">
               Add up to {MAX_QUEUE_ITEMS} images or videos per batch. Files are
               uploaded one at a time so the queue remains visible and stable.
             </p>
@@ -421,10 +456,10 @@ export default function UploadForm({
       <div className="surface-card-soft rounded-[1.2rem] p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-medium text-white">
+            <p className="text-sm font-medium text-[color:var(--foreground)]">
               Files waiting to upload
             </p>
-            <p className="mt-1 text-xs text-[var(--text-muted)]">
+            <p className="mt-1 text-xs text-[color:var(--text-muted)]">
               Remove any item before starting the batch, or retry failed items
               by running the queue again.
             </p>
@@ -446,23 +481,23 @@ export default function UploadForm({
             {queue.map((item) => (
               <div
                 key={item.id}
-                className="rounded-[1rem] border border-[rgba(140,172,197,0.12)] bg-[rgba(7,18,28,0.52)] px-4 py-3"
+                className="surface-card-quiet rounded-[1rem] border px-4 py-3"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate text-sm font-semibold text-white">
+                      <p className="truncate text-sm font-semibold text-[color:var(--foreground)]">
                         {item.file.name}
                       </p>
                       <span className={getStatusClass(item.status)}>
                         {getStatusLabel(item.status)}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    <p className="mt-1 text-xs text-[color:var(--text-muted)]">
                       {formatFileSize(item.file.size)}
                     </p>
                     {item.error ? (
-                      <p className="mt-2 text-xs text-[#ffb7b7]">{item.error}</p>
+                      <p className="mt-2 text-xs text-red-700">{item.error}</p>
                     ) : null}
                   </div>
 
@@ -482,10 +517,10 @@ export default function UploadForm({
           </div>
         ) : (
           <div className="ops-empty mt-4 !py-8">
-            <p className="text-base font-semibold text-white">
+            <p className="text-base font-semibold text-[color:var(--foreground)]">
               No files in the queue yet.
             </p>
-            <p className="mx-auto mt-2 max-w-xl text-sm">
+            <p className="mx-auto mt-2 max-w-xl text-sm text-[color:var(--text-muted)]">
               Drag media from your desktop onto the drop zone above, or use the
               browse button to build the next batch.
             </p>
@@ -501,11 +536,15 @@ export default function UploadForm({
         >
           {uploading ? "Uploading Queue..." : "Start Upload Queue"}
         </button>
-        <span className="text-sm text-[var(--text-muted)]">
+        <span className="text-sm text-[color:var(--text-muted)]">
           Files upload sequentially and remain visible here until you clear the
           completed items.
         </span>
       </div>
     </form>
   );
-}
+});
+
+UploadForm.displayName = "UploadForm";
+
+export default UploadForm;

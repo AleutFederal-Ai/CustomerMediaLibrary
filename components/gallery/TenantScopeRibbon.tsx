@@ -18,7 +18,7 @@ function TenantBadge({ tenant }: { tenant: TenantPublicItem | null }) {
       <img
         src={tenant.logoUrl}
         alt={tenant.name}
-        className="h-12 w-12 rounded-2xl border border-white/10 bg-slate-950/40 object-contain p-2"
+        className="h-12 w-12 rounded-2xl border border-[color:var(--border)] bg-white object-contain p-2"
       />
     );
   }
@@ -87,22 +87,25 @@ export default function TenantScopeRibbon({
   }
 
   return (
-    <section className="surface-card-soft rounded-[1.15rem] px-4 py-3 sm:px-5 sm:py-4">
+    <section className="surface-card rounded-[1.5rem] px-4 py-4 sm:px-5 sm:py-5">
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto_minmax(260px,320px)] xl:items-center">
         <div className="flex min-w-0 items-center gap-4">
           <TenantBadge tenant={activeTenant} />
           <div className="min-w-0">
-            <p className="hero-kicker">Active Tenant</p>
+            <p className="text-sm font-medium text-[color:var(--text-muted)]">
+              Active tenant
+            </p>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-lg font-semibold tracking-[-0.03em] text-white sm:text-xl">
+              <h1 className="truncate text-lg font-semibold tracking-[-0.03em] text-[color:var(--foreground)] sm:text-xl">
                 {activeTenant?.name ?? "Platform"}
               </h1>
               {activeTenant?.slug ? (
                 <span className="chip ops-code">/t/{activeTenant.slug}</span>
               ) : null}
             </div>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Current workspace routing for albums, uploads, and access checks.
+            <p className="mt-1 text-sm text-[color:var(--text-muted)]">
+              Switch tenant context here when you need to move between
+              organizations.
             </p>
           </div>
         </div>
@@ -129,7 +132,7 @@ export default function TenantScopeRibbon({
             <div className="space-y-2">
               <label
                 htmlFor="tenant-switcher"
-                className="block text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]"
+                className="block text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--text-muted)]"
               >
                 Switch Workspace
               </label>
@@ -149,14 +152,14 @@ export default function TenantScopeRibbon({
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-[var(--text-muted)]">
-                Change tenant context without returning to the sign-in flow.
+              <p className="text-xs text-[color:var(--text-muted)]">
+                Change tenant context without returning to sign-in.
               </p>
             </div>
           ) : (
-            <p className="text-sm text-[var(--text-muted)] xl:text-right">
-              Single-tenant session. No alternate organization context is
-              available for this account.
+            <p className="text-sm text-[color:var(--text-muted)] xl:text-right">
+              Single-tenant session. No alternate tenant is available for this
+              account.
             </p>
           )}
         </div>

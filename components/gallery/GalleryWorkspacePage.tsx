@@ -13,7 +13,7 @@ import {
   getActiveTenantPublicItem,
   listVisibleTenantsForSession,
 } from "@/lib/tenant-data";
-import { AppShell, PageWidth, TopBar } from "@/components/ui/AppFrame";
+import { AppShell, PageWidth } from "@/components/ui/AppFrame";
 
 interface Props {
   requestedSlug?: string;
@@ -82,45 +82,64 @@ export default async function GalleryWorkspacePage({
       : "Authorized Viewer";
 
   return (
-    <AppShell>
-      <TopBar accentColor={activeTenant.brandColor}>
-        <div className="flex items-center gap-4">
-          <div
-            className="flex h-11 w-11 items-center justify-center rounded-2xl text-sm font-bold text-white shadow-[0_10px_30px_rgba(0,0,0,0.22)]"
-            style={{ backgroundColor: brandColor }}
-          >
-            {activeTenant.name.charAt(0).toUpperCase()}
-          </div>
-          <div className="space-y-1">
-            <p className="hero-kicker">myMedia Operations</p>
-            <div>
-              <h1 className="text-xl font-semibold tracking-[-0.03em] text-white">
-                {activeTenant.name}
-              </h1>
-              <p className="ops-muted text-sm">
-                Secure tenant media workspace
-              </p>
+    <AppShell variant="gallery">
+      <PageWidth className="space-y-6 py-6 sm:space-y-8 sm:py-8">
+        <header className="surface-card rounded-[1.75rem] px-5 py-5 sm:px-7 sm:py-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex items-start gap-4">
+              <div
+                className="flex h-12 w-12 items-center justify-center rounded-2xl text-sm font-bold text-white shadow-[0_12px_26px_rgba(15,23,42,0.12)]"
+                style={{ backgroundColor: brandColor }}
+              >
+                {activeTenant.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-[color:var(--text-muted)]">
+                  Tenant workspace
+                </p>
+                <div className="space-y-2">
+                  <h1 className="text-3xl font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
+                    {activeTenant.name}
+                  </h1>
+                  <p className="max-w-3xl text-sm leading-6 text-[color:var(--text-muted)]">
+                    {canManage
+                      ? "Open an album, create a new one, or jump into the admin console when you need to manage content."
+                      : "Open an album to view and download the media shared with you."}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:items-end">
+              <div className="flex flex-wrap gap-2">
+                <span className="chip">
+                  Albums
+                  <strong>{albums.length}</strong>
+                </span>
+                <span className="chip">
+                  Role
+                  <strong>{roleLabel}</strong>
+                </span>
+              </div>
+
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
+                {canManage ? (
+                  <Link
+                    href={buildAdminTenantPath("/admin", activeTenant.slug)}
+                    className="ops-button-secondary"
+                  >
+                    Admin Console
+                  </Link>
+                ) : null}
+                <AccountMenu
+                  email={email}
+                  activeScopeLabel={activeTenant.name}
+                />
+              </div>
             </div>
           </div>
-        </div>
+        </header>
 
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-          {canManage ? (
-            <Link
-              href={buildAdminTenantPath("/admin", activeTenant.slug)}
-              className="ops-button-secondary"
-            >
-              Open Admin Console
-            </Link>
-          ) : null}
-          <AccountMenu
-            email={email}
-            activeScopeLabel={activeTenant.name}
-          />
-        </div>
-      </TopBar>
-
-      <PageWidth className="space-y-8 py-8 sm:space-y-10 sm:py-10">
         <TenantScopeRibbon
           activeTenant={activeTenant}
           tenants={userTenants}
@@ -128,25 +147,23 @@ export default async function GalleryWorkspacePage({
           albumCount={albums.length}
         />
 
-        <section className="space-y-5">
+        <section className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div className="space-y-2">
-              <p className="hero-kicker">Content Workspace</p>
-              <h2 className="section-title">
-                {canManage ? "Manageable albums" : "Available albums"}
+            <div className="space-y-1">
+              <h2 className="text-xl font-semibold tracking-[-0.03em] text-[color:var(--foreground)]">
+                Albums
               </h2>
-              <p className="section-copy">
-                Browse published collections, open an album workspace, or add a
-                new collection when your tenant role allows it.
+              <p className="text-sm leading-6 text-[color:var(--text-muted)]">
+                {canManage
+                  ? "Open an album or create a new one."
+                  : "Choose an album to start viewing media."}
               </p>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2">
               {isTenantAdm ? (
-                <span className="chip chip-accent">
-                  Create, curate, and publish
-                </span>
+                <span className="chip chip-accent">Can create albums</span>
               ) : (
-                <span className="chip">Read-only delivery surface</span>
+                <span className="chip">View and download access</span>
               )}
             </div>
           </div>

@@ -60,14 +60,14 @@ export default function AccountMenu({ email, activeScopeLabel }: Props) {
         aria-expanded={open}
         aria-label="Account menu"
       >
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[rgba(105,211,255,0.16)] text-xs font-semibold text-white">
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--accent-soft)] text-xs font-semibold text-[color:var(--foreground)]">
           {initials}
         </div>
         <div className="hidden min-w-0 sm:block">
-          <p className="text-[0.68rem] uppercase tracking-[0.16em] text-[var(--text-subtle)]">
+          <p className="text-[0.68rem] uppercase tracking-[0.16em] text-[color:var(--text-subtle)]">
             Account
           </p>
-          <p className="max-w-[12rem] truncate text-sm font-medium text-white">
+          <p className="max-w-[12rem] truncate text-sm font-medium text-[color:var(--foreground)]">
             {email}
           </p>
         </div>
@@ -79,13 +79,13 @@ export default function AccountMenu({ email, activeScopeLabel }: Props) {
           className="surface-card absolute right-0 top-full z-50 mt-3 w-[18.5rem] rounded-[1.2rem] p-4 shadow-[0_24px_64px_rgba(0,0,0,0.34)]"
         >
           <div className="border-b border-[rgba(140,172,197,0.12)] pb-3">
-            <p className="text-sm font-semibold text-white">{email}</p>
+            <p className="text-sm font-semibold text-[color:var(--foreground)]">{email}</p>
             {activeScopeLabel ? (
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
+              <p className="mt-1 text-xs text-[color:var(--text-muted)]">
                 Active scope: {activeScopeLabel}
               </p>
             ) : (
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
+              <p className="mt-1 text-xs text-[color:var(--text-muted)]">
                 Manage your identity, password, and uploads.
               </p>
             )}
@@ -94,21 +94,21 @@ export default function AccountMenu({ email, activeScopeLabel }: Props) {
           <div className="mt-3 space-y-1">
             <Link
               href="/profile"
-              className="block rounded-[0.9rem] px-3 py-2 text-sm text-white hover:bg-[rgba(105,211,255,0.08)]"
+              className="block rounded-[0.9rem] px-3 py-2 text-sm text-[color:var(--foreground)] hover:bg-[color:var(--accent-soft)]"
               onClick={() => setOpen(false)}
             >
               Manage Profile
             </Link>
             <Link
               href="/profile#password-access"
-              className="block rounded-[0.9rem] px-3 py-2 text-sm text-white hover:bg-[rgba(105,211,255,0.08)]"
+              className="block rounded-[0.9rem] px-3 py-2 text-sm text-[color:var(--foreground)] hover:bg-[color:var(--accent-soft)]"
               onClick={() => setOpen(false)}
             >
               Password & Access
             </Link>
             <Link
               href="/profile#owned-content"
-              className="block rounded-[0.9rem] px-3 py-2 text-sm text-white hover:bg-[rgba(105,211,255,0.08)]"
+              className="block rounded-[0.9rem] px-3 py-2 text-sm text-[color:var(--foreground)] hover:bg-[color:var(--accent-soft)]"
               onClick={() => setOpen(false)}
             >
               My Content
@@ -118,7 +118,7 @@ export default function AccountMenu({ email, activeScopeLabel }: Props) {
           <div className="mt-3 border-t border-[rgba(140,172,197,0.12)] pt-3">
             <Link
               href="/api/auth/signout"
-              className="block rounded-[0.9rem] px-3 py-2 text-sm text-[#ffd4d4] hover:bg-[rgba(255,122,122,0.08)]"
+              className="block rounded-[0.9rem] px-3 py-2 text-sm text-red-600 hover:bg-red-50"
               onClick={() => setOpen(false)}
             >
               Sign Out

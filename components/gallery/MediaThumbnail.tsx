@@ -21,25 +21,25 @@ export default function MediaThumbnail({
 }: Props) {
   return (
     <div
-      className={`group relative aspect-square overflow-hidden rounded-[1.2rem] border cursor-pointer ${
+      className={`group surface-card relative aspect-square cursor-pointer overflow-hidden rounded-[1.25rem] border ${
         selected
-          ? "border-[rgba(105,211,255,0.46)] shadow-[0_0_0_3px_rgba(105,211,255,0.14)]"
-          : "border-[rgba(140,172,197,0.12)]"
+          ? "border-[rgba(37,99,235,0.42)] shadow-[0_0_0_3px_rgba(37,99,235,0.12)]"
+          : ""
       }`}
       onClick={() => onClick?.(item)}
     >
       <img
         src={item.thumbnailUrl}
         alt={item.fileName}
-        className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+        className="h-full w-full bg-slate-100 object-cover transition duration-500 group-hover:scale-[1.03]"
         loading="lazy"
       />
 
-      <div className="absolute inset-0 bg-gradient-to-t from-[#06101a] via-transparent to-transparent opacity-80" />
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/15 via-transparent to-transparent" />
 
       {item.fileType === "video" ? (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/14 bg-black/45 backdrop-blur">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/80 bg-slate-950/80 shadow-lg backdrop-blur">
             <svg className="ml-0.5 h-5 w-5 text-white" fill="currentColor" viewBox="0 0 24 24">
               <path d="M8 5v14l11-7z" />
             </svg>
@@ -56,10 +56,10 @@ export default function MediaThumbnail({
           }}
         >
           <div
-            className={`flex h-6 w-6 items-center justify-center rounded-full border text-white ${
+            className={`flex h-7 w-7 items-center justify-center rounded-full border shadow-sm ${
               selected
-                ? "border-[rgba(105,211,255,0.46)] bg-[rgba(25,134,179,0.96)]"
-                : "border-white/30 bg-black/36 opacity-0 backdrop-blur group-hover:opacity-100"
+                ? "border-[rgba(37,99,235,0.42)] bg-blue-600 text-white"
+                : "border-white/90 bg-white/92 text-slate-500 opacity-0 backdrop-blur group-hover:opacity-100"
             }`}
           >
             {selected ? (
@@ -80,7 +80,7 @@ export default function MediaThumbnail({
         <button
           type="button"
           aria-label="Delete media"
-          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-[rgba(101,29,29,0.78)] text-white opacity-0 backdrop-blur group-hover:opacity-100"
+          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-red-100 bg-white/95 text-red-600 opacity-0 shadow-sm backdrop-blur group-hover:opacity-100"
           onClick={(e) => {
             e.stopPropagation();
             onDelete(item);
@@ -98,9 +98,9 @@ export default function MediaThumbnail({
       ) : null}
 
       <div className="absolute inset-x-0 bottom-0 translate-y-0 p-3">
-        <div className="rounded-2xl border border-white/8 bg-black/26 px-3 py-2 backdrop-blur">
-          <p className="truncate text-xs font-medium text-white">{item.fileName}</p>
-          <p className="mt-1 text-[0.7rem] uppercase tracking-[0.16em] text-[rgba(231,238,245,0.64)]">
+        <div className="rounded-2xl border border-white/70 bg-white/88 px-3 py-2 shadow-sm backdrop-blur">
+          <p className="truncate text-xs font-medium text-slate-900">{item.fileName}</p>
+          <p className="mt-1 text-[0.7rem] uppercase tracking-[0.16em] text-slate-500">
             {item.fileType}
           </p>
         </div>

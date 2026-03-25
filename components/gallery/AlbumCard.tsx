@@ -11,9 +11,9 @@ export default function AlbumCard({ album }: Props) {
   return (
     <Link
       href={`/album/${album.id}`}
-      className="group surface-card-soft block overflow-hidden rounded-[1.4rem] border border-[rgba(140,172,197,0.14)]"
+      className="group surface-card block overflow-hidden rounded-[1.5rem] border"
     >
-      <div className="relative aspect-[4/3] overflow-hidden bg-[rgba(7,18,28,0.88)]">
+      <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
         {album.coverThumbnailUrl ? (
           <img
             src={album.coverThumbnailUrl}
@@ -21,9 +21,9 @@ export default function AlbumCard({ album }: Props) {
             className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
           />
         ) : (
-          <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_top,rgba(105,211,255,0.18),transparent_44%),linear-gradient(180deg,rgba(14,34,51,0.9),rgba(7,18,28,0.96))]">
+          <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(191,219,254,0.8),_transparent_42%),linear-gradient(180deg,_#f8fafc,_#e2e8f0)]">
             <svg
-              className="h-12 w-12 text-[rgba(152,173,191,0.55)]"
+              className="h-12 w-12 text-slate-400"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -38,27 +38,37 @@ export default function AlbumCard({ album }: Props) {
           </div>
         )}
 
-        <div className="absolute inset-0 bg-gradient-to-t from-[#040a12] via-transparent to-transparent opacity-70" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/10 via-transparent to-transparent" />
+      </div>
 
-        <div className="absolute left-4 top-4">
-          <span className="ops-badge ops-badge-info">
+      <div className="space-y-3 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <span className="ops-badge ops-badge-neutral">Album</span>
+          <span className="text-sm font-medium text-[color:var(--text-muted)]">
             {album.mediaCount.toLocaleString()}{" "}
             {album.mediaCount === 1 ? "item" : "items"}
           </span>
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 space-y-2 p-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[#cfeeff] backdrop-blur">
-            Collection
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-xl font-semibold tracking-[-0.03em] text-white transition group-hover:text-[#d6f5ff]">
-              {album.name}
-            </h2>
-            <p className="line-clamp-2 text-sm leading-6 text-[rgba(231,238,245,0.74)]">
-              {album.description ?? "Managed album workspace for approved media."}
-            </p>
-          </div>
+        <div className="space-y-2">
+          <h2 className="text-xl font-semibold tracking-[-0.03em] text-[color:var(--foreground)] transition group-hover:text-slate-700">
+            {album.name}
+          </h2>
+          <p className="line-clamp-2 text-sm leading-6 text-[color:var(--text-muted)]">
+            {album.description ?? "Open this album to view and download media."}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+          <span>Open album</span>
+          <svg className="h-4 w-4 transition group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
         </div>
       </div>
     </Link>

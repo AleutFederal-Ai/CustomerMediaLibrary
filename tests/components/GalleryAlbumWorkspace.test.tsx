@@ -49,7 +49,7 @@ describe("GalleryAlbumWorkspace", () => {
     );
 
     await user.click(
-      screen.getByRole("button", { name: /Stand up a new album workspace/i })
+      screen.getByRole("button", { name: /Start a new album/i })
     );
     await user.type(screen.getByPlaceholderText(/Album name/i), "Fresh Collection");
     await user.type(

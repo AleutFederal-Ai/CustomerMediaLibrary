@@ -8,11 +8,23 @@ function joinClasses(...parts: Array<string | undefined | false>) {
 export function AppShell({
   children,
   className,
+  variant = "default",
 }: {
   children: ReactNode;
   className?: string;
+  variant?: "default" | "gallery";
 }) {
-  return <div className={joinClasses("app-shell", className)}>{children}</div>;
+  return (
+    <div
+      className={joinClasses(
+        "app-shell",
+        variant === "gallery" && "app-shell-gallery",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
 }
 
 export function PageWidth({
