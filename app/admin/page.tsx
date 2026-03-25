@@ -46,7 +46,7 @@ function CompactMetric({
   return (
     <div className="surface-card-soft rounded-[1.1rem] px-4 py-3 sm:px-5">
       <p className="metric-label">{label}</p>
-      <p className="mt-2 text-[1.45rem] font-semibold leading-none tracking-[-0.04em] text-white">
+      <p className="mt-2 text-[1.45rem] font-semibold leading-none tracking-[-0.04em] text-[color:var(--foreground)]">
         {value}
       </p>
       {subtext ? (
@@ -83,7 +83,7 @@ export default async function AdminDashboard({
   ]);
 
   return (
-    <AppShell>
+    <AppShell variant="gallery">
       <TopBar accentColor={activeTenant?.brandColor}>
         <div className="flex items-center gap-3">
           <BackLink href={buildGalleryWorkspacePath(activeTenant?.slug)}>
@@ -117,7 +117,7 @@ export default async function AdminDashboard({
             <div className="space-y-2">
               <p className="hero-kicker">Administrative Scope</p>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-lg font-semibold tracking-[-0.03em] text-white sm:text-xl">
+                <h1 className="text-lg font-semibold tracking-[-0.03em] text-[color:var(--foreground)] sm:text-xl">
                   {activeTenant?.name ?? "Platform"}
                 </h1>
                 {activeTenant?.slug ? (
@@ -223,7 +223,7 @@ export default async function AdminDashboard({
                   className="surface-card-soft rounded-[1.15rem] p-4"
                 >
                   <p className="hero-kicker">{item.label}</p>
-                  <h3 className="mt-2.5 text-lg font-semibold tracking-[-0.03em] text-white">
+                  <h3 className="mt-2.5 text-lg font-semibold tracking-[-0.03em] text-[color:var(--foreground)]">
                     {item.label}
                   </h3>
                   <p className="mt-2.5 text-sm leading-6 text-[var(--text-muted)]">
@@ -265,7 +265,7 @@ export default async function AdminDashboard({
                         <td className="ops-muted whitespace-nowrap">
                           {formatRelativeTime(log.timestamp)}
                         </td>
-                        <td className="text-white">{log.userEmail}</td>
+                        <td className="text-[color:var(--foreground)]">{log.userEmail}</td>
                         <td>
                           <span className="ops-badge ops-badge-info">
                             {formatAction(log.action)}

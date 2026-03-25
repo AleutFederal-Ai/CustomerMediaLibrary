@@ -5,6 +5,7 @@ import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { getTenantById, getTenantBySlug } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { getPublicBaseUrl } from "@/lib/auth/base-url";
+import { buildTenantLoginPath } from "@/lib/admin-scope";
 import { AuditAction } from "@/types";
 
 function getIp(request: NextRequest): string {
@@ -22,9 +23,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const isPlatformAdminMode = request.nextUrl.searchParams.get("mode") === "platform-admin";
 
   const publicBase = getPublicBaseUrl(request);
+  const invalidLoginPath = tenantSlug
+    ? `${buildTenantLoginPath(tenantSlug)}?error=invalid`
+    : "/login?error=invalid";
 
   if (!token) {
-    return NextResponse.redirect(new URL("/login?error=invalid", publicBase));
+    return NextResponse.redirect(new URL(invalidLoginPath, publicBase));
   }
 
   const email = await validateMagicLinkToken(token, ip);
@@ -36,7 +40,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       action: AuditAction.MAGIC_LINK_FAILED,
       detail: {},
     });
-    return NextResponse.redirect(new URL("/login?error=invalid", publicBase));
+    return NextResponse.redirect(new URL(invalidLoginPath, publicBase));
   }
 
   await writeAuditLog({
@@ -86,7 +90,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   } else if (isPlatformAdminMode || isPlatformAdmin) {
     redirectPath = "/admin";
   } else {
-    redirectPath = "/login";
+    redirectPath = "/select-tenant";
   }
 
   const response = NextResponse.redirect(new URL(redirectPath, publicBase));

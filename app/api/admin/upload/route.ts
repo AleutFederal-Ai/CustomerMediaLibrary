@@ -5,23 +5,8 @@ import { media, albums } from "@/lib/azure/cosmos";
 import { uploadBlob } from "@/lib/azure/blob";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { isMediaContributor } from "@/lib/auth/permissions";
+import { resolveUploadedMediaType } from "@/lib/media-upload";
 import { MediaRecord, AuditAction } from "@/types";
-
-const ALLOWED_IMAGE_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "image/heic",
-  "image/heif",
-]);
-
-const ALLOWED_VIDEO_TYPES = new Set([
-  "video/mp4",
-  "video/quicktime",
-  "video/x-msvideo",
-  "video/webm",
-]);
 
 const THUMBNAIL_SIZE = 400;
 
@@ -63,16 +48,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "albumId is required" }, { status: 400 });
   }
 
-  const mimeType = file.type.toLowerCase();
-  const isImage = ALLOWED_IMAGE_TYPES.has(mimeType);
-  const isVideo = ALLOWED_VIDEO_TYPES.has(mimeType);
+  const mediaType = resolveUploadedMediaType(file);
 
-  if (!isImage && !isVideo) {
+  if (!mediaType) {
     return NextResponse.json(
-      { error: "Unsupported file type" },
+      {
+        error:
+          "Unsupported file type. Upload an approved image or a common video format such as MP4, MOV, AVI, WEBM, M4V, MPEG, or WMV.",
+      },
       { status: 415 }
     );
   }
+
+  const { fileType, mimeType } = mediaType;
+  const isImage = fileType === "image";
 
   // Verify album exists and belongs to this tenant
   try {
@@ -134,7 +123,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       albumId,
       tenantId,
       fileName: file.name,
-      fileType: isImage ? "image" : "video",
+      fileType,
       mimeType,
       sizeBytes: buffer.length,
       blobName,

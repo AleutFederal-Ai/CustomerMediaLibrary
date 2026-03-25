@@ -61,7 +61,7 @@ export default async function ApiHealthPage() {
   ]);
 
   return (
-    <AppShell>
+    <AppShell variant="gallery">
       <TopBar accentColor={activeTenant?.brandColor}>
         <div className="flex items-center gap-3">
           <BackLink href={buildAdminTenantPath("/admin", activeTenant?.slug)}>

@@ -163,7 +163,7 @@ export default function ApiHealthPortal({ initialSnapshot }: Props) {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="hero-kicker">Automated Smoke Suite</p>
-            <h2 className="mt-3 text-xl font-semibold tracking-[-0.03em] text-white">
+            <h2 className="mt-3 text-xl font-semibold tracking-[-0.03em] text-[color:var(--foreground)]">
               Safe endpoint verification
             </h2>
             <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
@@ -209,7 +209,7 @@ export default function ApiHealthPortal({ initialSnapshot }: Props) {
             <tbody>
               {snapshot.probes.results.map((result) => (
                 <tr key={result.endpointId}>
-                  <td className="text-white">{result.endpointId}</td>
+                  <td className="text-[color:var(--foreground)]">{result.endpointId}</td>
                   <td className="ops-code ops-muted max-w-[320px] truncate">
                     {result.path}
                   </td>
@@ -234,7 +234,7 @@ export default function ApiHealthPortal({ initialSnapshot }: Props) {
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
         <div className="surface-card-soft rounded-[1.35rem] p-5">
           <p className="hero-kicker">Endpoint Catalog</p>
-          <h2 className="mt-3 text-xl font-semibold tracking-[-0.03em] text-white">
+          <h2 className="mt-3 text-xl font-semibold tracking-[-0.03em] text-[color:var(--foreground)]">
             Full API inventory
           </h2>
           <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
@@ -263,8 +263,8 @@ export default function ApiHealthPortal({ initialSnapshot }: Props) {
                         onClick={() => syncManualRunner(endpoint.id)}
                         className={`w-full rounded-[1.1rem] border px-4 py-4 text-left ${
                           selectedEndpointId === endpoint.id
-                            ? "border-[rgba(105,211,255,0.28)] bg-[rgba(105,211,255,0.08)]"
-                            : "border-[rgba(140,172,197,0.12)] bg-[rgba(7,18,28,0.4)]"
+                            ? "border-[rgba(37,99,235,0.24)] bg-[rgba(37,99,235,0.08)]"
+                            : "border-[rgba(148,163,184,0.2)] bg-[rgba(255,255,255,0.74)]"
                         }`}
                       >
                         <div className="flex flex-wrap items-center gap-2">
@@ -289,7 +289,7 @@ export default function ApiHealthPortal({ initialSnapshot }: Props) {
                             </span>
                           ) : null}
                         </div>
-                        <p className="ops-code mt-3 text-sm text-white">
+                        <p className="ops-code mt-3 text-sm text-[color:var(--foreground)]">
                           {endpoint.pathTemplate}
                         </p>
                         <p className="mt-2 text-sm leading-7 text-[var(--text-muted)]">
@@ -306,7 +306,7 @@ export default function ApiHealthPortal({ initialSnapshot }: Props) {
 
         <div className="surface-card-soft rounded-[1.35rem] p-5">
           <p className="hero-kicker">Manual Runner</p>
-          <h2 className="mt-3 text-xl font-semibold tracking-[-0.03em] text-white">
+          <h2 className="mt-3 text-xl font-semibold tracking-[-0.03em] text-[color:var(--foreground)]">
             Execute a live API request
           </h2>
           <p className="mt-3 text-sm leading-7 text-[var(--text-muted)]">
@@ -317,7 +317,7 @@ export default function ApiHealthPortal({ initialSnapshot }: Props) {
 
           <div className="mt-6 space-y-4">
             <div>
-              <label className="mb-2 block text-sm font-medium text-white/86">
+              <label className="mb-2 block text-sm font-medium text-[color:var(--foreground)]">
                 Endpoint template
               </label>
               <select
@@ -335,7 +335,7 @@ export default function ApiHealthPortal({ initialSnapshot }: Props) {
 
             <div className="grid gap-4 md:grid-cols-[160px_minmax(0,1fr)]">
               <div>
-                <label className="mb-2 block text-sm font-medium text-white/86">
+                <label className="mb-2 block text-sm font-medium text-[color:var(--foreground)]">
                   Method
                 </label>
                 <select
@@ -354,7 +354,7 @@ export default function ApiHealthPortal({ initialSnapshot }: Props) {
                 </select>
               </div>
               <div>
-                <label className="mb-2 block text-sm font-medium text-white/86">
+                <label className="mb-2 block text-sm font-medium text-[color:var(--foreground)]">
                   Path
                 </label>
                 <input
@@ -366,7 +366,7 @@ export default function ApiHealthPortal({ initialSnapshot }: Props) {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-white/86">
+              <label className="mb-2 block text-sm font-medium text-[color:var(--foreground)]">
                 JSON body
               </label>
               <textarea
@@ -377,7 +377,7 @@ export default function ApiHealthPortal({ initialSnapshot }: Props) {
               />
             </div>
 
-            <label className="flex items-start gap-3 rounded-[1rem] border border-[rgba(241,197,108,0.18)] bg-[rgba(96,76,21,0.18)] px-4 py-4 text-sm text-[#ffeab7]">
+            <label className="flex items-start gap-3 rounded-[1rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">
               <input
                 type="checkbox"
                 checked={allowMutating}
@@ -424,7 +424,7 @@ export default function ApiHealthPortal({ initialSnapshot }: Props) {
                     <strong>{manualResult.contentType}</strong>
                   </span>
                 </div>
-                <pre className="ops-code mt-4 overflow-x-auto rounded-[1rem] bg-[rgba(5,16,25,0.9)] p-4 text-xs text-[#d6f5ff]">
+                <pre className="ops-code mt-4 overflow-x-auto rounded-[1rem] bg-slate-950 p-4 text-xs text-slate-100">
                   {manualResult.responseBody}
                 </pre>
               </div>

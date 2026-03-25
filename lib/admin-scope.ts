@@ -20,6 +20,13 @@ export function buildGalleryWorkspacePath(
   return normalizedSlug ? `/t/${normalizedSlug}` : "/select-tenant";
 }
 
+export function buildTenantLoginPath(
+  tenantSlug?: string | null
+): string {
+  const normalizedSlug = tenantSlug?.trim().toLowerCase();
+  return normalizedSlug ? `/t/${normalizedSlug}/login` : "/login";
+}
+
 export function buildGalleryAlbumPath(
   tenantSlug: string | null | undefined,
   albumId: string

@@ -5,6 +5,7 @@ import { verifyPassword } from "@/lib/auth/password";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { getTenantById, getTenantBySlug } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/logger";
+import { buildTenantLoginPath } from "@/lib/admin-scope";
 import { AuditAction, UserRecord } from "@/types";
 
 function getIp(req: NextRequest): string {
@@ -133,7 +134,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     } else if (isPlatformAdminMode || isPlatformAdmin) {
       redirectTo = "/admin";
     } else {
-      redirectTo = "/login";
+      redirectTo = preferredTenantSlug
+        ? buildTenantLoginPath(preferredTenantSlug)
+        : "/select-tenant";
     }
 
     const response = NextResponse.json({ ok: true, redirectTo });

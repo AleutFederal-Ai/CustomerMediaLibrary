@@ -67,7 +67,7 @@ function TenantIdentity({
       <img
         src={logoUrl}
         alt={name}
-        className="h-10 w-10 rounded-2xl border border-white/10 bg-slate-950/40 object-contain p-2"
+        className="h-10 w-10 rounded-2xl border border-[color:var(--border)] bg-white object-contain p-2"
       />
     );
   }
@@ -182,7 +182,7 @@ export default function AdminTenantSection({
                   />
                   <div className="min-w-0">
                     <p className="hero-kicker">Selected Tenant</p>
-                    <h3 className="mt-1.5 truncate text-lg font-semibold tracking-[-0.03em] text-white">
+                    <h3 className="mt-1.5 truncate text-lg font-semibold tracking-[-0.03em] text-[color:var(--foreground)]">
                       {activeTenant.name}
                     </h3>
                     <p className="ops-code mt-1 text-sm text-[var(--text-muted)]">
@@ -207,7 +207,7 @@ export default function AdminTenantSection({
                     className="surface-card-soft rounded-[1.05rem] p-4"
                   >
                     <p className="hero-kicker">{item.label}</p>
-                    <h3 className="mt-2 text-base font-semibold tracking-[-0.03em] text-white">
+                    <h3 className="mt-2 text-base font-semibold tracking-[-0.03em] text-[color:var(--foreground)]">
                       {item.label}
                     </h3>
                     <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
@@ -224,7 +224,7 @@ export default function AdminTenantSection({
                     className="surface-card-soft rounded-[1.05rem] p-4"
                   >
                     <p className="hero-kicker">{item.label}</p>
-                    <h3 className="mt-2 text-base font-semibold tracking-[-0.03em] text-white">
+                    <h3 className="mt-2 text-base font-semibold tracking-[-0.03em] text-[color:var(--foreground)]">
                       {item.label}
                     </h3>
                     <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
@@ -238,7 +238,7 @@ export default function AdminTenantSection({
 
           <div className="surface-card-soft rounded-[1.1rem] p-4">
             <p className="hero-kicker">Tenant Selector</p>
-            <h3 className="mt-2.5 text-base font-semibold tracking-[-0.03em] text-white sm:text-lg">
+            <h3 className="mt-2.5 text-base font-semibold tracking-[-0.03em] text-[color:var(--foreground)] sm:text-lg">
               Change active tenant
             </h3>
             <p className="mt-2.5 text-sm leading-6 text-[var(--text-muted)]">
@@ -279,8 +279,8 @@ export default function AdminTenantSection({
                       key={tenant.id}
                       className={`rounded-[0.95rem] border px-3.5 py-3 ${
                         tenant.id === activeTenant?.id
-                          ? "border-[rgba(105,211,255,0.28)] bg-[rgba(105,211,255,0.08)]"
-                          : "border-[rgba(140,172,197,0.12)] bg-[rgba(7,18,28,0.48)]"
+                          ? "border-[rgba(37,99,235,0.24)] bg-[rgba(37,99,235,0.08)]"
+                          : "border-[rgba(148,163,184,0.2)] bg-[rgba(255,255,255,0.72)]"
                       }`}
                     >
                       <div className="flex items-center gap-2.5">
@@ -290,7 +290,7 @@ export default function AdminTenantSection({
                           brandColor={tenant.brandColor}
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-white">
+                          <p className="truncate text-sm font-semibold text-[color:var(--foreground)]">
                             {tenant.name}
                           </p>
                           <p className="ops-code mt-1 text-xs text-[var(--text-muted)]">
