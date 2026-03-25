@@ -498,7 +498,7 @@ export default function LoginPage() {
   const isPlatformAdmin = selectedTenant?.id === PLATFORM_ADMIN_TENANT.id;
 
   return (
-    <div className="app-shell flex min-h-[calc(100vh-44px)] items-center px-4 py-8 sm:px-6 sm:py-10">
+    <div className="app-shell flex min-h-[calc(100vh-88px)] items-center px-4 py-8 sm:px-6 sm:py-10">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
         <section className="surface-card overflow-hidden rounded-[2rem]">
           <div className="border-b border-[rgba(140,172,197,0.14)] bg-[linear-gradient(135deg,rgba(23,58,87,0.98),rgba(10,33,49,0.98))] px-5 py-5 sm:px-8 sm:py-6">

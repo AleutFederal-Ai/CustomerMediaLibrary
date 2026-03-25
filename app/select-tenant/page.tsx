@@ -83,7 +83,7 @@ export default function SelectTenantPage() {
   }
 
   return (
-    <div className="app-shell flex min-h-[calc(100vh-44px)] items-center justify-center px-4 py-10">
+    <div className="app-shell flex min-h-[calc(100vh-88px)] items-center justify-center px-4 py-10">
       <div className="surface-card w-full max-w-3xl rounded-[2rem] p-6 sm:p-8">
         {loading ? (
           <div className="flex items-center justify-center py-16">
