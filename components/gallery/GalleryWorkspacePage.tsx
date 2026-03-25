@@ -172,6 +172,7 @@ export default async function GalleryWorkspacePage({
             initialAlbums={albums}
             canCreate={isTenantAdm}
             tenantId={activeTenant.id}
+            tenantSlug={activeTenant.slug}
           />
         </section>
       </PageWidth>

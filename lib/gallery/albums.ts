@@ -2,6 +2,23 @@ import { albums, media } from "@/lib/azure/cosmos";
 import { generateSasUrl } from "@/lib/azure/blob";
 import { AlbumListItem, AlbumRecord, MediaRecord } from "@/types";
 
+export async function getAlbumById(albumId: string): Promise<AlbumRecord | null> {
+  try {
+    const albumsContainer = await albums();
+    const { resource } = await albumsContainer
+      .item(albumId, albumId)
+      .read<AlbumRecord>();
+
+    if (!resource || resource.isDeleted) {
+      return null;
+    }
+
+    return resource;
+  } catch {
+    return null;
+  }
+}
+
 export async function listAlbumItemsForTenant(
   tenantId: string
 ): Promise<AlbumListItem[]> {

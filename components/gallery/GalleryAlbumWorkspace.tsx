@@ -9,12 +9,14 @@ interface Props {
   initialAlbums: AlbumListItem[];
   canCreate: boolean;
   tenantId: string;
+  tenantSlug?: string;
 }
 
 export default function GalleryAlbumWorkspace({
   initialAlbums,
   canCreate,
   tenantId,
+  tenantSlug,
 }: Props) {
   const [albums, setAlbums] = useState(initialAlbums);
   const canCreateInActiveTenant = canCreate && Boolean(tenantId);
@@ -66,7 +68,7 @@ export default function GalleryAlbumWorkspace({
           <CreateAlbumCard tenantId={tenantId} onCreated={handleAlbumCreated} />
         ) : null}
         {orderedAlbums.map((album) => (
-          <AlbumCard key={album.id} album={album} />
+          <AlbumCard key={album.id} album={album} tenantSlug={tenantSlug} />
         ))}
       </div>
     </div>

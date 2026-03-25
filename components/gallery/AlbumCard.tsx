@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import { AlbumListItem } from "@/types";
+import { buildGalleryAlbumPath } from "@/lib/admin-scope";
 
 interface Props {
   album: AlbumListItem;
+  tenantSlug?: string;
 }
 
-export default function AlbumCard({ album }: Props) {
+export default function AlbumCard({ album, tenantSlug }: Props) {
   return (
     <Link
-      href={`/album/${album.id}`}
+      href={buildGalleryAlbumPath(tenantSlug, album.id)}
       className="group surface-card block overflow-hidden rounded-[1.5rem] border"
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">

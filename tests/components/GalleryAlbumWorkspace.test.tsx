@@ -35,6 +35,7 @@ describe("GalleryAlbumWorkspace", () => {
       <GalleryAlbumWorkspace
         canCreate={true}
         tenantId="tenant-1"
+        tenantSlug="alpha"
         initialAlbums={[
           {
             id: "album-1",
@@ -47,6 +48,10 @@ describe("GalleryAlbumWorkspace", () => {
         ]}
       />
     );
+
+    expect(
+      screen.getByRole("link", { name: /Existing Album/i })
+    ).toHaveAttribute("href", "/t/alpha/album/album-1");
 
     await user.click(
       screen.getByRole("button", { name: /Start a new album/i })
@@ -65,6 +70,10 @@ describe("GalleryAlbumWorkspace", () => {
         { timeout: 10000 }
       )
     ).toBeInTheDocument();
+
+    expect(
+      screen.getByRole("link", { name: /Fresh Collection/i })
+    ).toHaveAttribute("href", "/t/alpha/album/album-2");
 
     expect(global.fetch).toHaveBeenCalledWith(
       "/api/admin/albums?tenantId=tenant-1",
