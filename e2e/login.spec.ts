@@ -35,29 +35,51 @@ async function stubLoginApis(page: Page) {
   });
 }
 
-test("login page renders secure tenant entry flow", async ({ page }) => {
+test("base URL starts with tenant selection and keeps the auth entry points visible", async ({
+  page,
+}) => {
   await stubLoginApis(page);
+
+  await page.goto("/");
+
+  await expect(page).toHaveURL(/\/select-tenant$/);
+  await expect(page.getByText(/Controlled Unclassified Information/i)).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: /Choose the workspace before you sign in/i,
+    })
+  ).toBeVisible();
+  await expect(page.getByLabel(/Public workspace/i)).toBeVisible();
+  await expect(page.getByRole("button", {
+    name: /Continue with Selected Workspace/i,
+  })).toBeVisible();
 
   await page.goto("/login");
 
-  await expect(page.getByText(/Controlled Unclassified Information/i)).toBeVisible();
-  await expect(page.getByRole("heading", { name: /myMedia Platform/i })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Choose your organization/i })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Acme Mission Group/i })).toBeVisible();
-  await expect(page.getByText(/Cosmos DB/i)).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: /Platform administration sign-in/i,
+    })
+  ).toBeVisible();
+  await expect(page.getByText(/Platform Health/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: /Magic Link/i })).toBeVisible();
 });
 
-test("login page stays mobile-friendly without horizontal overflow", async ({
+test("tenant selection page stays mobile-friendly without horizontal overflow", async ({
   page,
 }) => {
   await stubLoginApis(page);
   await page.setViewportSize({ width: 390, height: 844 });
 
-  await page.goto("/login");
+  await page.goto("/select-tenant");
 
-  await expect(page.getByRole("heading", { name: /myMedia Platform/i })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Choose your organization/i })).toBeVisible();
-  await expect(page.getByText(/Platform Health/i)).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: /Choose the workspace before you sign in/i,
+    })
+  ).toBeVisible();
+  await expect(page.getByText(/Tenant First/i)).toBeVisible();
+  await expect(page.getByRole("link", { name: /Platform Administrator Sign-In/i })).toBeVisible();
 
   const hasHorizontalOverflow = await page.evaluate(() => {
     return document.documentElement.scrollWidth > window.innerWidth;

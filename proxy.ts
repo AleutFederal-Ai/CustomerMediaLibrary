@@ -69,6 +69,7 @@ function applySessionHeaders(
 
 // Routes that do NOT require authentication
 const PUBLIC_PATHS = [
+  "/",
   "/login",
   "/select-tenant",
   "/api/auth/request-link",
@@ -81,6 +82,10 @@ const PUBLIC_PATHS = [
 ];
 
 function isPublicPath(pathname: string): boolean {
+  if (/^\/t\/[^/]+\/login\/?$/.test(pathname)) {
+    return true;
+  }
+
   return PUBLIC_PATHS.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`)
   );
@@ -207,10 +212,14 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     }
 
     // Page navigations: redirect to login and clear stale cookie
-    const loginUrl = new URL("/login", getPublicBaseUrl(request));
-    const tenantMatch = pathname.match(/^\/t\/([^/]+)\/?$/);
+    const loginUrl = new URL(
+      pathname === "/" ? "/select-tenant" : "/login",
+      getPublicBaseUrl(request)
+    );
+    const tenantMatch = pathname.match(/^\/t\/([^/]+)(?:\/.*)?$/);
     if (tenantMatch?.[1]) {
-      loginUrl.searchParams.set("tenant", tenantMatch[1]);
+      loginUrl.pathname = `/t/${tenantMatch[1]}/login`;
+      loginUrl.search = "";
     }
     const response = NextResponse.redirect(loginUrl);
     response.cookies.set(SESSION_COOKIE_NAME, "", { maxAge: 0, path: "/" });
