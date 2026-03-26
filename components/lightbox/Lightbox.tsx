@@ -67,6 +67,8 @@ export default function Lightbox({
   hasNext,
 }: Props) {
   const touchStartXRef = useRef<number | null>(null);
+  const compactActionClass =
+    "!w-auto px-3 py-2 text-[0.78rem] sm:px-4 sm:py-3 sm:text-sm";
   const [title, setTitle] = useState(item.title ?? item.fileName);
   const [description, setDescription] = useState(item.description ?? "");
   const [tagsText, setTagsText] = useState(item.tags.join(", "));
@@ -240,7 +242,7 @@ export default function Lightbox({
       aria-label={item.title ?? item.fileName}
     >
       <div className="border-b border-white/10 bg-slate-950/70 px-4 py-4">
-        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4">
           <div className="min-w-0">
             <p className="text-sm font-medium text-slate-400">
               {currentIndex + 1} of {items.length}
@@ -253,12 +255,12 @@ export default function Lightbox({
             </p>
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex flex-wrap gap-2 sm:justify-end">
             {item.fileType === "image" ? (
               <button
                 type="button"
                 onClick={handleSlideshowToggle}
-                className="ops-button-secondary"
+                className={`ops-button-secondary ${compactActionClass}`}
               >
                 {slideshowActive ? "Stop Slideshow" : "Start Slideshow"}
               </button>
@@ -268,7 +270,7 @@ export default function Lightbox({
                 type="button"
                 onClick={onMakeAlbumCover}
                 disabled={makingAlbumCover || isAlbumCover}
-                className="ops-button-secondary disabled:opacity-50"
+                className={`ops-button-secondary ${compactActionClass} disabled:opacity-50`}
               >
                 {isAlbumCover
                   ? "Album Cover"
@@ -277,13 +279,25 @@ export default function Lightbox({
                     : "Make Album Cover"}
               </button>
             ) : null}
-            <button type="button" onClick={handleCopyLink} className="ops-button-secondary">
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              className={`ops-button-secondary ${compactActionClass}`}
+            >
               {copyState === "copied" ? "Link Copied" : "Copy Share Link"}
             </button>
-            <button type="button" onClick={handleDownload} className="ops-button">
+            <button
+              type="button"
+              onClick={handleDownload}
+              className={`ops-button ${compactActionClass}`}
+            >
               Download
             </button>
-            <button type="button" onClick={onClose} className="ops-button-secondary">
+            <button
+              type="button"
+              onClick={onClose}
+              className={`ops-button-secondary ${compactActionClass}`}
+            >
               Close
             </button>
           </div>
