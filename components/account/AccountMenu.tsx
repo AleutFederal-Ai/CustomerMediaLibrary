@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import { apiFetch } from "@/lib/api-fetch";
 
 export interface AccountTenantOption {
@@ -46,7 +47,15 @@ export default function AccountMenu({
   const [switching, setSwitching] = useState(false);
   const [selectedTenantId, setSelectedTenantId] = useState(activeTenantId ?? "");
   const [switchError, setSwitchError] = useState("");
+  const [mounted, setMounted] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<{
+    top: number;
+    right: number;
+    width: number;
+  } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   const initials = useMemo(() => getInitials(email), [email]);
@@ -56,8 +65,16 @@ export default function AccountMenu({
   }, [activeTenantId]);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
-      if (!containerRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        !containerRef.current?.contains(target) &&
+        !menuRef.current?.contains(target)
+      ) {
         setOpen(false);
       }
     }
@@ -76,6 +93,32 @@ export default function AccountMenu({
       window.removeEventListener("keydown", handleEscape);
     };
   }, []);
+
+  useEffect(() => {
+    function updateMenuPosition() {
+      const buttonRect = buttonRef.current?.getBoundingClientRect();
+      if (!buttonRect) {
+        return;
+      }
+
+      setMenuStyle({
+        top: buttonRect.bottom + window.scrollY + 12,
+        right: Math.max(window.innerWidth - buttonRect.right, 16),
+        width: 320,
+      });
+    }
+
+    if (open) {
+      updateMenuPosition();
+      window.addEventListener("resize", updateMenuPosition);
+      window.addEventListener("scroll", updateMenuPosition, true);
+    }
+
+    return () => {
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open]);
 
   async function handleTenantSwitch(tenantId: string) {
     if (!tenantId || tenantId === activeTenantId) {
@@ -121,8 +164,9 @@ export default function AccountMenu({
   const showTenantSwitcher = canSwitchTenant && tenantOptions.length > 1;
 
   return (
-    <div ref={containerRef} className="relative z-[70]">
+    <div ref={containerRef} className="relative">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((current) => !current)}
         className="inline-flex items-center gap-3 rounded-full border border-[rgba(148,163,184,0.28)] bg-white px-3 py-2 text-left shadow-sm"
@@ -143,86 +187,96 @@ export default function AccountMenu({
         </div>
       </button>
 
-      {open ? (
-        <div
-          role="menu"
-          className="absolute right-0 top-full z-[80] mt-3 w-[20rem] rounded-[1.2rem] border border-[rgba(148,163,184,0.2)] bg-white p-4 shadow-[0_24px_64px_rgba(15,23,42,0.18)]"
-        >
-          <div className="border-b border-[rgba(148,163,184,0.16)] pb-3">
-            <p className="text-sm font-semibold text-slate-950">{email}</p>
-            <p className="mt-1 text-xs text-slate-500">
-              {activeScopeLabel
-                ? `Active scope: ${activeScopeLabel}`
-                : "Manage your profile, media, and workspace context."}
-            </p>
-          </div>
-
-          <div className="mt-3 space-y-1">
-            <Link
-              href="/profile"
-              className="block rounded-[0.9rem] px-3 py-2 text-sm text-slate-900 hover:bg-slate-100"
-              onClick={() => setOpen(false)}
+      {mounted && open && menuStyle
+        ? createPortal(
+            <div
+              ref={menuRef}
+              role="menu"
+              className="fixed z-[200] rounded-[1.2rem] border border-[rgba(148,163,184,0.2)] bg-white p-4 shadow-[0_24px_64px_rgba(15,23,42,0.18)]"
+              style={{
+                top: `${menuStyle.top}px`,
+                right: `${menuStyle.right}px`,
+                width: `${menuStyle.width}px`,
+                maxWidth: "calc(100vw - 2rem)",
+              }}
             >
-              Profile
-            </Link>
-            <Link
-              href="/profile#owned-content"
-              className="block rounded-[0.9rem] px-3 py-2 text-sm text-slate-900 hover:bg-slate-100"
-              onClick={() => setOpen(false)}
-            >
-              My Media
-            </Link>
-            {adminHref ? (
-              <Link
-                href={adminHref}
-                className="block rounded-[0.9rem] px-3 py-2 text-sm text-slate-900 hover:bg-slate-100"
-                onClick={() => setOpen(false)}
-              >
-                Admin Console
-              </Link>
-            ) : null}
-          </div>
+              <div className="border-b border-[rgba(148,163,184,0.16)] pb-3">
+                <p className="text-sm font-semibold text-slate-950">{email}</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {activeScopeLabel
+                    ? `Active scope: ${activeScopeLabel}`
+                    : "Manage your profile, media, and workspace context."}
+                </p>
+              </div>
 
-          {showTenantSwitcher ? (
-            <div className="mt-3 border-t border-[rgba(148,163,184,0.16)] pt-3">
-              <label
-                htmlFor="account-tenant-switcher"
-                className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500"
-              >
-                Tenant Switcher
-              </label>
-              <select
-                id="account-tenant-switcher"
-                value={selectedTenantId}
-                onChange={(event) => {
-                  void handleTenantSwitch(event.target.value);
-                }}
-                disabled={switching}
-                className="ops-select disabled:opacity-60"
-              >
-                {tenantOptions.map((tenant) => (
-                  <option key={tenant.id} value={tenant.id}>
-                    {tenant.name}
-                  </option>
-                ))}
-              </select>
-              {switchError ? (
-                <p className="mt-2 text-xs text-red-700">{switchError}</p>
+              <div className="mt-3 space-y-1">
+                <Link
+                  href="/profile"
+                  className="block rounded-[0.9rem] px-3 py-2 text-sm text-slate-900 hover:bg-slate-100"
+                  onClick={() => setOpen(false)}
+                >
+                  Profile
+                </Link>
+                <Link
+                  href="/profile#owned-content"
+                  className="block rounded-[0.9rem] px-3 py-2 text-sm text-slate-900 hover:bg-slate-100"
+                  onClick={() => setOpen(false)}
+                >
+                  My Media
+                </Link>
+                {adminHref ? (
+                  <Link
+                    href={adminHref}
+                    className="block rounded-[0.9rem] px-3 py-2 text-sm text-slate-900 hover:bg-slate-100"
+                    onClick={() => setOpen(false)}
+                  >
+                    Admin Console
+                  </Link>
+                ) : null}
+              </div>
+
+              {showTenantSwitcher ? (
+                <div className="mt-3 border-t border-[rgba(148,163,184,0.16)] pt-3">
+                  <label
+                    htmlFor="account-tenant-switcher"
+                    className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500"
+                  >
+                    Tenant Switcher
+                  </label>
+                  <select
+                    id="account-tenant-switcher"
+                    value={selectedTenantId}
+                    onChange={(event) => {
+                      void handleTenantSwitch(event.target.value);
+                    }}
+                    disabled={switching}
+                    className="ops-select disabled:opacity-60"
+                  >
+                    {tenantOptions.map((tenant) => (
+                      <option key={tenant.id} value={tenant.id}>
+                        {tenant.name}
+                      </option>
+                    ))}
+                  </select>
+                  {switchError ? (
+                    <p className="mt-2 text-xs text-red-700">{switchError}</p>
+                  ) : null}
+                </div>
               ) : null}
-            </div>
-          ) : null}
 
-          <div className="mt-3 border-t border-[rgba(148,163,184,0.16)] pt-3">
-            <Link
-              href="/api/auth/signout"
-              className="block rounded-[0.9rem] px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-              onClick={() => setOpen(false)}
-            >
-              Sign Out
-            </Link>
-          </div>
-        </div>
-      ) : null}
+              <div className="mt-3 border-t border-[rgba(148,163,184,0.16)] pt-3">
+                <Link
+                  href="/api/auth/signout"
+                  className="block rounded-[0.9rem] px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                  onClick={() => setOpen(false)}
+                >
+                  Sign Out
+                </Link>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }

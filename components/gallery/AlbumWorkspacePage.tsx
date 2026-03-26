@@ -593,102 +593,133 @@ export default function AlbumWorkspacePage({
           </div>
         </header>
 
-        {showFilters ? (
-          <section className="surface-card rounded-[1.5rem] p-4 sm:p-5">
-            <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_220px] xl:grid-cols-[minmax(0,2.4fr)_220px_220px]">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-[color:var(--foreground)]">
-                  Search files or tags
-                </label>
-                <input
-                  type="search"
-                  placeholder="Search files or tags..."
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  className="ops-input"
-                />
-              </div>
+        {lightboxItem ? (
+          <Lightbox
+            item={lightboxItem}
+            items={items}
+            tenantSlug={tenantSlug}
+            currentIndex={lightboxIndex}
+            canEditDetails={isAdmin}
+            canSetAlbumCover={isAdmin && lightboxItem.fileType === "image"}
+            isAlbumCover={lightboxItem.id === albumCoverMediaId}
+            makingAlbumCover={updatingCover}
+            onSaveMetadata={handleMetadataSave}
+            onMakeAlbumCover={() => {
+              void handleMakeAlbumCover(lightboxItem.id);
+            }}
+            onClose={() => setLightboxItem(null)}
+            onPrev={() => {
+              void navigateLightbox(-1);
+            }}
+            onNext={() => {
+              void navigateLightbox(1);
+            }}
+            onSelect={(index) => {
+              void loadLightboxAtIndex(index);
+            }}
+            hasPrev={lightboxIndex > 0}
+            hasNext={lightboxIndex < items.length - 1}
+          />
+        ) : (
+          <>
+            {showFilters ? (
+              <section className="surface-card rounded-[1.5rem] p-4 sm:p-5">
+                <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_220px] xl:grid-cols-[minmax(0,2.4fr)_220px_220px]">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-[color:var(--foreground)]">
+                      Search files or tags
+                    </label>
+                    <input
+                      type="search"
+                      placeholder="Search files or tags..."
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      className="ops-input"
+                    />
+                  </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-[color:var(--foreground)]">
-                  Media type
-                </label>
-                <select
-                  value={typeFilter}
-                  onChange={(event) =>
-                    setTypeFilter(event.target.value as "" | "image" | "video")
-                  }
-                  aria-label="Filter by type"
-                  className="ops-select"
-                >
-                  <option value="">All types</option>
-                  <option value="image">Images</option>
-                  <option value="video">Videos</option>
-                </select>
-              </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-[color:var(--foreground)]">
+                      Media type
+                    </label>
+                    <select
+                      value={typeFilter}
+                      onChange={(event) =>
+                        setTypeFilter(event.target.value as "" | "image" | "video")
+                      }
+                      aria-label="Filter by type"
+                      className="ops-select"
+                    >
+                      <option value="">All types</option>
+                      <option value="image">Images</option>
+                      <option value="video">Videos</option>
+                    </select>
+                  </div>
 
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchQuery("");
-                    setTypeFilter("");
-                  }}
-                  className="ops-button-secondary w-full"
-                >
-                  Reset Filters
-                </button>
-              </div>
-            </div>
-          </section>
-        ) : null}
-
-        <section className="surface-card rounded-[1.5rem] p-4 sm:p-5">
-          {loading && items.length === 0 ? (
-            <div className="ops-empty">
-              <p className="text-lg font-semibold text-[color:var(--foreground)]">
-                Loading media...
-              </p>
-            </div>
-          ) : (
-            <>
-              <MediaGrid
-                items={items}
-                selectedIds={selectedIds}
-                onSelectedChange={setSelectedIds}
-                onItemClick={openLightbox}
-                onBulkDownload={handleBulkDownload}
-                onBulkDelete={canContribute ? handleBulkDelete : undefined}
-                onMakeAlbumCover={isAdmin ? handleMakeAlbumCover : undefined}
-                albumCoverMediaId={albumCoverMediaId}
-                deletingSelection={deletingSelection}
-                updatingCover={updatingCover}
-                canContribute={canContribute}
-                onDelete={handleDelete}
-              />
-
-              {cursor && !loading ? (
-                <div className="mt-8 flex justify-center">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void fetchItems(false);
-                    }}
-                    className="ops-button-secondary"
-                  >
-                    Load More Files
-                  </button>
+                  <div className="flex items-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchQuery("");
+                        setTypeFilter("");
+                      }}
+                      className="ops-button-secondary w-full"
+                    >
+                      Reset Filters
+                    </button>
+                  </div>
                 </div>
-              ) : null}
+              </section>
+            ) : null}
 
-              {loading && items.length > 0 ? (
-                <div className="mt-5 text-center text-sm text-[color:var(--text-muted)]">
-                  Loading additional files...
+            <section className="surface-card rounded-[1.5rem] p-4 sm:p-5">
+              {loading && items.length === 0 ? (
+                <div className="ops-empty">
+                  <p className="text-lg font-semibold text-[color:var(--foreground)]">
+                    Loading media...
+                  </p>
                 </div>
-              ) : null}
-            </>
-          )}
-        </section>
+              ) : (
+                <>
+                  <MediaGrid
+                    items={items}
+                    selectedIds={selectedIds}
+                    onSelectedChange={setSelectedIds}
+                    onItemClick={openLightbox}
+                    onBulkDownload={handleBulkDownload}
+                    onBulkDelete={canContribute ? handleBulkDelete : undefined}
+                    onMakeAlbumCover={isAdmin ? handleMakeAlbumCover : undefined}
+                    albumCoverMediaId={albumCoverMediaId}
+                    deletingSelection={deletingSelection}
+                    updatingCover={updatingCover}
+                    canContribute={canContribute}
+                    onDelete={handleDelete}
+                  />
+
+                  {cursor && !loading ? (
+                    <div className="mt-8 flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void fetchItems(false);
+                        }}
+                        className="ops-button-secondary"
+                      >
+                        Load More Files
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {loading && items.length > 0 ? (
+                    <div className="mt-5 text-center text-sm text-[color:var(--text-muted)]">
+                      Loading additional files...
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </section>
+          </>
+        )}
       </PageWidth>
 
       {pageDropActive ? (
@@ -752,35 +783,6 @@ export default function AlbumWorkspacePage({
             </div>
           </div>
         </div>
-      ) : null}
-
-      {lightboxItem ? (
-        <Lightbox
-          item={lightboxItem}
-          items={items}
-          tenantSlug={tenantSlug}
-          currentIndex={lightboxIndex}
-          canEditDetails={isAdmin}
-          canSetAlbumCover={isAdmin && lightboxItem.fileType === "image"}
-          isAlbumCover={lightboxItem.id === albumCoverMediaId}
-          makingAlbumCover={updatingCover}
-          onSaveMetadata={handleMetadataSave}
-          onMakeAlbumCover={() => {
-            void handleMakeAlbumCover(lightboxItem.id);
-          }}
-          onClose={() => setLightboxItem(null)}
-          onPrev={() => {
-            void navigateLightbox(-1);
-          }}
-          onNext={() => {
-            void navigateLightbox(1);
-          }}
-          onSelect={(index) => {
-            void loadLightboxAtIndex(index);
-          }}
-          hasPrev={lightboxIndex > 0}
-          hasNext={lightboxIndex < items.length - 1}
-        />
       ) : null}
     </AppShell>
   );

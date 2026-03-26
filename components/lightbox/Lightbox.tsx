@@ -67,7 +67,6 @@ export default function Lightbox({
   hasNext,
 }: Props) {
   const touchStartXRef = useRef<number | null>(null);
-  const [topOffset, setTopOffset] = useState(0);
   const [title, setTitle] = useState(item.title ?? item.fileName);
   const [description, setDescription] = useState(item.description ?? "");
   const [tagsText, setTagsText] = useState(item.tags.join(", "));
@@ -87,37 +86,41 @@ export default function Lightbox({
     setCopyState("idle");
   }, [item]);
 
-  useEffect(() => {
-    function updateTopOffset() {
-      const bannerHeight =
-        document.querySelector<HTMLElement>("[data-cui-banner='true']")?.offsetHeight ?? 0;
-      const headerHeight =
-        document.querySelector<HTMLElement>("[data-platform-header='true']")?.offsetHeight ?? 0;
-      setTopOffset(bannerHeight + headerHeight);
-    }
-
-    updateTopOffset();
-    window.addEventListener("resize", updateTopOffset);
-    return () => {
-      window.removeEventListener("resize", updateTopOffset);
-    };
+  const stopSlideshow = useCallback(() => {
+    setSlideshowActive(false);
   }, []);
 
-  const handleKey = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      if (e.key === "ArrowLeft" && hasPrev) onPrev?.();
-      if (e.key === "ArrowRight" && hasNext) onNext?.();
+  const handlePrev = useCallback(() => {
+    stopSlideshow();
+    onPrev?.();
+  }, [onPrev, stopSlideshow]);
+
+  const handleNext = useCallback(() => {
+    stopSlideshow();
+    onNext?.();
+  }, [onNext, stopSlideshow]);
+
+  const handleSelectIndex = useCallback(
+    (index: number) => {
+      stopSlideshow();
+      onSelect?.(index);
     },
-    [onClose, onPrev, onNext, hasPrev, hasNext]
+    [onSelect, stopSlideshow]
+  );
+
+  const handleKey = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+      if (event.key === "ArrowLeft" && hasPrev) handlePrev();
+      if (event.key === "ArrowRight" && hasNext) handleNext();
+    },
+    [handleNext, handlePrev, hasNext, hasPrev, onClose]
   );
 
   useEffect(() => {
     document.addEventListener("keydown", handleKey);
-    document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", handleKey);
-      document.body.style.overflow = "";
     };
   }, [handleKey]);
 
@@ -158,10 +161,6 @@ export default function Lightbox({
     };
   }, [currentIndex, getNextImageIndex, item.fileType, onSelect, slideshowActive]);
 
-  function stopSlideshow() {
-    setSlideshowActive(false);
-  }
-
   function handleSlideshowToggle() {
     if (item.fileType !== "image") {
       setSlideshowActive(false);
@@ -171,21 +170,6 @@ export default function Lightbox({
 
     setSlideshowMessage("");
     setSlideshowActive((current) => !current);
-  }
-
-  function handlePrev() {
-    stopSlideshow();
-    onPrev?.();
-  }
-
-  function handleNext() {
-    stopSlideshow();
-    onNext?.();
-  }
-
-  function handleSelectIndex(index: number) {
-    stopSlideshow();
-    onSelect?.(index);
   }
 
   const handleDownload = async () => {
@@ -250,12 +234,10 @@ export default function Lightbox({
   }
 
   return (
-    <div
-      className="fixed inset-x-0 bottom-0 z-50 flex flex-col bg-[rgba(1,7,12,0.96)] backdrop-blur-xl"
+    <section
+      className="surface-card overflow-hidden rounded-[1.5rem] border border-slate-900/80 bg-[rgba(1,7,12,0.96)]"
       role="dialog"
-      aria-modal="true"
       aria-label={item.title ?? item.fileName}
-      style={{ top: `${topOffset}px` }}
     >
       <div className="border-b border-white/10 bg-slate-950/70 px-4 py-4">
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4">
@@ -309,7 +291,7 @@ export default function Lightbox({
       </div>
 
       <div
-        className="relative flex flex-1 overflow-hidden px-4 py-6 sm:px-6"
+        className="relative px-4 py-6 sm:px-6"
         onTouchStart={(event) => {
           touchStartXRef.current = event.touches[0]?.clientX ?? null;
         }}
@@ -324,9 +306,9 @@ export default function Lightbox({
 
           const delta = endX - startX;
           if (delta > 60 && hasPrev) {
-            onPrev?.();
+            handlePrev();
           } else if (delta < -60 && hasNext) {
-            onNext?.();
+            handleNext();
           }
           touchStartXRef.current = null;
         }}
@@ -349,8 +331,8 @@ export default function Lightbox({
           </button>
         ) : null}
 
-        <div className="mx-auto grid h-full w-full max-w-7xl gap-4 xl:grid-cols-[minmax(0,1.8fr)_360px]">
-          <div className="flex min-h-0 items-center justify-center overflow-hidden rounded-[1.75rem] border border-white/8 bg-black/25 p-3 sm:p-5">
+        <div className="mx-auto grid min-h-[calc(100vh-19rem)] w-full max-w-7xl gap-4 xl:grid-cols-[minmax(0,1.8fr)_360px]">
+          <div className="flex min-h-[52vh] items-center justify-center overflow-hidden rounded-[1.75rem] border border-white/8 bg-black/25 p-3 sm:min-h-[64vh] sm:p-5">
             {item.fileType === "image" ? (
               <img
                 src={item.sasUrl}
@@ -367,13 +349,14 @@ export default function Lightbox({
             )}
           </div>
 
-          <aside className="min-h-0 overflow-y-auto rounded-[1.75rem] border border-white/10 bg-slate-950/68 p-5">
+          <aside className="overflow-y-auto rounded-[1.75rem] border border-white/10 bg-slate-950/68 p-5">
             <div className="space-y-5">
               {slideshowMessage ? (
                 <div className="rounded-[1rem] border border-white/8 bg-white/[0.04] px-4 py-3 text-sm text-slate-300">
                   {slideshowMessage}
                 </div>
               ) : null}
+
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                   Details
@@ -567,6 +550,6 @@ export default function Lightbox({
           </div>
         </div>
       ) : null}
-    </div>
+    </section>
   );
 }
