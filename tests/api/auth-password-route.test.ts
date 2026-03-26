@@ -143,6 +143,44 @@ describe("/api/auth/password", () => {
     expect(body.redirectTo).toBe("/admin");
   });
 
+  it("keeps platform-admin sign-in on the admin console even with tenant memberships", async () => {
+    vi.mocked(createSession).mockResolvedValue({
+      sessionId: "session-1",
+      tenantIds: ["tenant-alpha", "tenant-bravo"],
+      activeTenantId: "tenant-alpha",
+      signedCookieValue: "signed-cookie",
+    });
+    vi.mocked(getTenantById).mockResolvedValue({
+      id: "tenant-alpha",
+      name: "Alpha",
+      slug: "alpha",
+      isActive: true,
+      isPublic: false,
+      createdAt: "2026-03-24T00:00:00.000Z",
+      updatedAt: "2026-03-24T00:00:00.000Z",
+      createdBy: "system",
+    });
+    vi.mocked(canAccessAdmin).mockResolvedValue(true);
+
+    const request = new NextRequest("http://localhost:3000/api/auth/password", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        email: "admin@example.com",
+        password: "Password123!",
+        mode: "platform-admin",
+      }),
+    });
+
+    const response = await POST(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.redirectTo).toBe("/admin");
+  });
+
   it("returns the original safe destination after password login", async () => {
     const request = new NextRequest("http://localhost:3000/api/auth/password", {
       method: "POST",

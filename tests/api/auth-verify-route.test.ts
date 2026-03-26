@@ -110,6 +110,35 @@ describe("/api/auth/verify", () => {
     expect(response.headers.get("location")).toBe("http://localhost:3000/admin");
   });
 
+  it("keeps platform-admin magic-link sign-in on the admin console even with tenant memberships", async () => {
+    vi.mocked(createSession).mockResolvedValue({
+      sessionId: "session-1",
+      tenantIds: ["tenant-alpha", "tenant-bravo"],
+      activeTenantId: "tenant-alpha",
+      signedCookieValue: "signed-cookie",
+    });
+    vi.mocked(getTenantById).mockResolvedValue({
+      id: "tenant-alpha",
+      name: "Alpha",
+      slug: "alpha",
+      isActive: true,
+      isPublic: false,
+      createdAt: "2026-03-24T00:00:00.000Z",
+      updatedAt: "2026-03-24T00:00:00.000Z",
+      createdBy: "system",
+    });
+    vi.mocked(canAccessAdmin).mockResolvedValue(true);
+
+    const request = new NextRequest(
+      "http://localhost:3000/api/auth/verify?token=token-123&mode=platform-admin"
+    );
+
+    const response = await GET(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe("http://localhost:3000/admin");
+  });
+
   it("redirects back to the originally requested shared link after verification", async () => {
     vi.mocked(getTenantBySlug).mockResolvedValue({
       id: "tenant-bravo",

@@ -92,13 +92,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   // Redirect priority:
   // 0. Safe return path from the original shared link
-  // 1. Explicitly selected tenant from login
-  // 2. Active tenant resolved on the session
-  // 3. Multi-tenant selection step
-  // 4. Platform admin console
+  // 1. Explicit platform-admin sign-in entry
+  // 2. Explicitly selected tenant from login
+  // 3. Active tenant resolved on the session
+  // 4. Multi-tenant selection step
+  // 5. Platform admin console
   let redirectPath: string;
   if (nextPath) {
     redirectPath = nextPath;
+  } else if (isPlatformAdminMode) {
+    redirectPath = "/admin";
   } else if (preferredTenantSlug) {
     redirectPath = `/t/${preferredTenantSlug}`;
   } else if (activeTenantId) {

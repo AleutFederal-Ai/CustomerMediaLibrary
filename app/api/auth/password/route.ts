@@ -123,13 +123,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Redirect priority:
     // 0. Safe return path from the original shared link
-    // 1. Explicitly selected tenant from login
-    // 2. Active tenant resolved on the session
-    // 3. Multi-tenant selection step
-    // 4. Platform admin console
+    // 1. Explicit platform-admin sign-in entry
+    // 2. Explicitly selected tenant from login
+    // 3. Active tenant resolved on the session
+    // 4. Multi-tenant selection step
+    // 5. Platform admin console
     let redirectTo: string;
     if (nextPath) {
       redirectTo = nextPath;
+    } else if (isPlatformAdminMode) {
+      redirectTo = "/admin";
     } else if (preferredTenantSlug) {
       redirectTo = `/t/${preferredTenantSlug}`;
     } else if (activeTenantId) {
