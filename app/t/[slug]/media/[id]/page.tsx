@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import SingleMediaWorkspace from "@/components/gallery/SingleMediaWorkspace";
 import { canAccessAdmin } from "@/lib/auth/admin";
-import { buildAdminTenantPath } from "@/lib/admin-scope";
+import { buildAdminConsoleEntryPath } from "@/lib/admin-scope";
 import { isTenantAdmin } from "@/lib/auth/permissions";
 import { getGalleryMediaPageContext } from "@/lib/auth/gallery-media-page";
 import { listVisibleTenantsForSession } from "@/lib/tenant-data";
@@ -44,7 +44,9 @@ export default async function TenantMediaPage({
         slug: tenant.slug,
       }))}
       canSwitchTenant={canManage}
-      adminHref={canManage ? buildAdminTenantPath("/admin", tenantSlug) : undefined}
+      adminHref={
+        canManage ? buildAdminConsoleEntryPath(tenantId, tenantSlug) : undefined
+      }
     />
   );
 }

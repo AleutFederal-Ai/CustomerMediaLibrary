@@ -227,6 +227,7 @@ export default function AccountMenu({
                 {adminHref ? (
                   <Link
                     href={adminHref}
+                    prefetch={false}
                     className="block rounded-[0.9rem] px-3 py-2 text-sm text-slate-900 hover:bg-slate-100"
                     onClick={() => setOpen(false)}
                   >

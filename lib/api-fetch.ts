@@ -15,5 +15,16 @@ export async function apiFetch(
   input: RequestInfo | URL,
   init?: RequestInit
 ): Promise<Response> {
-  return fetch(input, init);
+  const requestInit: RequestInit = { ...init };
+  const method = (requestInit.method ?? "GET").toUpperCase();
+
+  if (!requestInit.credentials) {
+    requestInit.credentials = "same-origin";
+  }
+
+  if (!requestInit.cache && (method === "GET" || method === "HEAD")) {
+    requestInit.cache = "no-store";
+  }
+
+  return fetch(input, requestInit);
 }

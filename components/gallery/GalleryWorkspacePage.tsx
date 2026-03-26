@@ -2,7 +2,10 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import GalleryAlbumWorkspace from "@/components/gallery/GalleryAlbumWorkspace";
 import { canAccessAdmin } from "@/lib/auth/admin";
-import { buildAdminTenantPath, buildGalleryWorkspacePath } from "@/lib/admin-scope";
+import {
+  buildAdminConsoleEntryPath,
+  buildGalleryWorkspacePath,
+} from "@/lib/admin-scope";
 import { isTenantAdmin } from "@/lib/auth/permissions";
 import { getTenantBySlug } from "@/lib/auth/tenant";
 import { listAlbumItemsForTenant } from "@/lib/gallery/albums";
@@ -73,7 +76,7 @@ export default async function GalleryWorkspacePage({
   const isTenantAdm = await isTenantAdmin(email, activeTenant.id);
   const canManage = isPlatformAdmin || isTenantAdm;
   const adminHref = canManage
-    ? buildAdminTenantPath("/admin", activeTenant.slug)
+    ? buildAdminConsoleEntryPath(activeTenant.id, activeTenant.slug)
     : undefined;
 
   return (
@@ -118,7 +121,7 @@ export default async function GalleryWorkspacePage({
 
           <GalleryAlbumWorkspace
             initialAlbums={albums}
-            canCreate={isTenantAdm}
+            canCreate={canManage}
             tenantId={activeTenant.id}
             tenantSlug={activeTenant.slug}
           />

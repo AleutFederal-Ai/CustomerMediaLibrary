@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import AlbumWorkspacePage from "@/components/gallery/AlbumWorkspacePage";
 import { canAccessAdmin } from "@/lib/auth/admin";
 import { getGalleryAlbumPageContext } from "@/lib/auth/gallery-album-page";
-import { buildAdminTenantPath } from "@/lib/admin-scope";
+import { buildAdminConsoleEntryPath } from "@/lib/admin-scope";
 import { isTenantAdmin } from "@/lib/auth/permissions";
 import { listVisibleTenantsForSession } from "@/lib/tenant-data";
 
@@ -44,7 +44,9 @@ export default async function TenantAlbumPage({
         slug: tenant.slug,
       }))}
       canSwitchTenant={canManage}
-      adminHref={canManage ? buildAdminTenantPath("/admin", tenantSlug) : undefined}
+      adminHref={
+        canManage ? buildAdminConsoleEntryPath(tenantId, tenantSlug) : undefined
+      }
     />
   );
 }

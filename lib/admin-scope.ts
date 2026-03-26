@@ -13,6 +13,26 @@ export function buildAdminTenantPath(
   return `${scopedUrl.pathname}${scopedUrl.search}`;
 }
 
+export function buildTenantSessionHandoffPath(
+  tenantId: string,
+  nextPath: string
+): string {
+  const handoffUrl = new URL("/api/sessions/current", "http://localhost");
+  handoffUrl.searchParams.set("tenantId", tenantId);
+  handoffUrl.searchParams.set("next", nextPath);
+  return `${handoffUrl.pathname}${handoffUrl.search}`;
+}
+
+export function buildAdminConsoleEntryPath(
+  tenantId?: string | null,
+  tenantSlug?: string | null
+): string {
+  const adminPath = buildAdminTenantPath("/admin", tenantSlug);
+  return tenantId
+    ? buildTenantSessionHandoffPath(tenantId, adminPath)
+    : adminPath;
+}
+
 export function buildGalleryWorkspacePath(
   tenantSlug?: string | null
 ): string {
