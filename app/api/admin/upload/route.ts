@@ -6,6 +6,7 @@ import { uploadBlob } from "@/lib/azure/blob";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { isMediaContributor } from "@/lib/auth/permissions";
 import { resolveUploadedMediaType } from "@/lib/media-upload";
+import { buildDefaultMediaTitle, normalizeMediaTags } from "@/lib/media-metadata";
 import { MediaRecord, AuditAction } from "@/types";
 
 const THUMBNAIL_SIZE = 400;
@@ -32,8 +33,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   let formData: FormData;
   try {
     formData = await request.formData();
-  } catch {
-    return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
+  } catch (error) {
+    console.warn("[admin/upload] Unable to parse multipart form data", error);
+    return NextResponse.json(
+      {
+        error:
+          "Upload payload could not be read. Please retry the upload. Large video files over 500 MB may need to be reduced before uploading.",
+      },
+      { status: 400 }
+    );
   }
 
   const file = formData.get("file");
@@ -112,10 +120,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     await uploadBlob("thumbnails", thumbnailBlobName, thumbnailBuffer, "image/webp");
 
-    const tags = tagsRaw
-      .split(",")
-      .map((t) => t.trim().toLowerCase())
-      .filter(Boolean);
+    const tags = normalizeMediaTags(tagsRaw);
 
     const now = new Date().toISOString();
     const record: MediaRecord = {
@@ -123,6 +128,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       albumId,
       tenantId,
       fileName: file.name,
+      title: buildDefaultMediaTitle(file.name),
       fileType,
       mimeType,
       sizeBytes: buffer.length,

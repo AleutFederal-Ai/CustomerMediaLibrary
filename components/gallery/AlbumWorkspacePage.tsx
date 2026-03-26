@@ -21,11 +21,14 @@ import { AppShell, PageWidth } from "@/components/ui/AppFrame";
 interface MediaDetail {
   id: string;
   fileName: string;
+  title?: string;
+  description?: string;
   fileType: "image" | "video";
   mimeType: string;
   sasUrl: string;
   albumId: string;
   sizeBytes: number;
+  tags: string[];
 }
 
 interface Props {
@@ -54,6 +57,7 @@ export default function AlbumWorkspacePage({ albumId, tenantSlug }: Props) {
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [bulkDownloading, setBulkDownloading] = useState(false);
   const [canContribute, setCanContribute] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [sessionEmail, setSessionEmail] = useState("");
   const [albumName, setAlbumName] = useState("Album");
   const [albumDescription, setAlbumDescription] = useState("");
@@ -80,11 +84,15 @@ export default function AlbumWorkspacePage({ albumId, tenantSlug }: Props) {
 
       if (meResponse?.ok) {
         const data = (await meResponse.json().catch(() => null)) as
-          | { email?: string; canContribute?: boolean }
+          | { email?: string; canContribute?: boolean; isAdmin?: boolean }
           | null;
 
         if (data?.email) {
           setSessionEmail(data.email);
+        }
+
+        if (data?.isAdmin) {
+          setIsAdmin(true);
         }
 
         if (data?.canContribute) {
@@ -231,6 +239,56 @@ export default function AlbumWorkspacePage({ albumId, tenantSlug }: Props) {
     }
 
     setItems((prev) => prev.filter((currentItem) => currentItem.id !== item.id));
+  }
+
+  async function handleMetadataSave(nextMetadata: {
+    title: string;
+    description: string;
+    tags: string[];
+  }) {
+    if (!lightboxItem) {
+      return;
+    }
+
+    const res = await apiFetch(`/api/media/${lightboxItem.id}?albumId=${lightboxItem.albumId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(nextMetadata),
+    });
+
+    if (!res.ok) {
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(data?.error ?? "Unable to save media details.");
+    }
+
+    const updated = (await res.json()) as Pick<
+      MediaDetail,
+      "title" | "description" | "tags"
+    >;
+
+    setLightboxItem((current) =>
+      current
+        ? {
+            ...current,
+            title: updated.title,
+            description: updated.description,
+            tags: updated.tags,
+          }
+        : current
+    );
+
+    setItems((currentItems) =>
+      currentItems.map((item) =>
+        item.id === lightboxItem.id
+          ? {
+              ...item,
+              title: updated.title,
+              description: updated.description,
+              tags: updated.tags,
+            }
+          : item
+      )
+    );
   }
 
   const queueDroppedFiles = useEffectEvent((files: File[]) => {
@@ -560,7 +618,10 @@ export default function AlbumWorkspacePage({ albumId, tenantSlug }: Props) {
         <Lightbox
           item={lightboxItem}
           items={items}
+          tenantSlug={tenantSlug}
           currentIndex={lightboxIndex}
+          canEditDetails={isAdmin}
+          onSaveMetadata={handleMetadataSave}
           onClose={() => setLightboxItem(null)}
           onPrev={() => {
             void navigateLightbox(-1);

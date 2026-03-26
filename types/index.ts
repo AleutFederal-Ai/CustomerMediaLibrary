@@ -105,6 +105,8 @@ export interface MediaRecord {
   albumId: string;
   tenantId: string;       // which tenant owns this media
   fileName: string;
+  title?: string;
+  description?: string;
   fileType: FileType;
   mimeType: string;
   sizeBytes: number;
@@ -165,6 +167,7 @@ export enum AuditAction {
 
   // Admin — media
   MEDIA_UPLOADED = "media_uploaded",
+  MEDIA_UPDATED = "media_updated",
   MEDIA_DELETED = "media_deleted",
   ALBUM_CREATED = "album_created",
   ALBUM_UPDATED = "album_updated",
@@ -254,6 +257,8 @@ export interface MediaListItem {
   albumId: string;
   tenantId: string;
   fileName: string;
+  title?: string;
+  description?: string;
   fileType: FileType;
   mimeType: string;
   sizeBytes: number;

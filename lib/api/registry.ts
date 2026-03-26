@@ -194,6 +194,18 @@ export const API_ENDPOINTS: ApiEndpointDefinition[] = [
     destructive: true,
   },
   {
+    id: "media-update",
+    category: "Tenant Admin",
+    method: "PATCH",
+    pathTemplate: "/api/media/{sampleMediaId}?albumId={sampleAlbumId}",
+    description: "Updates title, description, and tags for a single media item.",
+    authScope: "tenantAdmin",
+    verificationMode: "manual",
+    destructive: true,
+    sampleBody:
+      '{\n  "title": "Updated title",\n  "description": "Updated description",\n  "tags": ["featured", "homepage"]\n}',
+  },
+  {
     id: "admin-stats",
     category: "Admin",
     method: "GET",

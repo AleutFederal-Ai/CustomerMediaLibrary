@@ -405,7 +405,7 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
               Add up to {MAX_QUEUE_ITEMS} images or videos per batch. Files are
               uploaded one at a time so the queue remains visible and stable.
               Common video formats such as MP4, MOV, AVI, WEBM, M4V, MPEG, and
-              WMV are supported.
+              WMV are supported, with a maximum size of 500 MB per file.
             </p>
           </div>
 

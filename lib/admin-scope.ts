@@ -34,3 +34,11 @@ export function buildGalleryAlbumPath(
   const normalizedSlug = tenantSlug?.trim().toLowerCase();
   return normalizedSlug ? `/t/${normalizedSlug}/album/${albumId}` : `/album/${albumId}`;
 }
+
+export function buildGalleryMediaPath(
+  tenantSlug: string | null | undefined,
+  mediaId: string
+): string {
+  const normalizedSlug = tenantSlug?.trim().toLowerCase();
+  return normalizedSlug ? `/t/${normalizedSlug}/media/${mediaId}` : `/media/${mediaId}`;
+}

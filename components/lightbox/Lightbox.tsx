@@ -1,24 +1,35 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import VideoPlayer from "@/components/video-player/VideoPlayer";
 import { apiFetch } from "@/lib/api-fetch";
+import { buildGalleryMediaPath } from "@/lib/admin-scope";
 import { MediaListItem } from "@/types";
 
 interface MediaDetail {
   id: string;
   fileName: string;
+  title?: string;
+  description?: string;
   fileType: "image" | "video";
   mimeType: string;
   sasUrl: string;
   albumId: string;
   sizeBytes: number;
+  tags: string[];
 }
 
 interface Props {
   item: MediaDetail;
   items: MediaListItem[];
+  tenantSlug?: string;
   currentIndex: number;
+  canEditDetails?: boolean;
+  onSaveMetadata?: (nextMetadata: {
+    title: string;
+    description: string;
+    tags: string[];
+  }) => Promise<void>;
   onClose: () => void;
   onPrev?: () => void;
   onNext?: () => void;
@@ -36,7 +47,10 @@ function formatBytes(bytes: number): string {
 export default function Lightbox({
   item,
   items,
+  tenantSlug,
   currentIndex,
+  canEditDetails = false,
+  onSaveMetadata,
   onClose,
   onPrev,
   onNext,
@@ -45,6 +59,22 @@ export default function Lightbox({
   hasNext,
 }: Props) {
   const touchStartXRef = useRef<number | null>(null);
+  const [title, setTitle] = useState(item.title ?? item.fileName);
+  const [description, setDescription] = useState(item.description ?? "");
+  const [tagsText, setTagsText] = useState(item.tags.join(", "));
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+  const [saveError, setSaveError] = useState("");
+
+  useEffect(() => {
+    setTitle(item.title ?? item.fileName);
+    setDescription(item.description ?? "");
+    setTagsText(item.tags.join(", "));
+    setSaveMessage("");
+    setSaveError("");
+    setCopyState("idle");
+  }, [item]);
 
   const handleKey = useCallback(
     (e: KeyboardEvent) => {
@@ -76,12 +106,61 @@ export default function Lightbox({
     URL.revokeObjectURL(url);
   };
 
+  const shareUrl = useMemo(() => {
+    const sharePath = buildGalleryMediaPath(tenantSlug, item.id);
+    if (typeof window === "undefined") {
+      return sharePath;
+    }
+    return new URL(sharePath, window.location.origin).toString();
+  }, [item.id, tenantSlug]);
+
+  async function handleCopyLink() {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopyState("copied");
+    } catch {
+      setCopyState("failed");
+    }
+  }
+
+  async function handleSaveDetails() {
+    if (!onSaveMetadata) {
+      return;
+    }
+
+    setSaving(true);
+    setSaveMessage("");
+    setSaveError("");
+
+    try {
+      const tags = tagsText
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+
+      await onSaveMetadata({
+        title: title.trim(),
+        description: description.trim(),
+        tags,
+      });
+
+      setTagsText(tags.join(", "));
+      setSaveMessage("Media details saved.");
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : "Unable to save media details."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col bg-[rgba(1,7,12,0.96)] backdrop-blur-xl"
       role="dialog"
       aria-modal="true"
-      aria-label={item.fileName}
+      aria-label={item.title ?? item.fileName}
     >
       <div className="border-b border-white/10 bg-slate-950/70 px-4 py-4">
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4">
@@ -90,7 +169,7 @@ export default function Lightbox({
               {currentIndex + 1} of {items.length}
             </p>
             <p className="mt-1 truncate text-lg font-semibold tracking-[-0.03em] text-white">
-              {item.fileName}
+              {item.title ?? item.fileName}
             </p>
             <p className="mt-1 text-sm text-slate-400">
               {item.fileType === "image" ? "Image" : "Video"} - {formatBytes(item.sizeBytes)}
@@ -98,6 +177,9 @@ export default function Lightbox({
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">
+            <button type="button" onClick={handleCopyLink} className="ops-button-secondary">
+              {copyState === "copied" ? "Link Copied" : "Copy Share Link"}
+            </button>
             <button type="button" onClick={handleDownload} className="ops-button">
               Download
             </button>
@@ -109,7 +191,7 @@ export default function Lightbox({
       </div>
 
       <div
-        className="relative flex flex-1 items-center justify-center overflow-hidden px-4 py-6 sm:px-6"
+        className="relative flex flex-1 overflow-hidden px-4 py-6 sm:px-6"
         onTouchStart={(event) => {
           touchStartXRef.current = event.touches[0]?.clientX ?? null;
         }}
@@ -135,7 +217,7 @@ export default function Lightbox({
           <button
             type="button"
             onClick={onPrev}
-            className="absolute left-4 z-10 flex h-12 w-12 items-center justify-center rounded-full border border-white/12 bg-black/45 text-white backdrop-blur"
+            className="absolute left-4 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/12 bg-black/45 text-white backdrop-blur"
             aria-label="Previous"
           >
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -149,28 +231,172 @@ export default function Lightbox({
           </button>
         ) : null}
 
-        <div className="flex h-full max-h-full w-full items-center justify-center overflow-hidden rounded-[1.75rem] border border-white/8 bg-black/25 p-3 sm:p-5">
-          {item.fileType === "image" ? (
-            <img
-              src={item.sasUrl}
-              alt={item.fileName}
-              className="max-h-full max-w-full rounded-[1.2rem] object-contain"
-              draggable={false}
-            />
-          ) : (
-            <VideoPlayer
-              src={item.sasUrl}
-              mimeType={item.mimeType}
-              fileName={item.fileName}
-            />
-          )}
+        <div className="mx-auto grid h-full w-full max-w-7xl gap-4 xl:grid-cols-[minmax(0,1.8fr)_360px]">
+          <div className="flex min-h-0 items-center justify-center overflow-hidden rounded-[1.75rem] border border-white/8 bg-black/25 p-3 sm:p-5">
+            {item.fileType === "image" ? (
+              <img
+                src={item.sasUrl}
+                alt={item.title ?? item.fileName}
+                className="max-h-full max-w-full rounded-[1.2rem] object-contain"
+                draggable={false}
+              />
+            ) : (
+              <VideoPlayer
+                src={item.sasUrl}
+                mimeType={item.mimeType}
+                fileName={item.fileName}
+              />
+            )}
+          </div>
+
+          <aside className="min-h-0 overflow-y-auto rounded-[1.75rem] border border-white/10 bg-slate-950/68 p-5">
+            <div className="space-y-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Details
+                </p>
+                <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
+                  {item.title ?? item.fileName}
+                </h2>
+                <p className="mt-2 text-sm text-slate-400">{item.fileName}</p>
+                {item.description ? (
+                  <p className="mt-4 text-sm leading-6 text-slate-300">{item.description}</p>
+                ) : (
+                  <p className="mt-4 text-sm text-slate-500">
+                    No description has been added for this item yet.
+                  </p>
+                )}
+              </div>
+
+              <div className="grid gap-3 rounded-[1.25rem] border border-white/8 bg-white/[0.03] p-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Media Type
+                  </p>
+                  <p className="mt-1 text-sm text-white">
+                    {item.fileType === "image" ? "Image" : "Video"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Size
+                  </p>
+                  <p className="mt-1 text-sm text-white">{formatBytes(item.sizeBytes)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Share URL
+                  </p>
+                  <p className="mt-1 break-all text-sm text-slate-300">{shareUrl}</p>
+                  {copyState === "failed" ? (
+                    <p className="mt-2 text-xs text-amber-300">
+                      Copy failed in this browser. The URL above can still be selected manually.
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Tags
+                </p>
+                {item.tags.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {item.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-medium text-slate-200"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-slate-500">
+                    No tags have been added for this item yet.
+                  </p>
+                )}
+              </div>
+
+              {canEditDetails ? (
+                <div className="rounded-[1.25rem] border border-white/10 bg-white/[0.03] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    Admin Edit
+                  </p>
+
+                  <div className="mt-4 space-y-4">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-white">
+                        Title
+                      </label>
+                      <input
+                        type="text"
+                        value={title}
+                        onChange={(event) => setTitle(event.target.value)}
+                        className="ops-input"
+                        disabled={saving}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-white">
+                        Description
+                      </label>
+                      <textarea
+                        value={description}
+                        onChange={(event) => setDescription(event.target.value)}
+                        rows={4}
+                        className="ops-input min-h-[120px] resize-y"
+                        disabled={saving}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-white">
+                        Tags
+                      </label>
+                      <input
+                        type="text"
+                        value={tagsText}
+                        onChange={(event) => setTagsText(event.target.value)}
+                        placeholder="featured, event, briefing"
+                        className="ops-input"
+                        disabled={saving}
+                      />
+                      <p className="mt-2 text-xs text-slate-500">
+                        Separate tags with commas.
+                      </p>
+                    </div>
+
+                    {saveMessage ? (
+                      <p className="text-sm text-emerald-300">{saveMessage}</p>
+                    ) : null}
+                    {saveError ? (
+                      <p className="text-sm text-rose-300">{saveError}</p>
+                    ) : null}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleSaveDetails();
+                      }}
+                      disabled={saving}
+                      className="ops-button"
+                    >
+                      {saving ? "Saving..." : "Save Details"}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </aside>
         </div>
 
         {hasNext ? (
           <button
             type="button"
             onClick={onNext}
-            className="absolute right-4 z-10 flex h-12 w-12 items-center justify-center rounded-full border border-white/12 bg-black/45 text-white backdrop-blur"
+            className="absolute right-4 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/12 bg-black/45 text-white backdrop-blur"
             aria-label="Next"
           >
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -183,8 +409,6 @@ export default function Lightbox({
             </svg>
           </button>
         ) : null}
-
-        <div className="absolute inset-0 -z-10" onClick={onClose} aria-hidden="true" />
       </div>
 
       {items.length > 1 ? (
@@ -200,11 +424,11 @@ export default function Lightbox({
                     ? "border-blue-400 shadow-[0_0_0_2px_rgba(96,165,250,0.35)]"
                     : "border-white/12 opacity-75 hover:opacity-100"
                 }`}
-                aria-label={`View ${media.fileName}`}
+                aria-label={`View ${media.title ?? media.fileName}`}
               >
                 <img
                   src={media.thumbnailUrl}
-                  alt={media.fileName}
+                  alt={media.title ?? media.fileName}
                   className="h-full w-full object-cover"
                   loading="lazy"
                 />

@@ -99,7 +99,12 @@ export default function MediaThumbnail({
 
       <div className="absolute inset-x-0 bottom-0 translate-y-0 p-3">
         <div className="rounded-2xl border border-white/70 bg-white/88 px-3 py-2 shadow-sm backdrop-blur">
-          <p className="truncate text-xs font-medium text-slate-900">{item.fileName}</p>
+          <p className="truncate text-sm font-semibold text-slate-950">
+            {item.title ?? item.fileName}
+          </p>
+          <p className="mt-1 truncate text-xs font-medium text-slate-600">
+            {item.fileName}
+          </p>
           <p className="mt-1 text-[0.7rem] uppercase tracking-[0.16em] text-slate-500">
             {item.fileType}
           </p>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { media } from "@/lib/azure/cosmos";
 import { generateSasUrl } from "@/lib/azure/blob";
+import { buildDefaultMediaTitle } from "@/lib/media-metadata";
 import { MediaRecord, MediaListItem } from "@/types";
 
 /**
@@ -41,7 +42,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     if (q) {
       conditions.push(
-        "(CONTAINS(LOWER(c.fileName), @q) OR ARRAY_CONTAINS(c.tags, @q))"
+        `(
+          CONTAINS(LOWER(c.fileName), @q)
+          OR (IS_DEFINED(c.title) AND CONTAINS(LOWER(c.title), @q))
+          OR (IS_DEFINED(c.description) AND CONTAINS(LOWER(c.description), @q))
+          OR ARRAY_CONTAINS(c.tags, @q)
+        )`
       );
       parameters.push({ name: "@q", value: q });
     }
@@ -70,6 +76,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           albumId: record.albumId,
           tenantId: record.tenantId,
           fileName: record.fileName,
+          title: record.title ?? buildDefaultMediaTitle(record.fileName),
+          description: record.description,
           fileType: record.fileType,
           mimeType: record.mimeType,
           sizeBytes: record.sizeBytes,
