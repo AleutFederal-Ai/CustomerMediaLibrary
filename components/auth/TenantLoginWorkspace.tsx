@@ -156,6 +156,7 @@ function PasswordForm({
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [state, setState] = useState<PasswordState>("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -232,16 +233,27 @@ function PasswordForm({
           >
             Password
           </label>
-          <input
-            id="pw-password"
-            type="password"
-            required
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            disabled={state === "submitting"}
-            className="ops-input disabled:opacity-50"
-          />
+          <div className="relative">
+            <input
+              id="pw-password"
+              type={showPassword ? "text" : "password"}
+              required
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              disabled={state === "submitting"}
+              className="ops-input pr-24 disabled:opacity-50"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((current) => !current)}
+              disabled={state === "submitting"}
+              className="absolute inset-y-1 right-1 inline-flex items-center justify-center rounded-full px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
         </div>
 
         {state === "error" && errorMessage ? (

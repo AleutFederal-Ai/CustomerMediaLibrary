@@ -36,4 +36,23 @@ describe("AccountMenu", () => {
       "/api/auth/signout"
     );
   });
+
+  it("renders API handoff admin links as normal browser links", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <AccountMenu
+        email="operator@example.com"
+        activeScopeLabel="Alpha Tenant"
+        adminHref="/api/sessions/current?tenantId=tenant-1&next=%2Fadmin%3Ftenant%3Dalpha"
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /Account/i }));
+
+    expect(screen.getByRole("link", { name: /Admin Console/i })).toHaveAttribute(
+      "href",
+      "/api/sessions/current?tenantId=tenant-1&next=%2Fadmin%3Ftenant%3Dalpha"
+    );
+  });
 });
