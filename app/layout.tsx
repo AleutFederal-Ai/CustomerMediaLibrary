@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import CuiBanner from "@/components/ui/CuiBanner";
+import PlatformFooter from "@/components/ui/PlatformFooter";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,7 +23,10 @@ export default async function RootLayout({
     <html lang="en">
       <body nonce={nonce} className="antialiased">
         <CuiBanner />
-        {children}
+        <div className="min-h-[calc(100vh-42px)] bg-[color:var(--background)]">
+          {children}
+        </div>
+        <PlatformFooter />
       </body>
     </html>
   );

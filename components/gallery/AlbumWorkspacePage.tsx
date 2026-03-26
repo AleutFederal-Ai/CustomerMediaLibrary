@@ -8,15 +8,15 @@ import {
   useRef,
   useState,
 } from "react";
-import Link from "next/link";
-import AccountMenu from "@/components/account/AccountMenu";
 import MediaGrid from "@/components/gallery/MediaGrid";
 import Lightbox from "@/components/lightbox/Lightbox";
 import UploadForm, { UploadFormHandle } from "@/components/admin/UploadForm";
+import { AccountTenantOption } from "@/components/account/AccountMenu";
 import { AlbumListItem, MediaListItem } from "@/types";
 import { apiFetch } from "@/lib/api-fetch";
 import { buildGalleryWorkspacePath } from "@/lib/admin-scope";
 import { AppShell, PageWidth } from "@/components/ui/AppFrame";
+import PlatformHeader from "@/components/ui/PlatformHeader";
 
 interface MediaDetail {
   id: string;
@@ -33,7 +33,14 @@ interface MediaDetail {
 
 interface Props {
   albumId: string;
+  initialAlbumName: string;
+  tenantName: string;
+  tenantId?: string;
   tenantSlug?: string;
+  sessionEmail: string;
+  tenantOptions?: AccountTenantOption[];
+  canSwitchTenant?: boolean;
+  adminHref?: string;
 }
 
 function hasFilePayload(transfer: DataTransfer | null | undefined): boolean {
@@ -44,7 +51,17 @@ function hasFilePayload(transfer: DataTransfer | null | undefined): boolean {
   return Array.from(transfer.types ?? []).includes("Files");
 }
 
-export default function AlbumWorkspacePage({ albumId, tenantSlug }: Props) {
+export default function AlbumWorkspacePage({
+  albumId,
+  initialAlbumName,
+  tenantName,
+  tenantId,
+  tenantSlug,
+  sessionEmail,
+  tenantOptions = [],
+  canSwitchTenant = false,
+  adminHref,
+}: Props) {
   const uploadFormRef = useRef<UploadFormHandle>(null);
   const dragDepthRef = useRef(0);
 
@@ -58,8 +75,7 @@ export default function AlbumWorkspacePage({ albumId, tenantSlug }: Props) {
   const [bulkDownloading, setBulkDownloading] = useState(false);
   const [canContribute, setCanContribute] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [sessionEmail, setSessionEmail] = useState("");
-  const [albumName, setAlbumName] = useState("Album");
+  const [albumName, setAlbumName] = useState(initialAlbumName);
   const [albumDescription, setAlbumDescription] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [showUploadPanel, setShowUploadPanel] = useState(false);
@@ -67,7 +83,9 @@ export default function AlbumWorkspacePage({ albumId, tenantSlug }: Props) {
   const [pendingDroppedFiles, setPendingDroppedFiles] = useState<File[]>([]);
 
   const deferredSearchQuery = useDeferredValue(searchQuery);
-  const albumWorkspacePath = buildGalleryWorkspacePath(tenantSlug);
+  const albumWorkspacePath = tenantId
+    ? `/api/sessions/current?tenantId=${encodeURIComponent(tenantId)}&next=${encodeURIComponent(buildGalleryWorkspacePath(tenantSlug))}`
+    : buildGalleryWorkspacePath(tenantSlug);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,10 +104,6 @@ export default function AlbumWorkspacePage({ albumId, tenantSlug }: Props) {
         const data = (await meResponse.json().catch(() => null)) as
           | { email?: string; canContribute?: boolean; isAdmin?: boolean }
           | null;
-
-        if (data?.email) {
-          setSessionEmail(data.email);
-        }
 
         if (data?.isAdmin) {
           setIsAdmin(true);
@@ -377,10 +391,20 @@ export default function AlbumWorkspacePage({ albumId, tenantSlug }: Props) {
 
     uploadFormRef.current.queueFiles(pendingDroppedFiles);
     setPendingDroppedFiles([]);
-    document
-      .getElementById("album-upload")
-      ?.scrollIntoView({ block: "start", behavior: "smooth" });
   }, [pendingDroppedFiles, showUploadPanel]);
+
+  useEffect(() => {
+    if (!showUploadPanel) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showUploadPanel]);
 
   const filterLabel =
     typeFilter === "image"
@@ -391,32 +415,24 @@ export default function AlbumWorkspacePage({ albumId, tenantSlug }: Props) {
 
   return (
     <AppShell variant="gallery">
+      <PlatformHeader
+        homeHref={buildGalleryWorkspacePath(tenantSlug)}
+        tenantName={tenantName}
+        pageLabel={albumName}
+        email={sessionEmail}
+        activeScopeLabel={albumName}
+        activeTenantId={tenantId}
+        tenantOptions={tenantOptions}
+        canSwitchTenant={canSwitchTenant}
+        adminHref={adminHref}
+      />
+
       <PageWidth className="space-y-4 py-4 sm:space-y-5 sm:py-6">
-        <header className="surface-card rounded-[1.75rem] px-4 py-4 sm:px-6 sm:py-5">
+        <header className="surface-card rounded-[1.5rem] px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-3">
-              <Link
-                href={albumWorkspacePath}
-                className="inline-flex items-center gap-2 text-sm font-medium text-[color:var(--text-muted)] hover:text-[color:var(--foreground)]"
-              >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-                All Albums
-              </Link>
-
               <div className="space-y-2">
-                <h1 className="text-3xl font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
+                <h1 className="text-2xl font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
                   {albumName}
                 </h1>
                 <p className="max-w-3xl text-sm leading-6 text-[color:var(--text-muted)]">
@@ -445,6 +461,12 @@ export default function AlbumWorkspacePage({ albumId, tenantSlug }: Props) {
 
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[220px] sm:items-end">
               <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
+                <a
+                  href={albumWorkspacePath}
+                  className="ops-button-ghost text-center"
+                >
+                  All Albums
+                </a>
                 <button
                   type="button"
                   onClick={() => setShowFilters((current) => !current)}
@@ -465,10 +487,6 @@ export default function AlbumWorkspacePage({ albumId, tenantSlug }: Props) {
 
               {bulkDownloading ? (
                 <span className="chip chip-accent">Preparing download...</span>
-              ) : null}
-
-              {sessionEmail ? (
-                <AccountMenu email={sessionEmail} activeScopeLabel={albumName} />
               ) : null}
             </div>
           </div>
@@ -521,37 +539,6 @@ export default function AlbumWorkspacePage({ albumId, tenantSlug }: Props) {
                 </button>
               </div>
             </div>
-          </section>
-        ) : null}
-
-        {canContribute && showUploadPanel ? (
-          <section
-            id="album-upload"
-            className="surface-card rounded-[1.5rem] p-4 sm:p-5"
-          >
-            <div className="mb-5 space-y-2">
-              <p className="text-sm font-medium text-[color:var(--text-muted)]">
-                Add media
-              </p>
-              <h2 className="text-xl font-semibold tracking-[-0.03em] text-[color:var(--foreground)]">
-                Upload files into this album
-              </h2>
-              <p className="text-sm leading-6 text-[color:var(--text-muted)]">
-                Drag files onto the page or browse from your computer. New files
-                are queued here and uploaded one at a time.
-              </p>
-            </div>
-
-            <UploadForm
-              ref={uploadFormRef}
-              albums={[{ id: albumId, name: albumName }]}
-              initialAlbumId={albumId}
-              lockAlbum={true}
-              albumLabel={albumName}
-              onSuccess={() => {
-                void fetchItems(true);
-              }}
-            />
           </section>
         ) : null}
 
@@ -609,6 +596,51 @@ export default function AlbumWorkspacePage({ albumId, tenantSlug }: Props) {
               <p className="mt-2 text-sm text-slate-600">
                 Release to add the files to this album&apos;s upload queue.
               </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {canContribute && showUploadPanel ? (
+        <div className="fixed inset-0 z-50 bg-slate-950/45 px-4 py-6 backdrop-blur-sm sm:px-6">
+          <div className="mx-auto flex h-full w-full max-w-4xl items-center justify-center">
+            <div className="surface-card max-h-full w-full overflow-y-auto rounded-[1.5rem] p-5 shadow-[0_30px_80px_rgba(15,23,42,0.22)] sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-[color:var(--text-muted)]">
+                    Upload media
+                  </p>
+                  <h2 className="text-xl font-semibold tracking-[-0.03em] text-[color:var(--foreground)]">
+                    {albumName}
+                  </h2>
+                  <p className="text-sm text-[color:var(--text-muted)]">
+                    Add files to this album, then return to the gallery when the upload finishes.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowUploadPanel(false)}
+                  className="ops-button-ghost !w-auto"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-5">
+                <UploadForm
+                  ref={uploadFormRef}
+                  albums={[{ id: albumId, name: albumName }]}
+                  initialAlbumId={albumId}
+                  lockAlbum={true}
+                  albumLabel={albumName}
+                  variant="compact"
+                  onSuccess={() => {
+                    void fetchItems(true);
+                    setShowUploadPanel(false);
+                  }}
+                />
+              </div>
             </div>
           </div>
         </div>

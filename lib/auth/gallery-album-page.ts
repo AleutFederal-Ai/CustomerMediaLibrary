@@ -49,7 +49,9 @@ export async function getGalleryAlbumPageContext({
 
   return {
     albumId,
+    albumName: album.name,
     tenantId: tenant.id,
+    tenantName: tenant.name,
     tenantSlug: tenant.slug,
   };
 }

@@ -53,6 +53,7 @@ export async function getGalleryMediaPageContext({
   return {
     mediaId,
     tenantId: tenant.id,
+    tenantName: tenant.name,
     tenantSlug: tenant.slug,
     albumId: mediaItem.albumId,
   };

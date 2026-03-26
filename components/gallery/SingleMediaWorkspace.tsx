@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import AccountMenu from "@/components/account/AccountMenu";
+import { AccountTenantOption } from "@/components/account/AccountMenu";
 import { AppShell, PageWidth } from "@/components/ui/AppFrame";
 import VideoPlayer from "@/components/video-player/VideoPlayer";
 import { apiFetch } from "@/lib/api-fetch";
@@ -10,6 +10,7 @@ import {
   buildGalleryAlbumPath,
   buildGalleryMediaPath,
 } from "@/lib/admin-scope";
+import PlatformHeader from "@/components/ui/PlatformHeader";
 
 interface MediaDetail {
   id: string;
@@ -33,14 +34,25 @@ function formatBytes(bytes: number): string {
 export default function SingleMediaWorkspace({
   mediaId,
   albumId,
+  tenantId,
+  tenantName,
   tenantSlug,
+  sessionEmail,
+  tenantOptions = [],
+  canSwitchTenant = false,
+  adminHref,
 }: {
   mediaId: string;
   albumId: string;
+  tenantId: string;
+  tenantName: string;
   tenantSlug: string;
+  sessionEmail: string;
+  tenantOptions?: AccountTenantOption[];
+  canSwitchTenant?: boolean;
+  adminHref?: string;
 }) {
   const [item, setItem] = useState<MediaDetail | null>(null);
-  const [sessionEmail, setSessionEmail] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
@@ -52,20 +64,12 @@ export default function SingleMediaWorkspace({
       setLoading(true);
       setError("");
 
-      const [mediaResponse, meResponse] = await Promise.all([
-        apiFetch(`/api/media/${mediaId}?albumId=${albumId}`).catch(() => null),
-        apiFetch("/api/me").catch(() => null),
-      ]);
+      const mediaResponse = await apiFetch(`/api/media/${mediaId}?albumId=${albumId}`).catch(
+        () => null
+      );
 
       if (cancelled) {
         return;
-      }
-
-      if (meResponse?.ok) {
-        const meData = (await meResponse.json().catch(() => null)) as
-          | { email?: string }
-          | null;
-        setSessionEmail(meData?.email ?? "");
       }
 
       if (!mediaResponse?.ok) {
@@ -125,8 +129,20 @@ export default function SingleMediaWorkspace({
 
   return (
     <AppShell variant="gallery">
+      <PlatformHeader
+        homeHref={buildGalleryAlbumPath(tenantSlug, albumId)}
+        tenantName={tenantName}
+        pageLabel={item?.title ?? item?.fileName ?? "Media"}
+        email={sessionEmail}
+        activeScopeLabel={item?.title ?? item?.fileName ?? "Media"}
+        activeTenantId={tenantId}
+        tenantOptions={tenantOptions}
+        canSwitchTenant={canSwitchTenant}
+        adminHref={adminHref}
+      />
+
       <PageWidth className="space-y-4 py-4 sm:space-y-5 sm:py-6">
-        <header className="surface-card rounded-[1.75rem] px-4 py-4 sm:px-6 sm:py-5">
+        <header className="surface-card rounded-[1.5rem] px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-3">
               <Link
@@ -145,7 +161,7 @@ export default function SingleMediaWorkspace({
               </Link>
 
               <div className="space-y-2">
-                <h1 className="text-3xl font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
+                <h1 className="text-2xl font-semibold tracking-[-0.04em] text-[color:var(--foreground)]">
                   {item?.title ?? item?.fileName ?? "Media"}
                 </h1>
                 <p className="max-w-3xl text-sm leading-6 text-[color:var(--text-muted)]">
@@ -155,9 +171,6 @@ export default function SingleMediaWorkspace({
               </div>
             </div>
 
-            {sessionEmail ? (
-              <AccountMenu email={sessionEmail} activeScopeLabel={item?.title ?? item?.fileName ?? "Media"} />
-            ) : null}
           </div>
         </header>
 

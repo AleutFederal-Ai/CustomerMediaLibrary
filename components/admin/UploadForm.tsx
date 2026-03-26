@@ -10,7 +10,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { apiFetch } from "@/lib/api-fetch";
 
 const MAX_QUEUE_ITEMS = 20;
 
@@ -24,6 +23,7 @@ interface Props {
   initialAlbumId?: string;
   lockAlbum?: boolean;
   albumLabel?: string;
+  variant?: "default" | "compact";
   onSuccess?: () => void;
 }
 
@@ -38,7 +38,15 @@ interface UploadQueueItem {
   id: string;
   file: File;
   status: UploadStatus;
+  progress: number;
   error?: string;
+}
+
+interface UploadResponseLike {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  json: () => Promise<unknown>;
 }
 
 function formatFileSize(sizeBytes: number): string {
@@ -87,11 +95,58 @@ function createQueueId(file: File): string {
   return `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function uploadFileWithProgress(
+  formData: FormData,
+  onProgress: (progress: number) => void
+): Promise<UploadResponseLike> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/admin/upload");
+    xhr.responseType = "text";
+
+    xhr.upload.addEventListener("progress", (event) => {
+      if (!event.lengthComputable) {
+        return;
+      }
+
+      onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+    });
+
+    xhr.addEventListener("load", () => {
+      onProgress(100);
+
+      resolve({
+        ok: xhr.status >= 200 && xhr.status < 300,
+        status: xhr.status,
+        statusText: xhr.statusText,
+        json: async () => {
+          if (!xhr.responseText) {
+            return {};
+          }
+
+          try {
+            return JSON.parse(xhr.responseText) as unknown;
+          } catch {
+            return {};
+          }
+        },
+      });
+    });
+
+    xhr.addEventListener("error", () => {
+      reject(new Error("Network error"));
+    });
+
+    xhr.send(formData);
+  });
+}
+
 const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
   albums,
   initialAlbumId,
   lockAlbum = false,
   albumLabel,
+  variant = "default",
   onSuccess,
 }: Props, ref) {
   const [albumId, setAlbumId] = useState(initialAlbumId ?? albums[0]?.id ?? "");
@@ -116,6 +171,23 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
   const uploadedCount = queue.filter((item) => item.status === "uploaded").length;
   const failedCount = queue.filter((item) => item.status === "failed").length;
   const uploadingCount = queue.filter((item) => item.status === "uploading").length;
+  const batchProgress =
+    queue.length === 0
+      ? 0
+      : Math.round(
+          queue.reduce((sum, item) => {
+            if (item.status === "uploaded") {
+              return sum + 100;
+            }
+
+            if (item.status === "uploading") {
+              return sum + item.progress;
+            }
+
+            return sum;
+          }, 0) / queue.length
+        );
+  const isCompact = variant === "compact";
 
   function updateQueueItem(
     itemId: string,
@@ -166,6 +238,7 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
         id: createQueueId(file),
         file,
         status: "queued" as const,
+        progress: 0,
       }));
 
       return [...current, ...nextItems];
@@ -262,6 +335,7 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
       updateQueueItem(item.id, (current) => ({
         ...current,
         status: "uploading",
+        progress: 0,
         error: undefined,
       }));
 
@@ -271,9 +345,11 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
       form.append("tags", tags);
 
       try {
-        const response = await apiFetch("/api/admin/upload", {
-          method: "POST",
-          body: form,
+        const response = await uploadFileWithProgress(form, (progress) => {
+          updateQueueItem(item.id, (current) => ({
+            ...current,
+            progress,
+          }));
         });
 
         if (response.ok) {
@@ -281,6 +357,7 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
           updateQueueItem(item.id, (current) => ({
             ...current,
             status: "uploaded",
+            progress: 100,
             error: undefined,
           }));
         } else {
@@ -289,6 +366,7 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
           updateQueueItem(item.id, (current) => ({
             ...current,
             status: "failed",
+            progress: 0,
             error:
               (data as { error?: string }).error ??
               response.statusText ??
@@ -300,6 +378,7 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
         updateQueueItem(item.id, (current) => ({
           ...current,
           status: "failed",
+          progress: 0,
           error: "Network error",
         }));
       }
@@ -321,7 +400,7 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} className={isCompact ? "space-y-4" : "space-y-5"}>
       <div className="grid gap-4 lg:grid-cols-2">
         <div>
           <label className="mb-2 block text-sm font-medium text-[color:var(--foreground)]">
@@ -370,7 +449,7 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
       </div>
 
       <div
-        className={`rounded-[1.2rem] border border-dashed p-5 transition ${
+        className={`rounded-[1.2rem] border border-dashed ${isCompact ? "p-4" : "p-5"} transition ${
           dropActive
             ? "border-[rgba(37,99,235,0.4)] bg-[rgba(37,99,235,0.08)]"
             : "surface-card-quiet border-[rgba(148,163,184,0.24)]"
@@ -395,17 +474,20 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
 
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-2">
-            <p className="text-sm font-medium text-[color:var(--text-muted)]">
-              Upload queue
-            </p>
+            {!isCompact ? (
+              <p className="text-sm font-medium text-[color:var(--text-muted)]">
+                Upload queue
+              </p>
+            ) : null}
             <h3 className="text-lg font-semibold tracking-[-0.03em] text-[color:var(--foreground)]">
-              Drag files here or browse from your desktop
+              {isCompact
+                ? "Drag files here or browse"
+                : "Drag files here or browse from your desktop"}
             </h3>
             <p className="text-sm leading-6 text-[color:var(--text-muted)]">
-              Add up to {MAX_QUEUE_ITEMS} images or videos per batch. Files are
-              uploaded one at a time so the queue remains visible and stable.
-              Common video formats such as MP4, MOV, AVI, WEBM, M4V, MPEG, and
-              WMV are supported, with a maximum size of 500 MB per file.
+              {isCompact
+                ? `Up to ${MAX_QUEUE_ITEMS} files per batch. Common image and video formats are supported up to 500 MB per file.`
+                : `Add up to ${MAX_QUEUE_ITEMS} images or videos per batch. Files are uploaded one at a time so the queue remains visible and stable. Common video formats such as MP4, MOV, AVI, WEBM, M4V, MPEG, and WMV are supported, with a maximum size of 500 MB per file.`}
             </p>
           </div>
 
@@ -439,6 +521,21 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
             </span>
           ) : null}
         </div>
+
+        {uploading ? (
+          <div className="mt-4 space-y-2">
+            <div className="flex items-center justify-between text-xs font-medium text-[color:var(--text-muted)]">
+              <span>Batch progress</span>
+              <span>{batchProgress}%</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-200/80">
+              <div
+                className="h-full rounded-full bg-[color:var(--foreground)] transition-[width] duration-200"
+                style={{ width: `${batchProgress}%` }}
+              />
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {summary ? (
@@ -455,7 +552,7 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
         </div>
       ) : null}
 
-      <div className="surface-card-soft rounded-[1.2rem] p-4">
+      <div className={`surface-card-soft rounded-[1.2rem] ${isCompact ? "p-3.5" : "p-4"}`}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-medium text-[color:var(--foreground)]">
@@ -498,6 +595,24 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
                     <p className="mt-1 text-xs text-[color:var(--text-muted)]">
                       {formatFileSize(item.file.size)}
                     </p>
+                    {item.status === "uploading" || item.status === "uploaded" ? (
+                      <div className="mt-3 space-y-1.5">
+                        <div className="flex items-center justify-between text-[0.7rem] font-medium uppercase tracking-[0.14em] text-[color:var(--text-muted)]">
+                          <span>Upload Progress</span>
+                          <span>{item.progress}%</span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-slate-200/80">
+                          <div
+                            className={`h-full rounded-full transition-[width] duration-200 ${
+                              item.status === "uploaded"
+                                ? "bg-emerald-500"
+                                : "bg-[color:var(--foreground)]"
+                            }`}
+                            style={{ width: `${item.progress}%` }}
+                          />
+                        </div>
+                      </div>
+                    ) : null}
                     {item.error ? (
                       <p className="mt-2 text-xs text-red-700">{item.error}</p>
                     ) : null}
@@ -538,10 +653,12 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
         >
           {uploading ? "Uploading Queue..." : "Start Upload Queue"}
         </button>
-        <span className="text-sm text-[color:var(--text-muted)]">
-          Files upload sequentially and remain visible here until you clear the
-          completed items.
-        </span>
+        {!isCompact ? (
+          <span className="text-sm text-[color:var(--text-muted)]">
+            Files upload sequentially and remain visible here until you clear the
+            completed items.
+          </span>
+        ) : null}
       </div>
     </form>
   );
