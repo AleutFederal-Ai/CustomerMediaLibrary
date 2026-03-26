@@ -27,7 +27,10 @@ export default function PlatformHeader({
   adminHref,
 }: Props) {
   return (
-    <header className="border-b border-[rgba(148,163,184,0.18)] bg-white/95 backdrop-blur">
+    <header
+      data-platform-header="true"
+      className="relative z-30 border-b border-[rgba(148,163,184,0.18)] bg-white/95 backdrop-blur"
+    >
       <PageWidth className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 space-y-1">
           <Link

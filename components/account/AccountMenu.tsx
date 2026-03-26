@@ -121,7 +121,7 @@ export default function AccountMenu({
   const showTenantSwitcher = canSwitchTenant && tenantOptions.length > 1;
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative z-[70]">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
@@ -146,7 +146,7 @@ export default function AccountMenu({
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 top-full z-50 mt-3 w-[20rem] rounded-[1.2rem] border border-[rgba(148,163,184,0.2)] bg-white p-4 shadow-[0_24px_64px_rgba(15,23,42,0.18)]"
+          className="absolute right-0 top-full z-[80] mt-3 w-[20rem] rounded-[1.2rem] border border-[rgba(148,163,184,0.2)] bg-white p-4 shadow-[0_24px_64px_rgba(15,23,42,0.18)]"
         >
           <div className="border-b border-[rgba(148,163,184,0.16)] pb-3">
             <p className="text-sm font-semibold text-slate-950">{email}</p>

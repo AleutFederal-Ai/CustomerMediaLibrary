@@ -5,6 +5,7 @@ import { MediaListItem } from "@/types";
 interface Props {
   item: MediaListItem;
   selected?: boolean;
+  isAlbumCover?: boolean;
   onSelect?: (id: string, selected: boolean) => void;
   onClick?: (item: MediaListItem) => void;
   canContribute?: boolean;
@@ -14,6 +15,7 @@ interface Props {
 export default function MediaThumbnail({
   item,
   selected,
+  isAlbumCover,
   onSelect,
   onClick,
   canContribute,
@@ -73,6 +75,12 @@ export default function MediaThumbnail({
               </svg>
             ) : null}
           </div>
+        </div>
+      ) : null}
+
+      {isAlbumCover ? (
+        <div className="absolute left-3 top-12 rounded-full border border-emerald-200 bg-white/95 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-emerald-700 shadow-sm backdrop-blur">
+          Album Cover
         </div>
       ) : null}
 

@@ -102,7 +102,9 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
   const id = request.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
-  let body: Partial<Pick<AlbumRecord, "name" | "description" | "order" | "coverMediaId">>;
+  let body: Partial<
+    Pick<AlbumRecord, "name" | "description" | "order" | "coverMediaId">
+  >;
   try {
     body = await request.json();
   } catch {
@@ -114,6 +116,42 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     const { resource: existing } = await container.item(id, id).read<AlbumRecord>();
     if (!existing || existing.tenantId !== caller.tenantId) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    if (body.coverMediaId !== undefined) {
+      const normalizedCoverMediaId = body.coverMediaId?.trim();
+      if (!normalizedCoverMediaId) {
+        return NextResponse.json(
+          { error: "coverMediaId must be a valid media id" },
+          { status: 400 }
+        );
+      }
+
+      const mediaContainer = await media();
+      const { resource: coverMedia } = await mediaContainer
+        .item(normalizedCoverMediaId, normalizedCoverMediaId)
+        .read<MediaRecord>();
+
+      if (
+        !coverMedia ||
+        coverMedia.isDeleted ||
+        coverMedia.tenantId !== caller.tenantId ||
+        coverMedia.albumId !== id
+      ) {
+        return NextResponse.json(
+          { error: "Cover image must belong to this album" },
+          { status: 400 }
+        );
+      }
+
+      if (coverMedia.fileType !== "image") {
+        return NextResponse.json(
+          { error: "Only images can be used as album covers" },
+          { status: 400 }
+        );
+      }
+
+      body.coverMediaId = normalizedCoverMediaId;
     }
 
     const updated: AlbumRecord = {

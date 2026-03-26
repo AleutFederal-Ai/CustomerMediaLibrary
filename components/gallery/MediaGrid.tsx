@@ -1,54 +1,79 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { MediaListItem } from "@/types";
 import MediaThumbnail from "./MediaThumbnail";
 
 interface Props {
   items: MediaListItem[];
+  selectedIds: Set<string>;
+  onSelectedChange: (nextSelection: Set<string>) => void;
   onItemClick: (item: MediaListItem) => void;
   onBulkDownload?: (ids: string[]) => void;
+  onBulkDelete?: (ids: string[]) => void;
+  onMakeAlbumCover?: (id: string) => void;
+  albumCoverMediaId?: string;
+  deletingSelection?: boolean;
+  updatingCover?: boolean;
   canContribute?: boolean;
   onDelete?: (item: MediaListItem) => void;
 }
 
 export default function MediaGrid({
   items,
+  selectedIds,
+  onSelectedChange,
   onItemClick,
   onBulkDownload,
+  onBulkDelete,
+  onMakeAlbumCover,
+  albumCoverMediaId,
+  deletingSelection = false,
+  updatingCover = false,
   canContribute,
   onDelete,
 }: Props) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const hasBulkActions =
+    Boolean(onBulkDownload) || Boolean(onBulkDelete) || Boolean(onMakeAlbumCover);
 
   const handleSelect = useCallback((id: string, isSelected: boolean) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (isSelected) next.add(id);
-      else next.delete(id);
-      return next;
-    });
-  }, []);
+    onSelectedChange(
+      (() => {
+        const next = new Set(selectedIds);
+        if (isSelected) next.add(id);
+        else next.delete(id);
+        return next;
+      })()
+    );
+  }, [onSelectedChange, selectedIds]);
 
   useEffect(() => {
     const validIds = new Set(items.map((item) => item.id));
-    setSelected((prev) => {
-      const next = new Set([...prev].filter((id) => validIds.has(id)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [items]);
+    const next = new Set([...selectedIds].filter((id) => validIds.has(id)));
+    if (next.size !== selectedIds.size) {
+      onSelectedChange(next);
+    }
+  }, [items, onSelectedChange, selectedIds]);
 
   const handleSelectAll = () => {
-    if (selected.size === items.length) {
-      setSelected(new Set());
+    if (selectedIds.size === items.length) {
+      onSelectedChange(new Set());
     } else {
-      setSelected(new Set(items.map((i) => i.id)));
+      onSelectedChange(new Set(items.map((i) => i.id)));
     }
   };
 
+  const selectedItems = useMemo(
+    () => items.filter((item) => selectedIds.has(item.id)),
+    [items, selectedIds]
+  );
+  const canSetAlbumCover =
+    selectedItems.length === 1 && selectedItems[0]?.fileType === "image";
+  const selectedCoverId = canSetAlbumCover ? selectedItems[0]?.id : undefined;
+
   const handleBulkDownload = () => {
-    if (selected.size > 0 && onBulkDownload) {
-      onBulkDownload(Array.from(selected));
+    if (selectedIds.size > 0 && onBulkDownload) {
+      onBulkDownload(Array.from(selectedIds));
     }
   };
 
@@ -67,7 +92,7 @@ export default function MediaGrid({
 
   return (
     <div className="space-y-5">
-      {onBulkDownload ? (
+      {hasBulkActions ? (
         <div className="surface-card-quiet rounded-[1.25rem] p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap items-center gap-3">
@@ -76,12 +101,12 @@ export default function MediaGrid({
                 onClick={handleSelectAll}
                 className="ops-button-secondary"
               >
-                {selected.size === items.length ? "Deselect All" : "Select All"}
+                {selectedIds.size === items.length ? "Deselect All" : "Select All"}
               </button>
 
               <span className="chip">
                 Selected
-                <strong>{selected.size}</strong>
+                <strong>{selectedIds.size}</strong>
               </span>
 
               <span className="text-sm text-[color:var(--text-muted)]">
@@ -89,31 +114,65 @@ export default function MediaGrid({
               </span>
             </div>
 
-            {selected.size > 0 ? (
+            {selectedIds.size > 0 ? (
               <div className="flex flex-col gap-3 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={handleBulkDownload}
-                  className="ops-button"
-                >
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+                {onBulkDownload ? (
+                  <button
+                    type="button"
+                    onClick={handleBulkDownload}
+                    className="ops-button"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                    />
-                  </svg>
-                  Download Selection
-                </button>
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                      />
+                    </svg>
+                    Download Selection
+                  </button>
+                ) : null}
+                {onMakeAlbumCover ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedCoverId) {
+                        onMakeAlbumCover(selectedCoverId);
+                      }
+                    }}
+                    disabled={
+                      updatingCover ||
+                      !canSetAlbumCover ||
+                      selectedCoverId === albumCoverMediaId
+                    }
+                    className="ops-button-secondary disabled:opacity-50"
+                  >
+                    {selectedCoverId === albumCoverMediaId
+                      ? "Album Cover Set"
+                      : updatingCover
+                        ? "Saving Cover..."
+                        : "Make Album Cover"}
+                  </button>
+                ) : null}
+                {onBulkDelete ? (
+                  <button
+                    type="button"
+                    onClick={() => onBulkDelete(Array.from(selectedIds))}
+                    disabled={deletingSelection}
+                    className="ops-button-secondary text-red-700 disabled:opacity-50"
+                  >
+                    {deletingSelection ? "Deleting..." : "Delete Selection"}
+                  </button>
+                ) : null}
                 <button
                   type="button"
-                  onClick={() => setSelected(new Set())}
+                  onClick={() => onSelectedChange(new Set())}
                   className="ops-button-ghost"
                 >
                   Clear
@@ -129,8 +188,9 @@ export default function MediaGrid({
           <MediaThumbnail
             key={item.id}
             item={item}
-            selected={selected.has(item.id)}
-            onSelect={onBulkDownload ? handleSelect : undefined}
+            selected={selectedIds.has(item.id)}
+            isAlbumCover={item.id === albumCoverMediaId}
+            onSelect={hasBulkActions ? handleSelect : undefined}
             onClick={onItemClick}
             canContribute={canContribute}
             onDelete={onDelete}

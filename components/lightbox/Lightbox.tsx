@@ -25,11 +25,15 @@ interface Props {
   tenantSlug?: string;
   currentIndex: number;
   canEditDetails?: boolean;
+  canSetAlbumCover?: boolean;
+  isAlbumCover?: boolean;
+  makingAlbumCover?: boolean;
   onSaveMetadata?: (nextMetadata: {
     title: string;
     description: string;
     tags: string[];
   }) => Promise<void>;
+  onMakeAlbumCover?: () => void;
   onClose: () => void;
   onPrev?: () => void;
   onNext?: () => void;
@@ -50,7 +54,11 @@ export default function Lightbox({
   tenantSlug,
   currentIndex,
   canEditDetails = false,
+  canSetAlbumCover = false,
+  isAlbumCover = false,
+  makingAlbumCover = false,
   onSaveMetadata,
+  onMakeAlbumCover,
   onClose,
   onPrev,
   onNext,
@@ -59,10 +67,13 @@ export default function Lightbox({
   hasNext,
 }: Props) {
   const touchStartXRef = useRef<number | null>(null);
+  const [topOffset, setTopOffset] = useState(0);
   const [title, setTitle] = useState(item.title ?? item.fileName);
   const [description, setDescription] = useState(item.description ?? "");
   const [tagsText, setTagsText] = useState(item.tags.join(", "));
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const [slideshowActive, setSlideshowActive] = useState(false);
+  const [slideshowMessage, setSlideshowMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState("");
@@ -75,6 +86,22 @@ export default function Lightbox({
     setSaveError("");
     setCopyState("idle");
   }, [item]);
+
+  useEffect(() => {
+    function updateTopOffset() {
+      const bannerHeight =
+        document.querySelector<HTMLElement>("[data-cui-banner='true']")?.offsetHeight ?? 0;
+      const headerHeight =
+        document.querySelector<HTMLElement>("[data-platform-header='true']")?.offsetHeight ?? 0;
+      setTopOffset(bannerHeight + headerHeight);
+    }
+
+    updateTopOffset();
+    window.addEventListener("resize", updateTopOffset);
+    return () => {
+      window.removeEventListener("resize", updateTopOffset);
+    };
+  }, []);
 
   const handleKey = useCallback(
     (e: KeyboardEvent) => {
@@ -93,6 +120,73 @@ export default function Lightbox({
       document.body.style.overflow = "";
     };
   }, [handleKey]);
+
+  const getNextImageIndex = useCallback(() => {
+    for (let index = currentIndex + 1; index < items.length; index += 1) {
+      if (items[index]?.fileType === "image") {
+        return index;
+      }
+    }
+
+    return null;
+  }, [currentIndex, items]);
+
+  useEffect(() => {
+    if (!slideshowActive) {
+      return;
+    }
+
+    if (item.fileType !== "image") {
+      setSlideshowActive(false);
+      setSlideshowMessage("Slideshow is available for images.");
+      return;
+    }
+
+    const nextImageIndex = getNextImageIndex();
+    if (nextImageIndex === null) {
+      setSlideshowActive(false);
+      setSlideshowMessage("Slideshow finished.");
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      onSelect?.(nextImageIndex);
+    }, 3500);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [currentIndex, getNextImageIndex, item.fileType, onSelect, slideshowActive]);
+
+  function stopSlideshow() {
+    setSlideshowActive(false);
+  }
+
+  function handleSlideshowToggle() {
+    if (item.fileType !== "image") {
+      setSlideshowActive(false);
+      setSlideshowMessage("Slideshow is available for images.");
+      return;
+    }
+
+    setSlideshowMessage("");
+    setSlideshowActive((current) => !current);
+  }
+
+  function handlePrev() {
+    stopSlideshow();
+    onPrev?.();
+  }
+
+  function handleNext() {
+    stopSlideshow();
+    onNext?.();
+  }
+
+  function handleSelectIndex(index: number) {
+    stopSlideshow();
+    onSelect?.(index);
+  }
 
   const handleDownload = async () => {
     const res = await apiFetch(`/api/media/download?id=${item.id}&albumId=${item.albumId}`);
@@ -157,10 +251,11 @@ export default function Lightbox({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col bg-[rgba(1,7,12,0.96)] backdrop-blur-xl"
+      className="fixed inset-x-0 bottom-0 z-50 flex flex-col bg-[rgba(1,7,12,0.96)] backdrop-blur-xl"
       role="dialog"
       aria-modal="true"
       aria-label={item.title ?? item.fileName}
+      style={{ top: `${topOffset}px` }}
     >
       <div className="border-b border-white/10 bg-slate-950/70 px-4 py-4">
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4">
@@ -177,6 +272,29 @@ export default function Lightbox({
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">
+            {item.fileType === "image" ? (
+              <button
+                type="button"
+                onClick={handleSlideshowToggle}
+                className="ops-button-secondary"
+              >
+                {slideshowActive ? "Stop Slideshow" : "Start Slideshow"}
+              </button>
+            ) : null}
+            {canSetAlbumCover ? (
+              <button
+                type="button"
+                onClick={onMakeAlbumCover}
+                disabled={makingAlbumCover || isAlbumCover}
+                className="ops-button-secondary disabled:opacity-50"
+              >
+                {isAlbumCover
+                  ? "Album Cover"
+                  : makingAlbumCover
+                    ? "Saving Cover..."
+                    : "Make Album Cover"}
+              </button>
+            ) : null}
             <button type="button" onClick={handleCopyLink} className="ops-button-secondary">
               {copyState === "copied" ? "Link Copied" : "Copy Share Link"}
             </button>
@@ -216,7 +334,7 @@ export default function Lightbox({
         {hasPrev ? (
           <button
             type="button"
-            onClick={onPrev}
+            onClick={handlePrev}
             className="absolute left-4 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/12 bg-black/45 text-white backdrop-blur"
             aria-label="Previous"
           >
@@ -251,6 +369,11 @@ export default function Lightbox({
 
           <aside className="min-h-0 overflow-y-auto rounded-[1.75rem] border border-white/10 bg-slate-950/68 p-5">
             <div className="space-y-5">
+              {slideshowMessage ? (
+                <div className="rounded-[1rem] border border-white/8 bg-white/[0.04] px-4 py-3 text-sm text-slate-300">
+                  {slideshowMessage}
+                </div>
+              ) : null}
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                   Details
@@ -395,7 +518,7 @@ export default function Lightbox({
         {hasNext ? (
           <button
             type="button"
-            onClick={onNext}
+            onClick={handleNext}
             className="absolute right-4 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/12 bg-black/45 text-white backdrop-blur"
             aria-label="Next"
           >
@@ -418,7 +541,7 @@ export default function Lightbox({
               <button
                 key={media.id}
                 type="button"
-                onClick={() => onSelect?.(index)}
+                onClick={() => handleSelectIndex(index)}
                 className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border ${
                   index === currentIndex
                     ? "border-blue-400 shadow-[0_0_0_2px_rgba(96,165,250,0.35)]"

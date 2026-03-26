@@ -290,71 +290,67 @@ export default function TenantLoginWorkspace({
     <AppShell variant="gallery">
       <PageWidth className="py-6 sm:py-8">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,440px)] xl:gap-8">
-          <div className="space-y-6">
-            <section className="surface-card rounded-[2rem] px-6 py-6 sm:px-8 sm:py-8">
-              <p className="hero-kicker">Secure Access</p>
-              <div className="mt-4 space-y-4">
-                <h1 className="hero-title max-w-3xl text-[clamp(2rem,5vw,3.8rem)]">
-                  {pageTitle}
-                </h1>
-                <p className="hero-subtitle">{pageDescription}</p>
-              </div>
+          <section className="order-1 surface-card rounded-[2rem] px-6 py-6 sm:px-8 sm:py-8">
+            <p className="hero-kicker">Secure Access</p>
+            <div className="mt-4 space-y-4">
+              <h1 className="hero-title max-w-3xl text-[clamp(2rem,5vw,3.8rem)]">
+                {pageTitle}
+              </h1>
+              <p className="hero-subtitle">{pageDescription}</p>
+            </div>
 
-              <div className="mt-6 flex flex-wrap gap-2">
-                {tenant.slug ? (
-                  <span className="chip ops-code">/t/{tenant.slug}</span>
-                ) : (
-                  <span className="chip chip-accent">
-                    Scope
-                    <strong>Platform Admin</strong>
-                  </span>
-                )}
-                <span className="chip">
-                  Methods
-                  <strong>Magic Link or Password</strong>
+            <div className="mt-6 flex flex-wrap gap-2">
+              {tenant.slug ? (
+                <span className="chip ops-code">/t/{tenant.slug}</span>
+              ) : (
+                <span className="chip chip-accent">
+                  Scope
+                  <strong>Platform Admin</strong>
                 </span>
-                <span className="chip">
-                  Access
-                  <strong>Tenant Scoped</strong>
-                </span>
-              </div>
+              )}
+              <span className="chip">
+                Methods
+                <strong>Magic Link or Password</strong>
+              </span>
+              <span className="chip">
+                Access
+                <strong>Tenant Scoped</strong>
+              </span>
+            </div>
 
-              <div className="mt-8 rounded-[1.4rem] border border-[color:var(--border)] bg-white/70 px-5 py-5">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-4">
-                    {isPlatformAdmin ? (
-                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold text-white">
-                        PF
-                      </div>
-                    ) : (
-                      <TenantBadge tenant={tenant} />
-                    )}
-                    <div className="space-y-1">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--text-subtle)]">
-                        Workspace Context
-                      </p>
-                      <p className="text-lg font-semibold tracking-[-0.03em] text-[color:var(--foreground)]">
-                        {tenant.name}
-                      </p>
-                      <p className="text-sm text-[color:var(--text-muted)]">
-                        {isPlatformAdmin
-                          ? "Administrative control-plane access."
-                          : "Authentication for this workspace stays tied to the selected tenant slug."}
-                      </p>
+            <div className="mt-8 rounded-[1.4rem] border border-[color:var(--border)] bg-white/70 px-5 py-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-4">
+                  {isPlatformAdmin ? (
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold text-white">
+                      PF
                     </div>
+                  ) : (
+                    <TenantBadge tenant={tenant} />
+                  )}
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--text-subtle)]">
+                      Workspace Context
+                    </p>
+                    <p className="text-lg font-semibold tracking-[-0.03em] text-[color:var(--foreground)]">
+                      {tenant.name}
+                    </p>
+                    <p className="text-sm text-[color:var(--text-muted)]">
+                      {isPlatformAdmin
+                        ? "Administrative control-plane access."
+                        : "Authentication for this workspace stays tied to the selected tenant slug."}
+                    </p>
                   </div>
-
-                  <Link href={changeHref} className="ops-button-secondary">
-                    Change Workspace
-                  </Link>
                 </div>
+
+                <Link href={changeHref} className="ops-button-secondary">
+                  Change Workspace
+                </Link>
               </div>
-            </section>
+            </div>
+          </section>
 
-            <HealthStatus />
-          </div>
-
-          <section className="surface-card overflow-hidden rounded-[2rem]">
+          <section className="order-2 surface-card overflow-hidden rounded-[2rem] lg:row-span-2">
             <div className="border-b border-[color:var(--border)] px-6 py-5 sm:px-7">
               <div className="flex items-center justify-between gap-4">
                 <div>
@@ -402,6 +398,10 @@ export default function TenantLoginWorkspace({
               )}
             </div>
           </section>
+
+          <div className="order-3">
+            <HealthStatus />
+          </div>
         </div>
       </PageWidth>
     </AppShell>

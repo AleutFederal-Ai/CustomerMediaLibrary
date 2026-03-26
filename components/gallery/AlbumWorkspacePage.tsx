@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   useCallback,
   useDeferredValue,
@@ -73,19 +74,21 @@ export default function AlbumWorkspacePage({
   const [lightboxItem, setLightboxItem] = useState<MediaDetail | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [bulkDownloading, setBulkDownloading] = useState(false);
+  const [deletingSelection, setDeletingSelection] = useState(false);
+  const [updatingCover, setUpdatingCover] = useState(false);
   const [canContribute, setCanContribute] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [albumName, setAlbumName] = useState(initialAlbumName);
   const [albumDescription, setAlbumDescription] = useState("");
+  const [albumCoverMediaId, setAlbumCoverMediaId] = useState<string | undefined>();
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
   const [showUploadPanel, setShowUploadPanel] = useState(false);
   const [pageDropActive, setPageDropActive] = useState(false);
   const [pendingDroppedFiles, setPendingDroppedFiles] = useState<File[]>([]);
 
   const deferredSearchQuery = useDeferredValue(searchQuery);
-  const albumWorkspacePath = tenantId
-    ? `/api/sessions/current?tenantId=${encodeURIComponent(tenantId)}&next=${encodeURIComponent(buildGalleryWorkspacePath(tenantSlug))}`
-    : buildGalleryWorkspacePath(tenantSlug);
+  const albumWorkspacePath = buildGalleryWorkspacePath(tenantSlug);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,6 +126,7 @@ export default function AlbumWorkspacePage({
         if (currentAlbum) {
           setAlbumName(currentAlbum.name);
           setAlbumDescription(currentAlbum.description ?? "");
+          setAlbumCoverMediaId(currentAlbum.coverMediaId);
         }
       }
     }
@@ -253,6 +257,103 @@ export default function AlbumWorkspacePage({
     }
 
     setItems((prev) => prev.filter((currentItem) => currentItem.id !== item.id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(item.id);
+      return next;
+    });
+
+    if (lightboxItem?.id === item.id) {
+      setLightboxItem(null);
+    }
+
+    if (albumCoverMediaId === item.id) {
+      setAlbumCoverMediaId(undefined);
+    }
+  }
+
+  async function handleBulkDelete(ids: string[]) {
+    if (ids.length === 0) {
+      return;
+    }
+
+    const selectedItems = items.filter((item) => ids.includes(item.id));
+    const label =
+      selectedItems.length === 1
+        ? `"${selectedItems[0]?.fileName ?? "selected file"}"`
+        : `${selectedItems.length} selected files`;
+
+    if (!confirm(`Delete ${label}? This cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingSelection(true);
+
+    try {
+      const results = await Promise.allSettled(
+        ids.map(async (id) => {
+          const targetItem = selectedItems.find((item) => item.id === id);
+          if (!targetItem) {
+            return;
+          }
+
+          const res = await apiFetch(`/api/media/${id}?albumId=${targetItem.albumId}`, {
+            method: "DELETE",
+          });
+
+          if (!res.ok) {
+            throw new Error(targetItem.fileName);
+          }
+        })
+      );
+
+      const failedCount = results.filter((result) => result.status === "rejected").length;
+      if (failedCount > 0) {
+        alert(
+          failedCount === ids.length
+            ? "Delete failed. Please try again."
+            : `${failedCount} file${failedCount === 1 ? "" : "s"} could not be deleted.`
+        );
+      }
+
+      const deletedIds = ids.filter((_, index) => results[index]?.status === "fulfilled");
+      if (deletedIds.length > 0) {
+        setItems((prev) => prev.filter((item) => !deletedIds.includes(item.id)));
+        setSelectedIds(new Set());
+
+        if (lightboxItem && deletedIds.includes(lightboxItem.id)) {
+          setLightboxItem(null);
+        }
+
+        if (albumCoverMediaId && deletedIds.includes(albumCoverMediaId)) {
+          setAlbumCoverMediaId(undefined);
+        }
+      }
+    } finally {
+      setDeletingSelection(false);
+    }
+  }
+
+  async function handleMakeAlbumCover(mediaId: string) {
+    setUpdatingCover(true);
+
+    try {
+      const res = await apiFetch(`/api/admin/albums?id=${albumId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ coverMediaId: mediaId }),
+      });
+
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        alert(data?.error ?? "Unable to update the album cover.");
+        return;
+      }
+
+      setAlbumCoverMediaId(mediaId);
+    } finally {
+      setUpdatingCover(false);
+    }
   }
 
   async function handleMetadataSave(nextMetadata: {
@@ -461,12 +562,12 @@ export default function AlbumWorkspacePage({
 
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[220px] sm:items-end">
               <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
-                <a
+                <Link
                   href={albumWorkspacePath}
                   className="ops-button-ghost text-center"
                 >
                   All Albums
-                </a>
+                </Link>
                 <button
                   type="button"
                   onClick={() => setShowFilters((current) => !current)}
@@ -553,8 +654,15 @@ export default function AlbumWorkspacePage({
             <>
               <MediaGrid
                 items={items}
+                selectedIds={selectedIds}
+                onSelectedChange={setSelectedIds}
                 onItemClick={openLightbox}
                 onBulkDownload={handleBulkDownload}
+                onBulkDelete={canContribute ? handleBulkDelete : undefined}
+                onMakeAlbumCover={isAdmin ? handleMakeAlbumCover : undefined}
+                albumCoverMediaId={albumCoverMediaId}
+                deletingSelection={deletingSelection}
+                updatingCover={updatingCover}
                 canContribute={canContribute}
                 onDelete={handleDelete}
               />
@@ -653,7 +761,13 @@ export default function AlbumWorkspacePage({
           tenantSlug={tenantSlug}
           currentIndex={lightboxIndex}
           canEditDetails={isAdmin}
+          canSetAlbumCover={isAdmin && lightboxItem.fileType === "image"}
+          isAlbumCover={lightboxItem.id === albumCoverMediaId}
+          makingAlbumCover={updatingCover}
           onSaveMetadata={handleMetadataSave}
+          onMakeAlbumCover={() => {
+            void handleMakeAlbumCover(lightboxItem.id);
+          }}
           onClose={() => setLightboxItem(null)}
           onPrev={() => {
             void navigateLightbox(-1);

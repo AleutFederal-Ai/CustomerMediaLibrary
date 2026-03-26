@@ -247,6 +247,7 @@ export interface AlbumListItem {
   tenantId: string;
   name: string;
   description?: string;
+  coverMediaId?: string;
   coverThumbnailUrl?: string;
   mediaCount: number;
   order: number;
