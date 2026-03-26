@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { canAccessAdmin } from "@/lib/auth/admin";
 import { switchActiveTenant } from "@/lib/auth/session";
+import { getPublicBaseUrl } from "@/lib/auth/base-url";
+import { sanitizeNextPath } from "@/lib/auth/redirect";
 import { getTenantById } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { AuditAction } from "@/types";
@@ -133,7 +135,8 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const resolved = await resolveTenantSwitch(request);
-  const fallbackUrl = new URL("/select-tenant", request.url);
+  const publicBaseUrl = getPublicBaseUrl(request);
+  const fallbackUrl = new URL("/select-tenant", publicBaseUrl);
 
   if (resolved instanceof NextResponse) {
     if (resolved.status >= 400) {
@@ -154,7 +157,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(fallbackUrl);
   }
 
-  const nextPath = request.nextUrl.searchParams.get("next") ?? "";
-  const safeNextPath = nextPath.startsWith("/") ? nextPath : "/select-tenant";
-  return NextResponse.redirect(new URL(safeNextPath, request.url));
+  const safeNextPath =
+    sanitizeNextPath(request.nextUrl.searchParams.get("next")) ?? "/select-tenant";
+  return NextResponse.redirect(new URL(safeNextPath, publicBaseUrl));
 }

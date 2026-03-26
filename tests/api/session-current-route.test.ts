@@ -5,6 +5,10 @@ vi.mock("@/lib/auth/admin", () => ({
   canAccessAdmin: vi.fn(),
 }));
 
+vi.mock("@/lib/auth/base-url", () => ({
+  getPublicBaseUrl: vi.fn(),
+}));
+
 vi.mock("@/lib/auth/session", () => ({
   switchActiveTenant: vi.fn(),
 }));
@@ -19,6 +23,7 @@ vi.mock("@/lib/audit/logger", () => ({
 
 import { GET, PATCH } from "@/app/api/sessions/current/route";
 import { canAccessAdmin } from "@/lib/auth/admin";
+import { getPublicBaseUrl } from "@/lib/auth/base-url";
 import { switchActiveTenant } from "@/lib/auth/session";
 import { getTenantById } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/logger";
@@ -29,6 +34,7 @@ describe("/api/sessions/current", () => {
     vi.clearAllMocks();
     vi.mocked(switchActiveTenant).mockResolvedValue(true);
     vi.mocked(canAccessAdmin).mockResolvedValue(false);
+    vi.mocked(getPublicBaseUrl).mockReturnValue("http://localhost:3000");
     vi.mocked(getTenantById).mockResolvedValue(null);
     vi.mocked(writeAuditLog).mockResolvedValue(undefined);
   });
@@ -144,6 +150,32 @@ describe("/api/sessions/current", () => {
       "session-1",
       "tenant-2",
       ["tenant-1", "tenant-2"]
+    );
+  });
+
+  it("builds tenant-switch redirects from the public host instead of the internal request url", async () => {
+    vi.mocked(getPublicBaseUrl).mockReturnValue("https://mymedia.aleutfederal.us");
+
+    const request = new NextRequest(
+      "http://912b3c9a2f1f:8080/api/sessions/current?tenantId=tenant-2&next=%2Fadmin%3Ftenant%3Dbravo",
+      {
+        method: "GET",
+        headers: {
+          "x-session-id": "session-1",
+          "x-session-email": "viewer@example.com",
+          "x-tenant-ids": "tenant-1,tenant-2",
+          "x-client-ip": "127.0.0.1",
+          "x-forwarded-proto": "https",
+          "x-forwarded-host": "mymedia.aleutfederal.us",
+        },
+      }
+    );
+
+    const response = await GET(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "https://mymedia.aleutfederal.us/admin?tenant=bravo"
     );
   });
 });
