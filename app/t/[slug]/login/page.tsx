@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import TenantLoginWorkspace from "@/components/auth/TenantLoginWorkspace";
 import { getTenantBySlug } from "@/lib/auth/tenant";
+import { sanitizeNextPath } from "@/lib/auth/redirect";
 import { TenantPublicItem } from "@/types";
 
 export default async function TenantLoginPage({
@@ -8,10 +9,10 @@ export default async function TenantLoginPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; next?: string }>;
 }) {
   const { slug } = await params;
-  const { error } = await searchParams;
+  const { error, next } = await searchParams;
   const tenant = await getTenantBySlug(slug.toLowerCase());
 
   if (!tenant) {
@@ -31,6 +32,7 @@ export default async function TenantLoginPage({
     <TenantLoginWorkspace
       tenant={tenantItem}
       hasError={error === "invalid"}
+      nextPath={sanitizeNextPath(next)}
     />
   );
 }

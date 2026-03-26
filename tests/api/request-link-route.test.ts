@@ -92,4 +92,32 @@ describe("/api/auth/request-link", () => {
     expect(canAccessAdmin).toHaveBeenCalledWith("admin@example.com");
     expect(sendMagicLinkEmail).toHaveBeenCalledOnce();
   });
+
+  it("includes the original destination in the magic link when provided", async () => {
+    vi.mocked(checkRateLimit).mockResolvedValue(true);
+    vi.mocked(generateMagicLinkToken).mockResolvedValue("token-789");
+    vi.mocked(sendMagicLinkEmail).mockResolvedValue(undefined);
+    vi.mocked(canAccessAdmin).mockResolvedValue(false);
+    vi.mocked(getPublicBaseUrl).mockReturnValue("http://localhost:3000");
+    vi.mocked(getUserTenantIds).mockResolvedValue(["tenant-1"]);
+
+    const request = new NextRequest("http://localhost:3000/api/auth/request-link", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        email: "member@example.com",
+        tenantSlug: "tenant-one",
+        nextPath: "/t/tenant-one/media/media-123",
+      }),
+    });
+
+    await POST(request);
+
+    expect(sendMagicLinkEmail).toHaveBeenCalledWith(
+      "member@example.com",
+      "http://localhost:3000/api/auth/verify?token=token-789&tenant=tenant-one&next=%2Ft%2Ftenant-one%2Fmedia%2Fmedia-123"
+    );
+  });
 });

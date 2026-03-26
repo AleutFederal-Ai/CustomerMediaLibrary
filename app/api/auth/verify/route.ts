@@ -5,6 +5,7 @@ import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { getTenantById, getTenantBySlug } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { getPublicBaseUrl } from "@/lib/auth/base-url";
+import { sanitizeNextPath } from "@/lib/auth/redirect";
 import { buildTenantLoginPath } from "@/lib/admin-scope";
 import { AuditAction } from "@/types";
 
@@ -20,12 +21,27 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const ip = getIp(request);
   const token = request.nextUrl.searchParams.get("token") ?? "";
   const tenantSlug = request.nextUrl.searchParams.get("tenant") ?? "";
+  const nextPath = sanitizeNextPath(request.nextUrl.searchParams.get("next"));
   const isPlatformAdminMode = request.nextUrl.searchParams.get("mode") === "platform-admin";
 
   const publicBase = getPublicBaseUrl(request);
   const invalidLoginPath = tenantSlug
-    ? `${buildTenantLoginPath(tenantSlug)}?error=invalid`
-    : "/login?error=invalid";
+    ? (() => {
+        const url = new URL(buildTenantLoginPath(tenantSlug), "http://localhost");
+        url.searchParams.set("error", "invalid");
+        if (nextPath) {
+          url.searchParams.set("next", nextPath);
+        }
+        return `${url.pathname}${url.search}`;
+      })()
+    : (() => {
+        const url = new URL("/login", "http://localhost");
+        url.searchParams.set("error", "invalid");
+        if (nextPath) {
+          url.searchParams.set("next", nextPath);
+        }
+        return `${url.pathname}${url.search}`;
+      })();
 
   if (!token) {
     return NextResponse.redirect(new URL(invalidLoginPath, publicBase));
@@ -75,12 +91,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const isPlatformAdmin = await canAccessAdmin(email);
 
   // Redirect priority:
+  // 0. Safe return path from the original shared link
   // 1. Explicitly selected tenant from login
   // 2. Active tenant resolved on the session
   // 3. Multi-tenant selection step
   // 4. Platform admin console
   let redirectPath: string;
-  if (preferredTenantSlug) {
+  if (nextPath) {
+    redirectPath = nextPath;
+  } else if (preferredTenantSlug) {
     redirectPath = `/t/${preferredTenantSlug}`;
   } else if (activeTenantId) {
     const activeTenant = await getTenantById(activeTenantId);

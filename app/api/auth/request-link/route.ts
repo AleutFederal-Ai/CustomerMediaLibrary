@@ -4,6 +4,7 @@ import { sendMagicLinkEmail } from "@/lib/azure/graph";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { canAccessAdmin } from "@/lib/auth/admin";
 import { getPublicBaseUrl } from "@/lib/auth/base-url";
+import { sanitizeNextPath } from "@/lib/auth/redirect";
 import { getUserTenantIds } from "@/lib/auth/tenant";
 import { AuditAction } from "@/types";
 
@@ -30,12 +31,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   let email = "";
   let tenantSlug = "";
   let mode = "";
+  let nextPath = "";
 
   try {
     const body = await request.json();
     email = (body?.email ?? "").toString().trim().toLowerCase();
     tenantSlug = (body?.tenantSlug ?? "").toString().trim().toLowerCase();
     mode = (body?.mode ?? "").toString().trim();
+    nextPath = sanitizeNextPath((body?.nextPath ?? "").toString()) ?? "";
   } catch {
     return NextResponse.json(GENERIC_RESPONSE, { status: 200 });
   }
@@ -85,7 +88,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const baseUrl = getPublicBaseUrl(request);
     const tenantParam = tenantSlug ? `&tenant=${encodeURIComponent(tenantSlug)}` : "";
     const modeParam = mode === "platform-admin" ? "&mode=platform-admin" : "";
-    const magicLinkUrl = `${baseUrl}/api/auth/verify?token=${rawToken}${tenantParam}${modeParam}`;
+    const nextParam = nextPath ? `&next=${encodeURIComponent(nextPath)}` : "";
+    const magicLinkUrl = `${baseUrl}/api/auth/verify?token=${rawToken}${tenantParam}${modeParam}${nextParam}`;
 
     await sendMagicLinkEmail(email, magicLinkUrl);
   } catch (err) {

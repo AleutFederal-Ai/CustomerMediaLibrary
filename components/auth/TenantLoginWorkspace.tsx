@@ -21,9 +21,11 @@ type Tab = "magic" | "password";
 function MagicLinkForm({
   tenant,
   hasError,
+  nextPath,
 }: {
   tenant: TenantPublicItem;
   hasError: boolean;
+  nextPath?: string;
 }) {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<MagicState>("idle");
@@ -39,6 +41,7 @@ function MagicLinkForm({
         body: JSON.stringify({
           email,
           tenantSlug: tenant.slug,
+          nextPath,
           ...(tenant.id === PLATFORM_ADMIN_TENANT.id && {
             mode: "platform-admin",
           }),
@@ -143,7 +146,13 @@ function MagicLinkForm({
   );
 }
 
-function PasswordForm({ tenant }: { tenant: TenantPublicItem }) {
+function PasswordForm({
+  tenant,
+  nextPath,
+}: {
+  tenant: TenantPublicItem;
+  nextPath?: string;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -163,6 +172,7 @@ function PasswordForm({ tenant }: { tenant: TenantPublicItem }) {
           email,
           password,
           tenantSlug: tenant.slug,
+          nextPath,
           ...(tenant.id === PLATFORM_ADMIN_TENANT.id && {
             mode: "platform-admin",
           }),
@@ -259,6 +269,7 @@ export default function TenantLoginWorkspace({
   heading,
   description,
   helpLabel,
+  nextPath,
 }: {
   tenant: TenantPublicItem;
   hasError?: boolean;
@@ -266,6 +277,7 @@ export default function TenantLoginWorkspace({
   heading?: string;
   description?: string;
   helpLabel?: string;
+  nextPath?: string | null;
 }) {
   const isPlatformAdmin = tenant.id === PLATFORM_ADMIN_TENANT.id;
   const [tab, setTab] = useState<Tab>(isPlatformAdmin ? "password" : "magic");
@@ -392,9 +404,16 @@ export default function TenantLoginWorkspace({
 
             <div className="px-6 py-6 sm:px-7 sm:py-7">
               {tab === "magic" ? (
-                <MagicLinkForm tenant={tenant} hasError={hasError} />
+                <MagicLinkForm
+                  tenant={tenant}
+                  hasError={hasError}
+                  nextPath={nextPath ?? undefined}
+                />
               ) : (
-                <PasswordForm tenant={tenant} />
+                <PasswordForm
+                  tenant={tenant}
+                  nextPath={nextPath ?? undefined}
+                />
               )}
             </div>
           </section>

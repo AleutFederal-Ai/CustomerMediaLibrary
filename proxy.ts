@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateSession, SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import { getPublicBaseUrl } from "@/lib/auth/base-url";
+import { sanitizeNextPath } from "@/lib/auth/redirect";
 import crypto from "crypto";
 import {
   logError,
@@ -216,10 +217,16 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
       pathname === "/" ? "/select-tenant" : "/login",
       getPublicBaseUrl(request)
     );
+    const requestedPath = sanitizeNextPath(
+      `${pathname}${request.nextUrl.search}${request.nextUrl.hash}`
+    );
     const tenantMatch = pathname.match(/^\/t\/([^/]+)(?:\/.*)?$/);
     if (tenantMatch?.[1]) {
       loginUrl.pathname = `/t/${tenantMatch[1]}/login`;
-      loginUrl.search = "";
+    }
+    loginUrl.search = "";
+    if (requestedPath && requestedPath !== loginUrl.pathname) {
+      loginUrl.searchParams.set("next", requestedPath);
     }
     const response = NextResponse.redirect(loginUrl);
     response.cookies.set(SESSION_COOKIE_NAME, "", { maxAge: 0, path: "/" });

@@ -109,4 +109,34 @@ describe("/api/auth/verify", () => {
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe("http://localhost:3000/admin");
   });
+
+  it("redirects back to the originally requested shared link after verification", async () => {
+    vi.mocked(getTenantBySlug).mockResolvedValue({
+      id: "tenant-bravo",
+      name: "Bravo",
+      slug: "bravo",
+      isActive: true,
+      isPublic: false,
+      createdAt: "2026-03-24T00:00:00.000Z",
+      updatedAt: "2026-03-24T00:00:00.000Z",
+      createdBy: "system",
+    });
+    vi.mocked(createSession).mockResolvedValue({
+      sessionId: "session-1",
+      tenantIds: ["tenant-alpha", "tenant-bravo"],
+      activeTenantId: "tenant-bravo",
+      signedCookieValue: "signed-cookie",
+    });
+
+    const request = new NextRequest(
+      "http://localhost:3000/api/auth/verify?token=token-123&tenant=bravo&next=%2Ft%2Fbravo%2Falbum%2Falbum-123"
+    );
+
+    const response = await GET(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/t/bravo/album/album-123"
+    );
+  });
 });

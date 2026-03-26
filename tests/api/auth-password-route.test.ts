@@ -142,4 +142,25 @@ describe("/api/auth/password", () => {
     expect(response.status).toBe(200);
     expect(body.redirectTo).toBe("/admin");
   });
+
+  it("returns the original safe destination after password login", async () => {
+    const request = new NextRequest("http://localhost:3000/api/auth/password", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        email: "admin@example.com",
+        password: "Password123!",
+        tenantSlug: "bravo",
+        nextPath: "/t/bravo/media/media-123?view=detail",
+      }),
+    });
+
+    const response = await POST(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.redirectTo).toBe("/t/bravo/media/media-123?view=detail");
+  });
 });

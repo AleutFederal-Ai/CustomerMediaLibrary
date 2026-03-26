@@ -3,6 +3,7 @@ import { users } from "@/lib/azure/cosmos";
 import { canAccessAdmin } from "@/lib/auth/admin";
 import { verifyPassword } from "@/lib/auth/password";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
+import { sanitizeNextPath } from "@/lib/auth/redirect";
 import { getTenantById, getTenantBySlug } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { buildTenantLoginPath } from "@/lib/admin-scope";
@@ -35,6 +36,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const password = typeof b.password === "string" ? b.password : "";
   const tenantSlug =
     typeof b.tenantSlug === "string" ? b.tenantSlug.toLowerCase().trim() : "";
+  const nextPath =
+    typeof b.nextPath === "string" ? sanitizeNextPath(b.nextPath) : null;
   const isPlatformAdminMode = b.mode === "platform-admin";
 
   if (!email || !password) {
@@ -119,12 +122,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const isPlatformAdmin = await canAccessAdmin(email);
 
     // Redirect priority:
+    // 0. Safe return path from the original shared link
     // 1. Explicitly selected tenant from login
     // 2. Active tenant resolved on the session
     // 3. Multi-tenant selection step
     // 4. Platform admin console
     let redirectTo: string;
-    if (preferredTenantSlug) {
+    if (nextPath) {
+      redirectTo = nextPath;
+    } else if (preferredTenantSlug) {
       redirectTo = `/t/${preferredTenantSlug}`;
     } else if (activeTenantId) {
       const activeTenant = await getTenantById(activeTenantId);
