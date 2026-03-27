@@ -1,15 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { UserAdminListItem } from "@/types";
+import { TenantAdminListItem, UserAdminListItem, MemberRole } from "@/types";
 import { apiFetch } from "@/lib/api-fetch";
 
 interface Props {
   initialUsers: UserAdminListItem[];
   initialCursor?: string | null;
+  availableTenants: TenantAdminListItem[];
 }
 
-export default function UserManager({ initialUsers, initialCursor }: Props) {
+export default function UserManager({
+  initialUsers,
+  initialCursor,
+  availableTenants,
+}: Props) {
   const [users, setUsers] = useState(initialUsers);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,6 +23,11 @@ export default function UserManager({ initialUsers, initialCursor }: Props) {
   const [password, setPassword] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState("");
+  const [createEmail, setCreateEmail] = useState("");
+  const [createTenantId, setCreateTenantId] = useState("");
+  const [createRole, setCreateRole] = useState<MemberRole>("viewer");
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createError, setCreateError] = useState("");
 
   async function fetchUsers(searchTerm: string, appendCursor?: string) {
     setLoading(true);
@@ -137,6 +147,40 @@ export default function UserManager({ initialUsers, initialCursor }: Props) {
     }
   }
 
+  async function handleCreateUser(e: React.FormEvent) {
+    e.preventDefault();
+    setCreateSaving(true);
+    setCreateError("");
+
+    try {
+      const res = await apiFetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: createEmail,
+          action: "create",
+          tenantId: createTenantId || undefined,
+          tenantRole: createRole,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setCreateError(data.error ?? "Failed to add user.");
+        return;
+      }
+
+      setCreateEmail("");
+      setCreateTenantId("");
+      setCreateRole("viewer");
+      await fetchUsers(search);
+    } catch {
+      setCreateError("Network error.");
+    } finally {
+      setCreateSaving(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <form onSubmit={handleSearch} className="surface-card-soft rounded-[1.25rem] p-5">
@@ -159,6 +203,64 @@ export default function UserManager({ initialUsers, initialCursor }: Props) {
             </button>
           </div>
         </div>
+      </form>
+
+      <form onSubmit={handleCreateUser} className="surface-card-soft rounded-[1.25rem] p-5">
+        <p className="hero-kicker">Direct User Provisioning</p>
+        <h3 className="mt-3 text-lg font-semibold tracking-[-0.03em] text-white">
+          Create or assign a user without requiring first login
+        </h3>
+        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_220px_auto]">
+          <div>
+            <label className="mb-2 block text-sm font-medium text-white/86">
+              Email address
+            </label>
+            <input
+              type="email"
+              value={createEmail}
+              onChange={(e) => setCreateEmail(e.target.value)}
+              placeholder="user@example.com"
+              required
+              className="ops-input"
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-white/86">
+              Tenant (optional)
+            </label>
+            <select
+              value={createTenantId}
+              onChange={(e) => setCreateTenantId(e.target.value)}
+              className="ops-select"
+            >
+              <option value="">No tenant assignment</option>
+              {availableTenants.map((tenant) => (
+                <option key={tenant.id} value={tenant.id}>
+                  {tenant.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-white/86">Tenant role</label>
+            <select
+              value={createRole}
+              onChange={(e) => setCreateRole(e.target.value as MemberRole)}
+              disabled={!createTenantId}
+              className="ops-select"
+            >
+              <option value="viewer">Viewer</option>
+              <option value="contributor">Media Contributor</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button type="submit" disabled={createSaving} className="ops-button">
+              {createSaving ? "Saving..." : "Add User"}
+            </button>
+          </div>
+        </div>
+        {createError ? <p className="mt-3 text-sm text-[#ffb7b7]">{createError}</p> : null}
       </form>
 
       {passwordTarget ? (
@@ -230,7 +332,9 @@ export default function UserManager({ initialUsers, initialCursor }: Props) {
                   </div>
                 </td>
                 <td className="ops-muted">
-                  {new Date(user.lastLoginAt).toLocaleDateString()}
+                  {user.loginCount === 0
+                    ? "Never"
+                    : new Date(user.lastLoginAt).toLocaleDateString()}
                 </td>
                 <td className="ops-muted">{user.loginCount}</td>
                 <td>

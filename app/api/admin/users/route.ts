@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { users, sessions } from "@/lib/azure/cosmos";
+import { v4 as uuidv4 } from "uuid";
+import { users, sessions, memberships, tenants } from "@/lib/azure/cosmos";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { isSuperAdmin } from "@/lib/auth/permissions";
-import { UserRecord, UserAdminListItem, AuditAction } from "@/types";
+import { UserRecord, UserAdminListItem, AuditAction, MemberRole, MembershipRecord } from "@/types";
+
+const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
 
 async function requireAdmin(request: NextRequest): Promise<string | null> {
   const email = request.headers.get("x-session-email");
@@ -67,14 +70,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
 // POST /api/admin/users/block — block a user
 // POST /api/admin/users/unblock — unblock a user
-// Body: { email: string, action: "block" | "unblock" }
+// Body: { email: string, action: "block" | "unblock" | "create", tenantId?: string, tenantRole?: MemberRole }
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const adminEmail = await requireAdmin(request);
   if (!adminEmail) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
-  let body: { email?: string; action?: "block" | "unblock" };
+  let body: {
+    email?: string;
+    action?: "block" | "unblock" | "create";
+    tenantId?: string;
+    tenantRole?: MemberRole;
+  };
   try {
     body = await request.json();
   } catch {
@@ -84,18 +92,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const targetEmail = (body.email ?? "").toLowerCase().trim();
   const action = body.action;
 
-  if (!targetEmail) {
-    return NextResponse.json({ error: "email is required" }, { status: 400 });
+  if (!targetEmail || !EMAIL_RE.test(targetEmail)) {
+    return NextResponse.json({ error: "valid email is required" }, { status: 400 });
   }
 
-  if (action !== "block" && action !== "unblock") {
+  if (action !== "block" && action !== "unblock" && action !== "create") {
     return NextResponse.json(
-      { error: "action must be 'block' or 'unblock'" },
+      { error: "action must be 'block', 'unblock', or 'create'" },
       { status: 400 }
     );
   }
 
-  if (targetEmail === adminEmail.toLowerCase()) {
+  if (targetEmail === adminEmail.toLowerCase() && action !== "create") {
     return NextResponse.json(
       { error: "Cannot block your own account" },
       { status: 400 }
@@ -111,11 +119,98 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       })
       .fetchAll();
 
+    const existingUser = resources[0];
+    if (action === "create") {
+      const now = new Date().toISOString();
+      const userRecord: UserRecord = existingUser ?? {
+        id: uuidv4(),
+        email: targetEmail,
+        firstLoginAt: now,
+        lastLoginAt: now,
+        loginCount: 0,
+        isBlocked: false,
+        isPlatformAdmin: false,
+      };
+
+      if (!existingUser) {
+        await container.items.create(userRecord);
+      }
+
+      const tenantId = (body.tenantId ?? "").trim();
+      if (tenantId) {
+        const tenantContainer = await tenants();
+        const { resources: tenantMatches } = await tenantContainer.items
+          .query<{ id: string }>({
+            query: "SELECT c.id FROM c WHERE c.id = @id AND c.isActive = true",
+            parameters: [{ name: "@id", value: tenantId }],
+          })
+          .fetchAll();
+
+        if (tenantMatches.length === 0) {
+          return NextResponse.json({ error: "Selected tenant was not found or is inactive" }, { status: 400 });
+        }
+
+        const tenantRole: MemberRole =
+          body.tenantRole === "admin"
+            ? "admin"
+            : body.tenantRole === "contributor"
+              ? "contributor"
+              : "viewer";
+
+        const membershipContainer = await memberships();
+        const { resources: existingMemberships } = await membershipContainer.items
+          .query<MembershipRecord>({
+            query:
+              "SELECT * FROM c WHERE c.tenantId = @tenantId AND c.userEmail = @email",
+            parameters: [
+              { name: "@tenantId", value: tenantId },
+              { name: "@email", value: targetEmail },
+            ],
+          })
+          .fetchAll();
+
+        if (existingMemberships.length > 0) {
+          await membershipContainer.item(existingMemberships[0].id, existingMemberships[0].id).patch([
+            { op: "replace", path: "/isActive", value: true },
+            { op: "replace", path: "/role", value: tenantRole },
+            { op: "replace", path: "/addedBy", value: adminEmail },
+            { op: "replace", path: "/addedAt", value: now },
+          ]);
+        } else {
+          const membership: MembershipRecord = {
+            id: uuidv4(),
+            tenantId,
+            userEmail: targetEmail,
+            role: tenantRole,
+            source: "explicit",
+            addedAt: now,
+            addedBy: adminEmail,
+            isActive: true,
+          };
+          await membershipContainer.items.create(membership);
+        }
+      }
+
+      await writeAuditLog({
+        userEmail: adminEmail,
+        ipAddress: ip,
+        action: AuditAction.USER_CREATED,
+        detail: {
+          targetEmail,
+          created: !existingUser,
+          tenantId: body.tenantId ?? null,
+          tenantRole: body.tenantRole ?? null,
+        },
+      });
+
+      return NextResponse.json({ success: true, created: !existingUser });
+    }
+
     if (resources.length === 0) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const user = resources[0];
+    const user = existingUser;
     const now = new Date().toISOString();
 
     const updated: UserRecord = {
