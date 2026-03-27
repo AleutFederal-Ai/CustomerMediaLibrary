@@ -60,7 +60,7 @@ test("base URL starts with tenant selection and keeps the auth entry points visi
 
   await expect(
     page.getByRole("heading", {
-      name: /Platform administration sign-in/i,
+      name: /Platform administrator sign-in/i,
     })
   ).toBeVisible();
   await expect(page.getByText(/Platform Health/i)).toBeVisible();
