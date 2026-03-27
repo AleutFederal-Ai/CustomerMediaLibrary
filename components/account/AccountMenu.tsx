@@ -162,7 +162,6 @@ export default function AccountMenu({
   }
 
   const showTenantSwitcher = canSwitchTenant && tenantOptions.length > 1;
-  const adminLinkIsApiRoute = adminHref?.startsWith("/api/") ?? false;
 
   return (
     <div ref={containerRef} className="relative">
@@ -226,24 +225,14 @@ export default function AccountMenu({
                   My Media
                 </Link>
                 {adminHref ? (
-                  adminLinkIsApiRoute ? (
-                    <a
-                      href={adminHref}
-                      className="block rounded-[0.9rem] px-3 py-2 text-sm text-slate-900 hover:bg-slate-100"
-                      onClick={() => setOpen(false)}
-                    >
-                      Admin Console
-                    </a>
-                  ) : (
-                    <Link
-                      href={adminHref}
-                      prefetch={false}
-                      className="block rounded-[0.9rem] px-3 py-2 text-sm text-slate-900 hover:bg-slate-100"
-                      onClick={() => setOpen(false)}
-                    >
-                      Admin Console
-                    </Link>
-                  )
+                  <Link
+                    href={adminHref}
+                    prefetch={false}
+                    className="block rounded-[0.9rem] px-3 py-2 text-sm text-slate-900 hover:bg-slate-100"
+                    onClick={() => setOpen(false)}
+                  >
+                    Admin Console
+                  </Link>
                 ) : null}
               </div>
 

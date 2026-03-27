@@ -16,9 +16,9 @@ describe("admin scope helpers", () => {
     );
   });
 
-  it("builds an admin console entry path that switches tenant context first", () => {
+  it("builds an admin console entry path for direct admin navigation", () => {
     expect(buildAdminConsoleEntryPath("tenant-1", "alpha")).toBe(
-      "/api/sessions/current?tenantId=tenant-1&next=%2Fadmin%3Ftenant%3Dalpha"
+      "/admin?tenant=alpha"
     );
   });
 });
