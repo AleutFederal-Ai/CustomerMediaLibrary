@@ -4,7 +4,8 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import TenantBadge from "@/components/auth/TenantBadge";
-import { AppShell, Metric, PageWidth } from "@/components/ui/AppFrame";
+import HealthStatus from "@/components/ui/HealthStatus";
+import { AppShell, PageWidth } from "@/components/ui/AppFrame";
 import { buildTenantLoginPath } from "@/lib/admin-scope";
 import { TenantPublicItem } from "@/types";
 
@@ -12,6 +13,7 @@ export default function SelectTenantPage() {
   const router = useRouter();
   const [publicTenants, setPublicTenants] = useState<TenantPublicItem[]>([]);
   const [selectedSlug, setSelectedSlug] = useState("");
+  const [publicSearch, setPublicSearch] = useState("");
   const [privateSlug, setPrivateSlug] = useState("");
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
@@ -24,6 +26,7 @@ export default function SelectTenantPage() {
         const tenants = Array.isArray(data) ? (data as TenantPublicItem[]) : [];
         setPublicTenants(tenants);
         setSelectedSlug(tenants[0]?.slug ?? "");
+        setPublicSearch("");
         setLoading(false);
       })
       .catch(() => {
@@ -71,41 +74,48 @@ export default function SelectTenantPage() {
 
   const selectedTenant =
     publicTenants.find((tenant) => tenant.slug === selectedSlug) ?? null;
+  const normalizedSearch = publicSearch.trim().toLowerCase();
+  const filteredPublicTenants =
+    normalizedSearch.length === 0
+      ? publicTenants
+      : publicTenants.filter((tenant) =>
+          [tenant.name, tenant.slug, tenant.description]
+            .filter(Boolean)
+            .some((value) => value?.toLowerCase().includes(normalizedSearch))
+        );
 
   return (
     <AppShell variant="gallery">
       <PageWidth className="py-6 sm:py-8">
+        <section className="surface-card-quiet mb-6 rounded-[1.2rem] border border-[color:var(--border)] px-5 py-4 sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--text-subtle)]">
+                Aleut Federal
+              </p>
+              <p className="text-lg font-semibold tracking-[-0.03em] text-[color:var(--foreground)]">
+                myMedia
+              </p>
+            </div>
+            <span className="chip chip-accent">
+              Platform
+              <strong>Tenant Access</strong>
+            </span>
+          </div>
+        </section>
+
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,430px)] xl:gap-8">
           <section className="space-y-6">
             <div className="surface-card rounded-[2rem] px-6 py-6 sm:px-8 sm:py-8">
               <p className="hero-kicker">Tenant Selection</p>
               <div className="mt-4 space-y-4">
                 <h1 className="hero-title max-w-4xl text-[clamp(2rem,5vw,3.8rem)]">
-                  Choose the workspace before you sign in.
+                  Select tenant, then sign in.
                 </h1>
                 <p className="hero-subtitle">
-                  Start with the tenant boundary. Once you choose a workspace,
-                  the URL switches to the tenant slug and the login screen stays
-                  scoped to that organization.
+                  Start with your organization and continue directly to login.
+                  This page stays focused on tenant selection only.
                 </p>
-              </div>
-
-              <div className="mt-8 grid gap-3 sm:grid-cols-3">
-                <Metric
-                  label="Flow"
-                  value="Tenant First"
-                  subtext="Select the workspace before authentication."
-                />
-                <Metric
-                  label="Routing"
-                  value="/t/{slug}"
-                  subtext="The slug becomes part of the URL before sign-in."
-                />
-                <Metric
-                  label="Access"
-                  value="Magic or Password"
-                  subtext="Both sign-in methods stay available after selection."
-                />
               </div>
             </div>
 
@@ -152,24 +162,63 @@ export default function SelectTenantPage() {
                   {publicTenants.length > 0 ? (
                     <form onSubmit={handlePublicSubmit} className="space-y-4">
                       <div>
-                        <label
-                          htmlFor="public-tenant"
-                          className="mb-2 block text-sm font-medium text-[color:var(--foreground)]"
-                        >
+                        <p className="mb-2 text-sm font-medium text-[color:var(--foreground)]">
                           Public workspace
-                        </label>
-                        <select
-                          id="public-tenant"
-                          value={selectedSlug}
-                          onChange={(event) => setSelectedSlug(event.target.value)}
-                          className="ops-select"
-                        >
-                          {publicTenants.map((tenant) => (
-                            <option key={tenant.id} value={tenant.slug}>
-                              {tenant.name}
-                            </option>
-                          ))}
-                        </select>
+                        </p>
+                        <input
+                          id="public-tenant-search"
+                          type="text"
+                          value={publicSearch}
+                          onChange={(event) => {
+                            setPublicSearch(event.target.value);
+                            setSelectedSlug("");
+                          }}
+                          placeholder="Search by tenant name or slug"
+                          className="ops-input"
+                        />
+                        <p className="mt-2 text-xs text-[color:var(--text-muted)]">
+                          Search and select a public tenant below.
+                        </p>
+
+                        <div className="space-y-2">
+                          {filteredPublicTenants.map((tenant) => {
+                            const isSelected = selectedSlug === tenant.slug;
+                            return (
+                              <button
+                                key={tenant.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedSlug(tenant.slug);
+                                  setPublicSearch(tenant.name);
+                                }}
+                                className={`w-full rounded-[1rem] border px-4 py-3 text-left transition ${
+                                  isSelected
+                                    ? "border-slate-900 bg-slate-900 text-white shadow-[0_8px_20px_rgba(15,23,42,0.15)]"
+                                    : "border-[color:var(--border)] bg-white/80 text-[color:var(--foreground)] hover:border-slate-400"
+                                }`}
+                              >
+                                <p className="text-sm font-semibold">{tenant.name}</p>
+                                {tenant.description ? (
+                                  <p
+                                    className={`mt-1 text-xs ${
+                                      isSelected
+                                        ? "text-slate-100"
+                                        : "text-[color:var(--text-muted)]"
+                                    }`}
+                                  >
+                                    {tenant.description}
+                                  </p>
+                                ) : null}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {filteredPublicTenants.length === 0 ? (
+                          <div className="mt-2 rounded-[1rem] border border-dashed border-[color:var(--border)] bg-slate-50/70 px-3 py-3 text-xs text-[color:var(--text-muted)]">
+                            No matching public tenant. Use the private tenant code
+                            field below if your workspace is not listed.
+                          </div>
+                        ) : null}
                       </div>
 
                       <button
@@ -232,6 +281,10 @@ export default function SelectTenantPage() {
               </div>
             </div>
           </section>
+        </div>
+
+        <div className="mt-6">
+          <HealthStatus />
         </div>
       </PageWidth>
     </AppShell>
