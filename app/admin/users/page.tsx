@@ -4,8 +4,8 @@ import { canAccessAdmin } from "@/lib/auth/admin";
 import AccountMenu from "@/components/account/AccountMenu";
 import { buildAdminTenantPath } from "@/lib/admin-scope";
 import { getActiveTenantPublicItem } from "@/lib/tenant-data";
-import { users } from "@/lib/azure/cosmos";
-import { UserAdminListItem } from "@/types";
+import { users, tenants } from "@/lib/azure/cosmos";
+import { UserAdminListItem, TenantAdminListItem } from "@/types";
 import UserManager from "@/components/admin/UserManager";
 import {
   AppShell,
@@ -34,6 +34,16 @@ async function getRecentUsers(): Promise<{
   };
 }
 
+async function getActiveTenants(): Promise<TenantAdminListItem[]> {
+  const container = await tenants();
+  const { resources } = await container.items
+    .query<TenantAdminListItem>({
+      query: "SELECT c.id, c.name, c.slug, c.isActive FROM c WHERE c.isActive = true ORDER BY c.name ASC",
+    })
+    .fetchAll();
+  return resources;
+}
+
 export default async function AdminUsersPage() {
   const headerStore = await headers();
   const email = headerStore.get("x-session-email");
@@ -43,9 +53,10 @@ export default async function AdminUsersPage() {
   const isAdmin = await canAccessAdmin(email);
   if (!isAdmin) redirect("/");
 
-  const [{ items: userList, cursor }, activeTenant] = await Promise.all([
+  const [{ items: userList, cursor }, activeTenant, tenantList] = await Promise.all([
     getRecentUsers(),
     getActiveTenantPublicItem(activeTenantId),
+    getActiveTenants(),
   ]);
 
   return (
@@ -84,7 +95,11 @@ export default async function AdminUsersPage() {
         />
 
         <div className="surface-card rounded-[1.5rem] p-5 sm:p-6">
-          <UserManager initialUsers={userList} initialCursor={cursor} />
+          <UserManager
+            initialUsers={userList}
+            initialCursor={cursor}
+            availableTenants={tenantList}
+          />
         </div>
       </PageWidth>
     </AppShell>

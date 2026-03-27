@@ -352,6 +352,20 @@ Via Admin Panel:
 1. Admin → Users → Find user by email → Revoke Access
 2. This immediately invalidates all active sessions and blocklists the email
 
+### Provisioning a Direct User and Assigning Tenant Access
+
+Via Admin Panel:
+1. Navigate to **Admin → Users**.
+2. In **Direct User Provisioning**, enter the user's email address.
+3. (Optional) Select a tenant and tenant role to grant immediate access.
+4. Click **Add User**.
+
+Behavior:
+- If the user does not exist, a user record is created immediately.
+- If the user already exists, the existing user record is reused.
+- If a tenant is selected, the tenant membership is created (or reactivated and role-updated if it already exists).
+- All provisioning actions are written to the audit log.
+
 ### Rotating Key Vault Secrets
 
 ```bash

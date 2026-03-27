@@ -86,6 +86,13 @@ export interface UserAdminListItem {
   isPlatformAdmin?: boolean;
 }
 
+export interface TenantAdminListItem {
+  id: string;
+  name: string;
+  slug: string;
+  isActive: boolean;
+}
+
 export interface AlbumRecord {
   id: string;
   tenantId: string;       // which tenant owns this album
@@ -192,6 +199,7 @@ export enum AuditAction {
   MEMBER_ROLE_CHANGED = "member_role_changed",
 
   // Admin — user management
+  USER_CREATED = "user_created",
   USER_PROMOTED = "user_promoted",
 }
 
