@@ -199,10 +199,10 @@ export default async function AdminDashboard({
                     "Create, activate, and configure tenant identity and branding.",
                 },
                 {
-                  href: "/admin/users",
+                  href: buildAdminTenantPath("/admin/members", activeTenant?.slug),
                   label: "User Control",
                   description:
-                    "Review access posture, set passwords, block accounts, and promote platform admins.",
+                    "Single-pane membership and platform user governance, including compliant impersonation.",
                 },
               {
                 href: "/admin/audit-logs",

@@ -55,6 +55,10 @@ export interface SessionRecord {
   // Multi-tenant: resolved at session creation, updated on tenant switch
   activeTenantId?: string;
   tenantIds?: string[];
+  impersonatedBy?: string;
+  impersonatorActiveTenantId?: string;
+  impersonatorTenantIds?: string[];
+  impersonatedAt?: string;
 }
 
 export interface UserRecord {
@@ -201,6 +205,8 @@ export enum AuditAction {
   // Admin — user management
   USER_CREATED = "user_created",
   USER_PROMOTED = "user_promoted",
+  USER_IMPERSONATION_STARTED = "user_impersonation_started",
+  USER_IMPERSONATION_ENDED = "user_impersonation_ended",
 }
 
 // ============================================================
@@ -213,6 +219,12 @@ export interface SessionContext {
   isAdmin: boolean;
   activeTenantId: string | null;
   tenantIds: string[];
+  impersonatedBy?: string;
+}
+
+export interface UserImpersonationStatus {
+  isImpersonating: boolean;
+  impersonatedBy?: string;
 }
 
 // ============================================================
