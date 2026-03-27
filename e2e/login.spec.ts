@@ -46,10 +46,12 @@ test("base URL starts with tenant selection and keeps the auth entry points visi
   await expect(page.getByText(/Controlled Unclassified Information/i)).toBeVisible();
   await expect(
     page.getByRole("heading", {
-      name: /Choose the workspace before you sign in/i,
+      name: /Select tenant, then sign in/i,
     })
   ).toBeVisible();
-  await expect(page.getByLabel(/Public workspace/i)).toBeVisible();
+  await expect(
+    page.getByPlaceholder(/Search by tenant name or slug/i)
+  ).toBeVisible();
   await expect(page.getByRole("button", {
     name: /Continue with Selected Workspace/i,
   })).toBeVisible();
@@ -75,10 +77,10 @@ test("tenant selection page stays mobile-friendly without horizontal overflow", 
 
   await expect(
     page.getByRole("heading", {
-      name: /Choose the workspace before you sign in/i,
+      name: /Select tenant, then sign in/i,
     })
   ).toBeVisible();
-  await expect(page.getByText(/Tenant First/i)).toBeVisible();
+  await expect(page.getByText(/Aleut Federal/i)).toBeVisible();
   await expect(page.getByRole("link", { name: /Platform Administrator Sign-In/i })).toBeVisible();
 
   const hasHorizontalOverflow = await page.evaluate(() => {
