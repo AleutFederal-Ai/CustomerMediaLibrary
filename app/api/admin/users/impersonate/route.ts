@@ -137,10 +137,6 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
   const impersonatorEmail = request.headers.get("x-impersonator-email")?.toLowerCase() ?? "";
   const ip = request.headers.get("x-client-ip") ?? "unknown";
   const actorActiveTenantId = request.headers.get("x-active-tenant-id") ?? undefined;
-  const actorTenantIds = (request.headers.get("x-tenant-ids") ?? "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
 
   if (!sessionId || !impersonatorEmail) {
     logWarn("admin.users.impersonation.end_forbidden", {
@@ -150,12 +146,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "No active impersonation session" }, { status: 400 });
   }
 
-  const ended = await endUserImpersonation(
-    sessionId,
-    impersonatorEmail,
-    actorActiveTenantId,
-    actorTenantIds
-  );
+  const ended = await endUserImpersonation(sessionId);
 
   if (!ended) {
     return NextResponse.json({ error: "Failed to stop impersonation" }, { status: 500 });

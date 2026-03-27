@@ -127,12 +127,7 @@ describe("/api/admin/users/impersonate", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(endUserImpersonation).toHaveBeenCalledWith(
-      "session-2",
-      "admin@example.com",
-      "tenant-4",
-      ["tenant-4", "tenant-5"]
-    );
+    expect(endUserImpersonation).toHaveBeenCalledWith("session-2");
     expect(body.success).toBe(true);
   });
 });

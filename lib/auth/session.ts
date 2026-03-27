@@ -319,6 +319,10 @@ export async function beginUserImpersonation(
 ): Promise<boolean> {
   try {
     const container = await sessions();
+    const current = await container.item(sessionId, sessionId).read<SessionRecord>();
+    if (!current.resource || current.resource.impersonatedBy) {
+      return false;
+    }
     await container.item(sessionId, sessionId).patch([
       { op: "replace", path: "/email", value: targetEmail.toLowerCase() },
       { op: "replace", path: "/activeTenantId", value: targetTenantId },
@@ -335,13 +339,21 @@ export async function beginUserImpersonation(
 }
 
 export async function endUserImpersonation(
-  sessionId: string,
-  impersonatorEmail: string,
-  impersonatorActiveTenantId?: string | null,
-  impersonatorTenantIds: string[] = []
+  sessionId: string
 ): Promise<boolean> {
   try {
     const container = await sessions();
+    const current = await container.item(sessionId, sessionId).read<SessionRecord>();
+    const existing = current.resource;
+
+    if (!existing?.impersonatedBy) {
+      return false;
+    }
+
+    const impersonatorEmail = existing.impersonatedBy;
+    const impersonatorActiveTenantId = existing.impersonatorActiveTenantId ?? null;
+    const impersonatorTenantIds = existing.impersonatorTenantIds ?? [];
+
     await container.item(sessionId, sessionId).patch([
       { op: "replace", path: "/email", value: impersonatorEmail.toLowerCase() },
       { op: "replace", path: "/activeTenantId", value: impersonatorActiveTenantId ?? null },
