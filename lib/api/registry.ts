@@ -255,6 +255,30 @@ export const API_ENDPOINTS: ApiEndpointDefinition[] = [
     sampleBody: '{\n  "email": "operator@example.com",\n  "isPlatformAdmin": true\n}',
   },
   {
+    id: "admin-users-impersonate-start",
+    category: "Admin",
+    method: "POST",
+    pathTemplate: "/api/admin/users/impersonate",
+    description:
+      "Starts tenant-scoped impersonation for a platform administrator session.",
+    authScope: "platformAdmin",
+    verificationMode: "manual",
+    destructive: true,
+    sampleBody:
+      '{\n  "email": "operator@example.com",\n  "tenantId": "{activeTenantId}"\n}',
+  },
+  {
+    id: "admin-users-impersonate-stop",
+    category: "Admin",
+    method: "DELETE",
+    pathTemplate: "/api/admin/users/impersonate",
+    description:
+      "Stops active impersonation and restores the original platform admin session.",
+    authScope: "platformAdmin",
+    verificationMode: "manual",
+    destructive: true,
+  },
+  {
     id: "admin-set-password",
     category: "Admin",
     method: "POST",
