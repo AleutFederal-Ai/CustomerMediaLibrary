@@ -67,7 +67,7 @@ az account set --subscription "<YOUR-GCCH-SUBSCRIPTION-ID>"
 │   ├── auth/                 # Magic link and session logic
 │   ├── azure/                # Azure SDK clients (Blob, Cosmos, Key Vault, Graph)
 │   └── audit/                # Audit log writer
-├── middleware.ts             # Route protection — runs on every request
+├── proxy.ts                  # Route protection + security headers — runs on every request
 ├── infrastructure/
 │   └── bicep/                # Azure Infrastructure as Code
 ├── docs/
@@ -77,6 +77,14 @@ az account set --subscription "<YOUR-GCCH-SUBSCRIPTION-ID>"
 ├── SECURITY.md               # Threat model and compliance mapping
 └── README.md                 # This file
 ```
+
+---
+
+## 2.1 Tenant/Admin Navigation
+
+- Admin entry links should route users to `/admin?tenant=<slug>` (page navigation), not directly to API handoff endpoints.
+- Tenant context switching is enforced server-side during page load; when needed, server components trigger `/api/sessions/current` to switch active tenant and continue safely.
+- This keeps navigation user-friendly (normal page transitions) and avoids exposing raw API 401 responses during menu-driven portal navigation.
 
 ---
 

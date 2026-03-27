@@ -27,10 +27,8 @@ export function buildAdminConsoleEntryPath(
   tenantId?: string | null,
   tenantSlug?: string | null
 ): string {
-  const adminPath = buildAdminTenantPath("/admin", tenantSlug);
-  return tenantId
-    ? buildTenantSessionHandoffPath(tenantId, adminPath)
-    : adminPath;
+  void tenantId;
+  return buildAdminTenantPath("/admin", tenantSlug);
 }
 
 export function buildGalleryWorkspacePath(
