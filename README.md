@@ -332,8 +332,8 @@ az network application-gateway waf-policy show \
 
 Via the Admin Panel:
 1. Log in as an admin
-2. Navigate to **Admin → Users → Domain Allowlist**
-3. Click **Add Domain** and enter the new domain (e.g., `contractor.com`)
+2. Navigate to **Admin → Members** (single user governance workspace)
+3. Open the domain management section and add the new domain (e.g., `contractor.com`)
 
 Via direct Cosmos DB (break-glass only):
 ```json
@@ -349,8 +349,16 @@ Via direct Cosmos DB (break-glass only):
 ### Revoking a User
 
 Via Admin Panel:
-1. Admin → Users → Find user by email → Revoke Access
-2. This immediately invalidates all active sessions and blocklists the email
+1. Admin → Members → Platform User Controls → Find user by email and select **Block**
+2. This immediately invalidates all active sessions and blocklists the account
+
+
+### Platform Admin Impersonation (Tenant-scoped)
+
+1. Navigate to **Admin → Members** and confirm the target tenant scope in the header.
+2. In the members table, select **Impersonate** on the target user row.
+3. Perform the validation or support workflow, then use **Stop Impersonation** to restore your original admin session.
+4. Impersonation start/end events are written to the audit log for traceability.
 
 ### Rotating Key Vault Secrets
 

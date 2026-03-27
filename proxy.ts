@@ -59,6 +59,7 @@ function applySessionHeaders(
     activeTenantId: string | null | undefined;
     tenantIds: string[];
     ipAddress: string;
+    impersonatedBy?: string;
   }
 ): void {
   headers.set("x-session-id", session.sessionId);
@@ -66,6 +67,9 @@ function applySessionHeaders(
   headers.set("x-client-ip", session.ipAddress);
   headers.set("x-active-tenant-id", session.activeTenantId ?? "");
   headers.set("x-tenant-ids", session.tenantIds.join(","));
+  if (session.impersonatedBy) {
+    headers.set("x-impersonator-email", session.impersonatedBy);
+  }
 }
 
 // Routes that do NOT require authentication
@@ -246,6 +250,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     ipAddress: ip,
     activeTenantId: session.activeTenantId,
     tenantIds: session.tenantIds,
+    impersonatedBy: session.impersonatedBy,
   });
 
   const response = nextWithNonce();

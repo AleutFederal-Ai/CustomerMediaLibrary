@@ -280,6 +280,7 @@ export async function validateSession(
     isAdmin: false, // Admin check done separately (cached per session)
     activeTenantId: record.activeTenantId ?? null,
     tenantIds: record.tenantIds ?? [],
+    ...(record.impersonatedBy ? { impersonatedBy: record.impersonatedBy } : {}),
   };
 }
 
@@ -299,6 +300,56 @@ export async function switchActiveTenant(
     await container.item(sessionId, sessionId).patch([
       { op: "replace", path: "/activeTenantId", value: tenantId },
       { op: "replace", path: "/tenantIds", value: currentTenantIds },
+    ]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+
+export async function beginUserImpersonation(
+  sessionId: string,
+  actorEmail: string,
+  targetEmail: string,
+  targetTenantId: string,
+  targetTenantIds: string[],
+  actorActiveTenantId?: string | null,
+  actorTenantIds: string[] = []
+): Promise<boolean> {
+  try {
+    const container = await sessions();
+    await container.item(sessionId, sessionId).patch([
+      { op: "replace", path: "/email", value: targetEmail.toLowerCase() },
+      { op: "replace", path: "/activeTenantId", value: targetTenantId },
+      { op: "replace", path: "/tenantIds", value: targetTenantIds },
+      { op: "add", path: "/impersonatedBy", value: actorEmail.toLowerCase() },
+      { op: "add", path: "/impersonatorActiveTenantId", value: actorActiveTenantId ?? null },
+      { op: "add", path: "/impersonatorTenantIds", value: actorTenantIds },
+      { op: "add", path: "/impersonatedAt", value: new Date().toISOString() },
+    ]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function endUserImpersonation(
+  sessionId: string,
+  impersonatorEmail: string,
+  impersonatorActiveTenantId?: string | null,
+  impersonatorTenantIds: string[] = []
+): Promise<boolean> {
+  try {
+    const container = await sessions();
+    await container.item(sessionId, sessionId).patch([
+      { op: "replace", path: "/email", value: impersonatorEmail.toLowerCase() },
+      { op: "replace", path: "/activeTenantId", value: impersonatorActiveTenantId ?? null },
+      { op: "replace", path: "/tenantIds", value: impersonatorTenantIds },
+      { op: "remove", path: "/impersonatedBy" },
+      { op: "remove", path: "/impersonatorActiveTenantId" },
+      { op: "remove", path: "/impersonatorTenantIds" },
+      { op: "remove", path: "/impersonatedAt" },
     ]);
     return true;
   } catch {
