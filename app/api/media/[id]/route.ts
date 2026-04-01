@@ -39,12 +39,6 @@ export async function GET(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    // Generate 15-minute SAS URLs for both full res and thumbnail
-    const [fullRes, thumb] = await Promise.all([
-      generateSasUrl("media", record.blobName),
-      generateSasUrl("thumbnails", record.thumbnailBlobName),
-    ]);
-
     await writeAuditLog({
       userEmail: email,
       ipAddress: ip,
@@ -52,6 +46,38 @@ export async function GET(
       action: AuditAction.MEDIA_VIEWED,
       detail: { mediaId: id, albumId: record.albumId, fileName: record.fileName },
     });
+
+    // External URL media — return the URL directly, no SAS needed
+    if (record.fileType === "link") {
+      const ytMatch = record.externalUrl?.match(
+        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([\w-]+)/
+      );
+      const thumbnailUrl = ytMatch?.[1]
+        ? `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`
+        : "";
+
+      return NextResponse.json({
+        id: record.id,
+        albumId: record.albumId,
+        fileName: record.fileName,
+        title: record.title ?? record.fileName,
+        description: record.description,
+        fileType: record.fileType,
+        mimeType: record.mimeType,
+        sizeBytes: record.sizeBytes,
+        tags: record.tags,
+        sasUrl: "",
+        thumbnailUrl,
+        externalUrl: record.externalUrl,
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      });
+    }
+
+    // Generate 15-minute SAS URLs for both full res and thumbnail
+    const [fullRes, thumb] = await Promise.all([
+      generateSasUrl("media", record.blobName),
+      generateSasUrl("thumbnails", record.thumbnailBlobName),
+    ]);
 
     return NextResponse.json({
       id: record.id,

@@ -454,6 +454,16 @@ export const API_ENDPOINTS: ApiEndpointDefinition[] = [
     destructive: true,
     sampleBody: "{\n  \"formData\": \"binary upload required\"\n}",
   },
+  {
+    id: "admin-media-urls",
+    category: "Tenant Admin",
+    method: "POST",
+    pathTemplate: "/api/admin/media-urls",
+    description: "Adds an external media URL (YouTube, Vimeo, etc.) to an album.",
+    authScope: "contributor",
+    verificationMode: "manual",
+    sampleBody: '{\n  "albumId": "{sampleAlbumId}",\n  "url": "https://www.youtube.com/watch?v=example",\n  "title": "Example Video"\n}',
+  },
 ];
 
 export interface ProbeSamples {
