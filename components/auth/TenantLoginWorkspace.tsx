@@ -21,10 +21,12 @@ type Tab = "magic" | "password";
 function MagicLinkForm({
   tenant,
   hasError,
+  errorKind = "invalid",
   nextPath,
 }: {
   tenant: TenantPublicItem;
   hasError: boolean;
+  errorKind?: "invalid" | "server";
   nextPath?: string;
 }) {
   const [email, setEmail] = useState("");
@@ -103,7 +105,9 @@ function MagicLinkForm({
 
       {hasError && state === "idle" ? (
         <div className="ops-danger-panel rounded-[1rem] px-4 py-3 text-sm">
-          That login link is invalid or has expired. Please request a new one.
+          {errorKind === "server"
+            ? "Something went wrong while signing you in. Please request a new login link."
+            : "That login link is invalid or has expired. Please request a new one."}
         </div>
       ) : null}
 
@@ -277,6 +281,7 @@ function PasswordForm({
 export default function TenantLoginWorkspace({
   tenant,
   hasError = false,
+  errorKind = "invalid",
   changeHref = "/select-tenant",
   heading,
   description,
@@ -285,6 +290,7 @@ export default function TenantLoginWorkspace({
 }: {
   tenant: TenantPublicItem;
   hasError?: boolean;
+  errorKind?: "invalid" | "server";
   changeHref?: string;
   heading?: string;
   description?: string;
@@ -419,6 +425,7 @@ export default function TenantLoginWorkspace({
                 <MagicLinkForm
                   tenant={tenant}
                   hasError={hasError}
+                  errorKind={errorKind}
                   nextPath={nextPath ?? undefined}
                 />
               ) : (

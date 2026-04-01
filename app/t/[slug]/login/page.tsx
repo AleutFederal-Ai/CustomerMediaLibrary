@@ -31,7 +31,8 @@ export default async function TenantLoginPage({
   return (
     <TenantLoginWorkspace
       tenant={tenantItem}
-      hasError={error === "invalid"}
+      hasError={error === "invalid" || error === "server"}
+      errorKind={error === "server" ? "server" : "invalid"}
       nextPath={sanitizeNextPath(next)}
     />
   );
