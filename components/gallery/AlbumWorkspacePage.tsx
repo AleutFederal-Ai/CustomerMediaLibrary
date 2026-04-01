@@ -24,12 +24,13 @@ interface MediaDetail {
   fileName: string;
   title?: string;
   description?: string;
-  fileType: "image" | "video";
+  fileType: "image" | "video" | "link";
   mimeType: string;
   sasUrl: string;
   albumId: string;
   sizeBytes: number;
   tags: string[];
+  externalUrl?: string;
 }
 
 interface Props {
@@ -70,7 +71,7 @@ export default function AlbumWorkspacePage({
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"" | "image" | "video">("");
+  const [typeFilter, setTypeFilter] = useState<"" | "image" | "video" | "link">("");
   const [lightboxItem, setLightboxItem] = useState<MediaDetail | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [bulkDownloading, setBulkDownloading] = useState(false);
@@ -84,6 +85,12 @@ export default function AlbumWorkspacePage({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
   const [showUploadPanel, setShowUploadPanel] = useState(false);
+  const [showAddUrlPanel, setShowAddUrlPanel] = useState(false);
+  const [addUrlValue, setAddUrlValue] = useState("");
+  const [addUrlTitle, setAddUrlTitle] = useState("");
+  const [addUrlDescription, setAddUrlDescription] = useState("");
+  const [addUrlSubmitting, setAddUrlSubmitting] = useState(false);
+  const [addUrlError, setAddUrlError] = useState("");
   const [pageDropActive, setPageDropActive] = useState(false);
   const [pendingDroppedFiles, setPendingDroppedFiles] = useState<File[]>([]);
 
@@ -406,6 +413,44 @@ export default function AlbumWorkspacePage({
     );
   }
 
+  async function handleAddUrl() {
+    const url = addUrlValue.trim();
+    if (!url) return;
+
+    setAddUrlSubmitting(true);
+    setAddUrlError("");
+
+    try {
+      const res = await apiFetch("/api/admin/media-urls", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          albumId,
+          url,
+          title: addUrlTitle.trim() || undefined,
+          description: addUrlDescription.trim() || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        setAddUrlError(data?.error ?? "Failed to add URL.");
+        return;
+      }
+
+      const newItem = (await res.json()) as MediaListItem;
+      setItems((prev) => [newItem, ...prev]);
+      setAddUrlValue("");
+      setAddUrlTitle("");
+      setAddUrlDescription("");
+      setShowAddUrlPanel(false);
+    } catch {
+      setAddUrlError("Network error. Please try again.");
+    } finally {
+      setAddUrlSubmitting(false);
+    }
+  }
+
   const queueDroppedFiles = useEffectEvent((files: File[]) => {
     if (!canContribute || files.length === 0) {
       return;
@@ -512,7 +557,9 @@ export default function AlbumWorkspacePage({
       ? "Images"
       : typeFilter === "video"
         ? "Videos"
-        : "All media";
+        : typeFilter === "link"
+          ? "Links"
+          : "All media";
 
   return (
     <AppShell variant="gallery">
@@ -576,13 +623,22 @@ export default function AlbumWorkspacePage({
                   {showFilters ? "Hide Filters" : "Filters"}
                 </button>
                 {canContribute ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowUploadPanel((current) => !current)}
-                    className="ops-button"
-                  >
-                    {showUploadPanel ? "Hide Add Media" : "Add Media"}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddUrlPanel((current) => !current)}
+                      className="ops-button-secondary"
+                    >
+                      {showAddUrlPanel ? "Hide Add URL" : "Add URL"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowUploadPanel((current) => !current)}
+                      className="ops-button"
+                    >
+                      {showUploadPanel ? "Hide Add Media" : "Add Media"}
+                    </button>
+                  </>
                 ) : null}
               </div>
 
@@ -645,7 +701,7 @@ export default function AlbumWorkspacePage({
                     <select
                       value={typeFilter}
                       onChange={(event) =>
-                        setTypeFilter(event.target.value as "" | "image" | "video")
+                        setTypeFilter(event.target.value as "" | "image" | "video" | "link")
                       }
                       aria-label="Filter by type"
                       className="ops-select"
@@ -653,6 +709,7 @@ export default function AlbumWorkspacePage({
                       <option value="">All types</option>
                       <option value="image">Images</option>
                       <option value="video">Videos</option>
+                      <option value="link">External Links</option>
                     </select>
                   </div>
 
@@ -735,6 +792,99 @@ export default function AlbumWorkspacePage({
               <p className="mt-2 text-sm text-slate-600">
                 Release to add the files to this album&apos;s upload queue.
               </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {canContribute && showAddUrlPanel ? (
+        <div className="fixed inset-0 z-50 bg-slate-950/45 px-4 py-6 backdrop-blur-sm sm:px-6">
+          <div className="mx-auto flex h-full w-full max-w-xl items-center justify-center">
+            <div className="surface-card max-h-full w-full overflow-y-auto rounded-[1.5rem] p-5 shadow-[0_30px_80px_rgba(15,23,42,0.22)] sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-[color:var(--text-muted)]">
+                    Add external video URL
+                  </p>
+                  <h2 className="text-xl font-semibold tracking-[-0.03em] text-[color:var(--foreground)]">
+                    {albumName}
+                  </h2>
+                  <p className="text-sm text-[color:var(--text-muted)]">
+                    Add a YouTube, Vimeo, Dailymotion, or Rumble video link to this album.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddUrlPanel(false);
+                    setAddUrlError("");
+                  }}
+                  className="ops-button-ghost !w-auto"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-5 space-y-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[color:var(--foreground)]">
+                    Video URL <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="url"
+                    value={addUrlValue}
+                    onChange={(e) => setAddUrlValue(e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    className="ops-input"
+                    disabled={addUrlSubmitting}
+                  />
+                  <p className="mt-1.5 text-xs text-[color:var(--text-muted)]">
+                    Supported: YouTube, Vimeo, Dailymotion, Rumble (HTTPS only)
+                  </p>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[color:var(--foreground)]">
+                    Title <span className="text-[color:var(--text-muted)]">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={addUrlTitle}
+                    onChange={(e) => setAddUrlTitle(e.target.value)}
+                    placeholder="My Video Title"
+                    className="ops-input"
+                    disabled={addUrlSubmitting}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-[color:var(--foreground)]">
+                    Description <span className="text-[color:var(--text-muted)]">(optional)</span>
+                  </label>
+                  <textarea
+                    value={addUrlDescription}
+                    onChange={(e) => setAddUrlDescription(e.target.value)}
+                    rows={3}
+                    placeholder="Brief description of the video..."
+                    className="ops-input min-h-[80px] resize-y"
+                    disabled={addUrlSubmitting}
+                  />
+                </div>
+
+                {addUrlError ? (
+                  <p className="text-sm text-red-600">{addUrlError}</p>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => { void handleAddUrl(); }}
+                  disabled={addUrlSubmitting || !addUrlValue.trim()}
+                  className="ops-button w-full disabled:opacity-50"
+                >
+                  {addUrlSubmitting ? "Adding..." : "Add URL to Album"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

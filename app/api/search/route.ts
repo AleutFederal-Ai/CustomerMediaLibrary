@@ -35,7 +35,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       parameters.push({ name: "@albumId", value: albumId });
     }
 
-    if (fileType === "image" || fileType === "video") {
+    if (fileType === "image" || fileType === "video" || fileType === "link") {
       conditions.push("c.fileType = @fileType");
       parameters.push({ name: "@fileType", value: fileType });
     }
@@ -67,10 +67,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const items: MediaListItem[] = await Promise.all(
       records.map(async (record) => {
-        const { sasUrl: thumbnailUrl } = await generateSasUrl(
-          "thumbnails",
-          record.thumbnailBlobName
-        );
+        let thumbnailUrl: string;
+        if (record.fileType === "link") {
+          // External URL media — use YouTube thumbnail or empty string
+          const ytMatch = record.externalUrl?.match(
+            /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([\w-]+)/
+          );
+          thumbnailUrl = ytMatch?.[1]
+            ? `https://img.youtube.com/vi/${ytMatch[1]}/hqdefault.jpg`
+            : "";
+        } else {
+          const { sasUrl } = await generateSasUrl(
+            "thumbnails",
+            record.thumbnailBlobName
+          );
+          thumbnailUrl = sasUrl;
+        }
         return {
           id: record.id,
           albumId: record.albumId,
@@ -84,6 +96,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           thumbnailUrl,
           tags: record.tags,
           uploadedAt: record.uploadedAt,
+          externalUrl: record.externalUrl,
         };
       })
     );

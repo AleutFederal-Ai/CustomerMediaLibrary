@@ -109,7 +109,7 @@ export interface AlbumRecord {
   isDeleted: boolean;
 }
 
-export type FileType = "image" | "video";
+export type FileType = "image" | "video" | "link";
 
 export interface MediaRecord {
   id: string;
@@ -129,6 +129,8 @@ export interface MediaRecord {
   isDeleted: boolean;
   deletedAt?: string;
   deletedBy?: string;
+  /** External URL for link-type media (YouTube, Vimeo, etc.) */
+  externalUrl?: string;
 }
 
 export interface AuditLogRecord {
@@ -177,6 +179,7 @@ export enum AuditAction {
   ALBUM_VIEWED = "album_viewed",
 
   // Admin — media
+  MEDIA_URL_ADDED = "media_url_added",
   MEDIA_UPLOADED = "media_uploaded",
   MEDIA_UPDATED = "media_updated",
   MEDIA_DELETED = "media_deleted",
@@ -286,6 +289,7 @@ export interface MediaListItem {
   thumbnailUrl: string;
   tags: string[];
   uploadedAt: string;
+  externalUrl?: string;
 }
 
 export interface UserProfileSummary {

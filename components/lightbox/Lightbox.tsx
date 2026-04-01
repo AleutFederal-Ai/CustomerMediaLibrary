@@ -11,12 +11,45 @@ interface MediaDetail {
   fileName: string;
   title?: string;
   description?: string;
-  fileType: "image" | "video";
+  fileType: "image" | "video" | "link";
   mimeType: string;
   sasUrl: string;
   albumId: string;
   sizeBytes: number;
   tags: string[];
+  externalUrl?: string;
+}
+
+function getEmbedUrl(url: string): string | null {
+  // YouTube
+  const ytPatterns = [
+    /youtube\.com\/watch\?v=([\w-]+)/,
+    /youtu\.be\/([\w-]+)/,
+    /youtube\.com\/embed\/([\w-]+)/,
+    /youtube\.com\/shorts\/([\w-]+)/,
+  ];
+  for (const pattern of ytPatterns) {
+    const match = url.match(pattern);
+    if (match?.[1]) return `https://www.youtube-nocookie.com/embed/${match[1]}`;
+  }
+
+  // Vimeo
+  const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+  if (vimeoMatch?.[1]) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+
+  // Dailymotion
+  const dmMatch = url.match(/dailymotion\.com\/video\/([\w-]+)/);
+  if (dmMatch?.[1]) return `https://www.dailymotion.com/embed/video/${dmMatch[1]}`;
+
+  return null;
+}
+
+function getPlatformLabel(url: string): string {
+  if (/youtube\.com|youtu\.be/.test(url)) return "YouTube";
+  if (/vimeo\.com/.test(url)) return "Vimeo";
+  if (/dailymotion\.com/.test(url)) return "Dailymotion";
+  if (/rumble\.com/.test(url)) return "Rumble";
+  return "External Video";
 }
 
 interface Props {
@@ -251,7 +284,9 @@ export default function Lightbox({
               {item.title ?? item.fileName}
             </p>
             <p className="mt-1 text-sm text-slate-400">
-              {item.fileType === "image" ? "Image" : "Video"} - {formatBytes(item.sizeBytes)}
+              {item.fileType === "link"
+                ? `External Link${item.externalUrl ? ` — ${getPlatformLabel(item.externalUrl)}` : ""}`
+                : `${item.fileType === "image" ? "Image" : "Video"} - ${formatBytes(item.sizeBytes)}`}
             </p>
           </div>
 
@@ -286,13 +321,27 @@ export default function Lightbox({
             >
               {copyState === "copied" ? "Link Copied" : "Copy Share Link"}
             </button>
-            <button
-              type="button"
-              onClick={handleDownload}
-              className={`ops-button ${compactActionClass}`}
-            >
-              Download
-            </button>
+            {item.fileType === "link" && item.externalUrl ? (
+              <a
+                href={item.externalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`ops-button ${compactActionClass} inline-flex items-center gap-1.5`}
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                Open Link
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={handleDownload}
+                className={`ops-button ${compactActionClass}`}
+              >
+                Download
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -347,7 +396,41 @@ export default function Lightbox({
 
         <div className="mx-auto grid min-h-[calc(100vh-19rem)] w-full max-w-7xl gap-4 xl:grid-cols-[minmax(0,1.8fr)_360px]">
           <div className="flex min-h-[52vh] items-center justify-center overflow-hidden rounded-[1.75rem] border border-white/8 bg-black/25 p-3 sm:min-h-[64vh] sm:p-5">
-            {item.fileType === "image" ? (
+            {item.fileType === "link" && item.externalUrl ? (
+              (() => {
+                const embedUrl = getEmbedUrl(item.externalUrl);
+                if (embedUrl) {
+                  return (
+                    <iframe
+                      src={embedUrl}
+                      title={item.title ?? item.fileName}
+                      className="aspect-video w-full max-w-4xl rounded-[1.2rem]"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      referrerPolicy="no-referrer"
+                    />
+                  );
+                }
+                return (
+                  <div className="flex flex-col items-center gap-4 text-center">
+                    <svg className="h-16 w-16 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    <p className="text-sm text-slate-300">
+                      This media is hosted on {getPlatformLabel(item.externalUrl)}.
+                    </p>
+                    <a
+                      href={item.externalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ops-button"
+                    >
+                      Open in {getPlatformLabel(item.externalUrl)}
+                    </a>
+                  </div>
+                );
+              })()
+            ) : item.fileType === "image" ? (
               <img
                 src={item.sasUrl}
                 alt={item.title ?? item.fileName}
@@ -394,15 +477,36 @@ export default function Lightbox({
                     Media Type
                   </p>
                   <p className="mt-1 text-sm text-white">
-                    {item.fileType === "image" ? "Image" : "Video"}
+                    {item.fileType === "link"
+                      ? `External Link${item.externalUrl ? ` (${getPlatformLabel(item.externalUrl)})` : ""}`
+                      : item.fileType === "image"
+                        ? "Image"
+                        : "Video"}
                   </p>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Size
-                  </p>
-                  <p className="mt-1 text-sm text-white">{formatBytes(item.sizeBytes)}</p>
-                </div>
+                {item.fileType !== "link" ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Size
+                    </p>
+                    <p className="mt-1 text-sm text-white">{formatBytes(item.sizeBytes)}</p>
+                  </div>
+                ) : null}
+                {item.fileType === "link" && item.externalUrl ? (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      External URL
+                    </p>
+                    <a
+                      href={item.externalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 block break-all text-sm text-blue-400 hover:text-blue-300"
+                    >
+                      {item.externalUrl}
+                    </a>
+                  </div>
+                ) : null}
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                     Share URL
@@ -546,16 +650,31 @@ export default function Lightbox({
                 }`}
                 aria-label={`View ${media.title ?? media.fileName}`}
               >
-                <img
-                  src={media.thumbnailUrl}
-                  alt={media.title ?? media.fileName}
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                />
+                {media.fileType === "link" && !media.thumbnailUrl ? (
+                  <div className="flex h-full w-full items-center justify-center bg-slate-800">
+                    <svg className="h-6 w-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                  </div>
+                ) : (
+                  <img
+                    src={media.thumbnailUrl}
+                    alt={media.title ?? media.fileName}
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                )}
                 {media.fileType === "video" ? (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/25">
                     <svg className="h-5 w-5 text-white" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </div>
+                ) : null}
+                {media.fileType === "link" ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/25">
+                    <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
                   </div>
                 ) : null}
