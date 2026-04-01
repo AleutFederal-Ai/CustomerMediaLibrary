@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import { sessions, users } from "@/lib/azure/cosmos";
 import { getSecret } from "@/lib/azure/keyvault";
+import { logError, logWarn, logInfo } from "@/lib/logging/structured";
 import { SessionRecord } from "@/types";
 
 const TOKEN_EXPIRY_MINUTES = 10;
@@ -62,23 +63,75 @@ export async function validateMagicLinkToken(
   rawToken: string,
   ipAddress: string
 ): Promise<string | null> {
+  // Step 1: Hash the incoming token
+  let secret: string;
+  let tokenHash: string;
   try {
-    const secret = await getSecret("MagicLinkSigningSecret");
-    const tokenHash = hashToken(rawToken, secret);
+    secret = await getSecret("MagicLinkSigningSecret");
+    tokenHash = hashToken(rawToken, secret);
+  } catch (err) {
+    logError("magic-link.validate.secret_failed", {
+      error: err,
+      hint: "Could not retrieve MagicLinkSigningSecret from Key Vault",
+    });
+    return null;
+  }
 
-    const container = await sessions();
-    const { resource: record } = await container
+  // Step 2: Look up the token record in Cosmos DB
+  let container: Awaited<ReturnType<typeof sessions>>;
+  let record: SessionRecord | undefined;
+  try {
+    container = await sessions();
+    const result = await container
       .item(tokenHash, tokenHash)
       .read<SessionRecord>();
+    record = result.resource;
+  } catch (err) {
+    logError("magic-link.validate.cosmos_read_failed", {
+      error: err,
+      tokenHashPrefix: tokenHash.slice(0, 8),
+      hint: "Cosmos DB read failed — may be a connectivity or auth issue",
+    });
+    return null;
+  }
 
-    if (!record) return null;
-    if (record.type !== "magic-link") return null;
-    if (record.usedAt) return null; // already used
+  // Step 3: Validate the record
+  if (!record) {
+    logWarn("magic-link.validate.not_found", {
+      tokenHashPrefix: tokenHash.slice(0, 8),
+      hint: "No document with this token hash exists in sessions container",
+    });
+    return null;
+  }
 
-    const now = new Date();
-    if (now > new Date(record.expiresAt)) return null;
+  if (record.type !== "magic-link") {
+    logWarn("magic-link.validate.wrong_type", {
+      type: record.type,
+      tokenHashPrefix: tokenHash.slice(0, 8),
+    });
+    return null;
+  }
 
-    // Check if user is blocked
+  if (record.usedAt) {
+    logWarn("magic-link.validate.already_used", {
+      email: record.email,
+      usedAt: record.usedAt,
+    });
+    return null;
+  }
+
+  const now = new Date();
+  if (now > new Date(record.expiresAt)) {
+    logWarn("magic-link.validate.expired", {
+      email: record.email,
+      expiresAt: record.expiresAt,
+      now: now.toISOString(),
+    });
+    return null;
+  }
+
+  // Step 4: Check if user is blocked
+  try {
     const usersContainer = await users();
     const { resources: userRecords } = await usersContainer.items
       .query({
@@ -87,18 +140,37 @@ export async function validateMagicLinkToken(
       })
       .fetchAll();
 
-    if (userRecords.length > 0) return null;
+    if (userRecords.length > 0) {
+      logWarn("magic-link.validate.user_blocked", { email: record.email });
+      return null;
+    }
+  } catch (err) {
+    logError("magic-link.validate.blocked_check_failed", {
+      email: record.email,
+      error: err,
+    });
+    // Fail closed — if we can't verify the user isn't blocked, deny access
+    return null;
+  }
 
-    // Mark as used
+  // Step 5: Mark token as used (best-effort — do not fail the login if this errors)
+  try {
     await container.item(tokenHash, tokenHash).replace<SessionRecord>({
       ...record,
       usedAt: now.toISOString(),
     });
-
-    return record.email;
-  } catch {
-    return null;
+  } catch (err) {
+    // Log but continue — the token is valid and the 10-minute expiry + TTL
+    // will clean up the record. Failing here should NOT block the user.
+    logError("magic-link.validate.mark_used_failed", {
+      email: record.email,
+      error: err,
+      hint: "Token is valid but could not be marked as used — login will proceed",
+    });
   }
+
+  logInfo("magic-link.validate.success", { email: record.email });
+  return record.email;
 }
 
 /**

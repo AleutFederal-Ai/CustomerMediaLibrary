@@ -28,7 +28,8 @@ export default async function LoginPage({
   return (
     <TenantLoginWorkspace
       tenant={PLATFORM_ADMIN_TENANT}
-      hasError={error === "invalid"}
+      hasError={error === "invalid" || error === "server"}
+      errorKind={error === "server" ? "server" : "invalid"}
       heading="Platform administration sign-in"
       description="Use this path when you need the control plane, audit workflows, API health portal, or tenant administration."
       helpLabel="Choose a tenant workspace"
