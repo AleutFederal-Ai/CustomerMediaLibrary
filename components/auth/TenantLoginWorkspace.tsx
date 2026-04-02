@@ -309,7 +309,7 @@ export default function TenantLoginWorkspace({
     description ??
     (isPlatformAdmin
       ? "Use the administrative access path when you need the control plane, user management, or health portals."
-      : "Continue into the tenant-scoped workspace with a one-time magic link or your password.");
+      : "Log into your media library with a one-time magic link or your password.");
   const helperCopy =
     helpLabel ??
     (isPlatformAdmin
