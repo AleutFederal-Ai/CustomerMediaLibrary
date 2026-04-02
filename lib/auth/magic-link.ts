@@ -77,6 +77,12 @@ export async function validateMagicLinkToken(
     return null;
   }
 
+  logInfo("magic-link.validate.hash_computed", {
+    tokenHashPrefix: tokenHash.slice(0, 8),
+    rawTokenLength: rawToken.length,
+    hint: "Token hashed successfully, looking up in Cosmos DB",
+  });
+
   // Step 2: Look up the token record in Cosmos DB
   let container: Awaited<ReturnType<typeof sessions>>;
   let record: SessionRecord | undefined;

@@ -13,6 +13,15 @@ import {
 
 const MAX_QUEUE_ITEMS = 20;
 
+/**
+ * Files larger than this threshold are uploaded using the chunked
+ * (block blob) path instead of a single multipart POST.
+ */
+const CHUNKED_THRESHOLD_BYTES = 50 * 1024 * 1024; // 50 MB
+
+/** Size of each chunk sent to the server. */
+const CHUNK_SIZE_BYTES = 8 * 1024 * 1024; // 8 MB
+
 interface Album {
   id: string;
   name: string;
@@ -95,6 +104,10 @@ function createQueueId(file: File): string {
   return `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// ----------------------------------------------------------------
+// Single-request upload (files <= CHUNKED_THRESHOLD_BYTES)
+// ----------------------------------------------------------------
+
 function uploadFileWithProgress(
   formData: FormData,
   onProgress: (progress: number) => void
@@ -140,6 +153,155 @@ function uploadFileWithProgress(
     xhr.send(formData);
   });
 }
+
+// ----------------------------------------------------------------
+// Chunked upload (files > CHUNKED_THRESHOLD_BYTES)
+// ----------------------------------------------------------------
+
+interface InitiateResponse {
+  uploadId: string;
+  blobName: string;
+  fileType: "image" | "video";
+  mimeType: string;
+  totalChunks: number;
+}
+
+async function initiateChunkedUpload(
+  file: File,
+  albumId: string,
+  tags: string
+): Promise<InitiateResponse> {
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE_BYTES);
+  const response = await fetch("/api/admin/upload/initiate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fileName: file.name,
+      mimeType: file.type,
+      fileSize: file.size,
+      albumId,
+      tags,
+      totalChunks,
+    }),
+  });
+
+  if (!response.ok) {
+    const data = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(data.error ?? `Initiate failed (${response.status})`);
+  }
+
+  return response.json() as Promise<InitiateResponse>;
+}
+
+async function uploadChunk(
+  blobName: string,
+  chunkIndex: number,
+  chunkBlob: Blob
+): Promise<void> {
+  const formData = new FormData();
+  formData.append("chunk", chunkBlob);
+
+  const params = new URLSearchParams({
+    blobName,
+    chunkIndex: String(chunkIndex),
+  });
+
+  const response = await fetch(`/api/admin/upload/chunk?${params}`, {
+    method: "PUT",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const data = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(data.error ?? `Chunk ${chunkIndex} failed (${response.status})`);
+  }
+}
+
+async function commitChunkedUpload(
+  initData: InitiateResponse,
+  file: File,
+  albumId: string,
+  tags: string
+): Promise<UploadResponseLike> {
+  const response = await fetch("/api/admin/upload/commit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      uploadId: initData.uploadId,
+      blobName: initData.blobName,
+      fileName: file.name,
+      mimeType: initData.mimeType,
+      fileType: initData.fileType,
+      fileSize: file.size,
+      albumId,
+      tags,
+      totalChunks: initData.totalChunks,
+    }),
+  });
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    statusText: response.statusText,
+    json: () => response.json(),
+  };
+}
+
+/**
+ * Upload a large file in chunks with progress tracking.
+ * Retries individual failed chunks up to 2 times.
+ */
+async function chunkedUploadWithProgress(
+  file: File,
+  albumId: string,
+  tags: string,
+  onProgress: (progress: number) => void
+): Promise<UploadResponseLike> {
+  // Step 1: Initiate
+  const initData = await initiateChunkedUpload(file, albumId, tags);
+  const totalChunks = initData.totalChunks;
+
+  // Step 2: Upload chunks sequentially
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * CHUNK_SIZE_BYTES;
+    const end = Math.min(start + CHUNK_SIZE_BYTES, file.size);
+    const chunkBlob = file.slice(start, end);
+
+    let lastError: Error | null = null;
+    const maxRetries = 3;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        await uploadChunk(initData.blobName, i, chunkBlob);
+        lastError = null;
+        break;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        if (attempt < maxRetries - 1) {
+          // Wait before retry with exponential backoff
+          await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
+        }
+      }
+    }
+
+    if (lastError) {
+      throw lastError;
+    }
+
+    // Progress: chunk uploads are ~95% of the work, commit is ~5%
+    const chunkProgress = Math.round(((i + 1) / totalChunks) * 95);
+    onProgress(chunkProgress);
+  }
+
+  // Step 3: Commit
+  const commitResponse = await commitChunkedUpload(initData, file, albumId, tags);
+  onProgress(100);
+  return commitResponse;
+}
+
+// ----------------------------------------------------------------
+// Component
+// ----------------------------------------------------------------
 
 const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
   albums,
@@ -339,18 +501,38 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
         error: undefined,
       }));
 
-      const form = new FormData();
-      form.append("file", item.file);
-      form.append("albumId", albumId);
-      form.append("tags", tags);
+      const useChunked = item.file.size > CHUNKED_THRESHOLD_BYTES;
 
       try {
-        const response = await uploadFileWithProgress(form, (progress) => {
-          updateQueueItem(item.id, (current) => ({
-            ...current,
-            progress,
-          }));
-        });
+        let response: UploadResponseLike;
+
+        if (useChunked) {
+          // Large file: chunked upload via block blob staging
+          response = await chunkedUploadWithProgress(
+            item.file,
+            albumId,
+            tags,
+            (progress) => {
+              updateQueueItem(item.id, (current) => ({
+                ...current,
+                progress,
+              }));
+            }
+          );
+        } else {
+          // Small file: single-request upload
+          const form = new FormData();
+          form.append("file", item.file);
+          form.append("albumId", albumId);
+          form.append("tags", tags);
+
+          response = await uploadFileWithProgress(form, (progress) => {
+            updateQueueItem(item.id, (current) => ({
+              ...current,
+              progress,
+            }));
+          });
+        }
 
         if (response.ok) {
           uploaded += 1;
@@ -373,13 +555,13 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
               "Upload failed",
           }));
         }
-      } catch {
+      } catch (err) {
         failed += 1;
         updateQueueItem(item.id, (current) => ({
           ...current,
           status: "failed",
           progress: 0,
-          error: "Network error",
+          error: err instanceof Error ? err.message : "Network error",
         }));
       }
     }
@@ -486,8 +668,8 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
             </h3>
             <p className="text-sm leading-6 text-[color:var(--text-muted)]">
               {isCompact
-                ? `Up to ${MAX_QUEUE_ITEMS} files per batch. Common image and video formats are supported up to 500 MB per file.`
-                : `Add up to ${MAX_QUEUE_ITEMS} images or videos per batch. Files are uploaded one at a time so the queue remains visible and stable. Common video formats such as MP4, MOV, AVI, WEBM, M4V, MPEG, and WMV are supported, with a maximum size of 500 MB per file.`}
+                ? `Up to ${MAX_QUEUE_ITEMS} files per batch. Common image and video formats are supported — large video files are uploaded in chunks automatically.`
+                : `Add up to ${MAX_QUEUE_ITEMS} images or videos per batch. Files are uploaded one at a time so the queue remains visible and stable. Common video formats such as MP4, MOV, AVI, WEBM, M4V, MPEG, and WMV are supported. Large files are uploaded in chunks automatically — no size limit.`}
             </p>
           </div>
 
@@ -594,6 +776,11 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
                     </div>
                     <p className="mt-1 text-xs text-[color:var(--text-muted)]">
                       {formatFileSize(item.file.size)}
+                      {item.file.size > CHUNKED_THRESHOLD_BYTES ? (
+                        <span className="ml-2 text-[color:var(--text-muted)] opacity-70">
+                          (chunked upload)
+                        </span>
+                      ) : null}
                     </p>
                     {item.status === "uploading" || item.status === "uploaded" ? (
                       <div className="mt-3 space-y-1.5">
