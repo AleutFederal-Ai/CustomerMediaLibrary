@@ -110,6 +110,7 @@ function AlbumRow({
 }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(album.name);
+  const [slug, setSlug] = useState(album.slug ?? "");
   const [description, setDescription] = useState(album.description ?? "");
   const [saving, setSaving] = useState(false);
   const [showCoverPicker, setShowCoverPicker] = useState(false);
@@ -119,6 +120,7 @@ function AlbumRow({
     setSaving(true);
     const ok = await onUpdate(album.id, {
       name: name.trim(),
+      slug: slug.trim(),
       description: description.trim(),
     });
     setSaving(false);
@@ -127,6 +129,7 @@ function AlbumRow({
 
   function handleCancel() {
     setName(album.name);
+    setSlug(album.slug ?? "");
     setDescription(album.description ?? "");
     setEditing(false);
   }
@@ -149,6 +152,21 @@ function AlbumRow({
             onChange={(e) => setName(e.target.value)}
             className="w-full px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-400 mb-1">
+            Slug (URL-friendly name, optional)
+          </label>
+          <input
+            type="text"
+            value={slug}
+            onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
+            placeholder="e.g. training-photos-2024"
+            className="w-full px-3 py-1.5 bg-slate-700 border border-slate-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <p className="text-xs text-slate-500 mt-1">
+            Used in shareable URLs. Leave blank to auto-generate from the name.
+          </p>
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-400 mb-1">
@@ -210,6 +228,11 @@ function AlbumRow({
 
           <div className="min-w-0">
             <p className="text-white font-medium">{album.name}</p>
+            {album.slug && (
+              <p className="text-blue-400 text-xs font-mono">
+                /{album.slug}
+              </p>
+            )}
             {album.description && (
               <p className="text-slate-400 text-sm truncate">
                 {album.description}
@@ -265,6 +288,7 @@ export default function AlbumManager({ initialAlbums, tenantId }: Props) {
   const [albums, setAlbums] = useState(initialAlbums);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newSlug, setNewSlug] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -287,6 +311,7 @@ export default function AlbumManager({ initialAlbums, tenantId }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: newName.trim(),
+          slug: newSlug.trim() || undefined,
           description: newDesc.trim(),
           order: activeAlbums.length,
         }),
@@ -297,6 +322,7 @@ export default function AlbumManager({ initialAlbums, tenantId }: Props) {
         const created: AlbumRecord = await res.json();
         setAlbums((prev) => [...prev, created]);
         setNewName("");
+        setNewSlug("");
         setNewDesc("");
         setCreating(false);
       } else {
@@ -429,6 +455,18 @@ export default function AlbumManager({ initialAlbums, tenantId }: Props) {
               required
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-slate-300 mb-1">
+              Slug (optional, URL-friendly name)
+            </label>
+            <input
+              type="text"
+              value={newSlug}
+              onChange={(e) => setNewSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
+              placeholder="auto-generated from name if blank"
               className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>

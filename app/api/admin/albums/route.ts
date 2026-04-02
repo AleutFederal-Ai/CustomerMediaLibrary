@@ -4,6 +4,7 @@ import { albums, media } from "@/lib/azure/cosmos";
 import { deleteBlob } from "@/lib/azure/blob";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { isTenantAdmin } from "@/lib/auth/permissions";
+import { generateAlbumSlug, ensureUniqueAlbumSlug } from "@/lib/gallery/albums";
 import { AlbumRecord, MediaRecord, AuditAction } from "@/types";
 import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 
@@ -59,7 +60,7 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
-  let body: { name?: string; description?: string; order?: number };
+  let body: { name?: string; slug?: string; description?: string; order?: number };
   try {
     body = await request.json();
   } catch {
@@ -71,11 +72,20 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "name is required" }, { status: 400 });
   }
 
+  // Generate slug: use provided slug or auto-generate from name
+  const rawSlug = body.slug?.trim()
+    ? generateAlbumSlug(body.slug.trim())
+    : generateAlbumSlug(name);
+  const slug = rawSlug
+    ? await ensureUniqueAlbumSlug(rawSlug, caller.tenantId)
+    : undefined;
+
   const now = new Date().toISOString();
   const album: AlbumRecord = {
     id: uuidv4(),
     tenantId: caller.tenantId,
     name,
+    slug,
     description: body.description?.trim(),
     order: body.order ?? 0,
     createdAt: now,
@@ -116,7 +126,7 @@ async function handlePatch(request: NextRequest): Promise<NextResponse> {
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
   let body: Partial<
-    Pick<AlbumRecord, "name" | "description" | "order" | "coverMediaId">
+    Pick<AlbumRecord, "name" | "slug" | "description" | "order" | "coverMediaId">
   >;
   try {
     body = await request.json();
@@ -167,9 +177,21 @@ async function handlePatch(request: NextRequest): Promise<NextResponse> {
       body.coverMediaId = normalizedCoverMediaId;
     }
 
+    // Resolve slug if provided
+    let resolvedSlug: string | undefined;
+    if (body.slug !== undefined) {
+      const rawSlug = generateAlbumSlug(body.slug.trim());
+      if (rawSlug) {
+        resolvedSlug = await ensureUniqueAlbumSlug(rawSlug, caller.tenantId, id);
+      } else {
+        resolvedSlug = undefined; // Empty slug removes it
+      }
+    }
+
     const updated: AlbumRecord = {
       ...existing,
       ...(body.name !== undefined && { name: body.name.trim() }),
+      ...(body.slug !== undefined && { slug: resolvedSlug }),
       ...(body.description !== undefined && { description: body.description.trim() }),
       ...(body.order !== undefined && { order: body.order }),
       ...(body.coverMediaId !== undefined && { coverMediaId: body.coverMediaId }),

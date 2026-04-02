@@ -101,6 +101,7 @@ export interface AlbumRecord {
   id: string;
   tenantId: string;       // which tenant owns this album
   name: string;
+  slug?: string;          // URL-friendly identifier, unique per tenant, optional
   description?: string;
   coverMediaId?: string;
   order: number;
@@ -269,6 +270,7 @@ export interface AlbumListItem {
   id: string;
   tenantId: string;
   name: string;
+  slug?: string;
   description?: string;
   coverMediaId?: string;
   coverThumbnailUrl?: string;

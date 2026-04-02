@@ -19,6 +19,99 @@ export async function getAlbumById(albumId: string): Promise<AlbumRecord | null>
   }
 }
 
+/**
+ * Resolve an album by slug within a given tenant.
+ * Returns null if no active album matches the slug.
+ */
+export async function getAlbumBySlug(
+  slug: string,
+  tenantId: string
+): Promise<AlbumRecord | null> {
+  try {
+    const albumsContainer = await albums();
+    const { resources } = await albumsContainer.items
+      .query<AlbumRecord>({
+        query:
+          "SELECT * FROM c WHERE c.slug = @slug AND c.tenantId = @tenantId AND c.isDeleted = false",
+        parameters: [
+          { name: "@slug", value: slug.toLowerCase() },
+          { name: "@tenantId", value: tenantId },
+        ],
+      })
+      .fetchAll();
+    return resources[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve an album by either ID (UUID) or slug within a tenant.
+ * Tries ID lookup first, then falls back to slug lookup.
+ */
+export async function getAlbumByIdOrSlug(
+  idOrSlug: string,
+  tenantId: string
+): Promise<AlbumRecord | null> {
+  // Try direct ID lookup first (fast point-read)
+  const byId = await getAlbumById(idOrSlug);
+  if (byId && byId.tenantId === tenantId) return byId;
+
+  // Fall back to slug query
+  return getAlbumBySlug(idOrSlug, tenantId);
+}
+
+/**
+ * Generate a URL-safe slug from an album name.
+ * Strips special chars, lowercases, replaces spaces with hyphens.
+ */
+export function generateAlbumSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/[\s_]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
+}
+
+/**
+ * Ensure a slug is unique within a tenant by appending a numeric suffix if needed.
+ */
+export async function ensureUniqueAlbumSlug(
+  slug: string,
+  tenantId: string,
+  excludeAlbumId?: string
+): Promise<string> {
+  const albumsContainer = await albums();
+  let candidate = slug;
+  let suffix = 1;
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const { resources } = await albumsContainer.items
+      .query<Pick<AlbumRecord, "id">>({
+        query:
+          "SELECT c.id FROM c WHERE c.slug = @slug AND c.tenantId = @tenantId AND c.isDeleted = false",
+        parameters: [
+          { name: "@slug", value: candidate },
+          { name: "@tenantId", value: tenantId },
+        ],
+      })
+      .fetchAll();
+
+    const conflict = excludeAlbumId
+      ? resources.some((r) => r.id !== excludeAlbumId)
+      : resources.length > 0;
+
+    if (!conflict) return candidate;
+
+    suffix += 1;
+    candidate = `${slug}-${suffix}`;
+  }
+}
+
 export async function listAlbumItemsForTenant(
   tenantId: string
 ): Promise<AlbumListItem[]> {
@@ -121,6 +214,7 @@ export async function listAlbumItemsForTenant(
         id: album.id,
         tenantId: album.tenantId,
         name: album.name,
+        slug: album.slug,
         description: album.description,
         coverMediaId: album.coverMediaId ?? coverRecord?.id,
         coverThumbnailUrl,
