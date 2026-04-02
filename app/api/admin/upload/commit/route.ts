@@ -79,6 +79,15 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
     );
   }
 
+  // Security: ensure the blob name is scoped to the caller's tenant
+  if (!blobName.startsWith(`${tenantId}/`)) {
+    logWarn("admin.upload.commit.POST.blob_scope_violation", {
+      email, tenantId, blobName,
+      hint: "blobName does not match the caller's tenant prefix",
+    });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   // Build ordered block ID list
   const blockIds: string[] = [];
   for (let i = 0; i < totalChunks; i++) {

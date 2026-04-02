@@ -362,7 +362,7 @@ export type ApiVerificationMode = "automated" | "manual";
 export interface ApiEndpointDefinition {
   id: string;
   category: string;
-  method: "GET" | "POST" | "PATCH" | "DELETE";
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   pathTemplate: string;
   description: string;
   authScope: ApiAuthScope;

@@ -43,7 +43,11 @@ export async function getGalleryAlbumPageContext({
     redirect(buildGalleryWorkspacePath(normalizedRequestedTenantSlug));
   }
 
-  const canonicalPath = buildGalleryAlbumPath(tenant.slug, albumId);
+  // Use the resolved album ID (UUID), not the route param which may be a slug.
+  // Downstream components (search, upload) need the UUID to query Cosmos DB.
+  const resolvedAlbumId = album.id;
+  const canonicalAlbumIdentifier = album.slug || resolvedAlbumId;
+  const canonicalPath = buildGalleryAlbumPath(tenant.slug, canonicalAlbumIdentifier);
 
   if (activeTenantId !== tenant.id) {
     redirect(
@@ -51,6 +55,7 @@ export async function getGalleryAlbumPageContext({
     );
   }
 
+  // Redirect to canonical URL if the tenant slug doesn't match
   if (
     normalizedRequestedTenantSlug &&
     normalizedRequestedTenantSlug !== tenant.slug
@@ -58,8 +63,13 @@ export async function getGalleryAlbumPageContext({
     redirect(canonicalPath);
   }
 
+  // Redirect to slug-based URL if album was accessed by ID and has a slug
+  if (album.slug && albumId !== album.slug && albumId === album.id) {
+    redirect(buildGalleryAlbumPath(tenant.slug, album.slug));
+  }
+
   return {
-    albumId,
+    albumId: resolvedAlbumId,
     albumName: album.name,
     tenantId: tenant.id,
     tenantName: tenant.name,

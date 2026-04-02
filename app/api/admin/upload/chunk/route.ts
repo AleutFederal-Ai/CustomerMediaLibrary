@@ -44,6 +44,17 @@ async function handlePut(request: NextRequest): Promise<NextResponse> {
     );
   }
 
+  // Security: ensure the blob name is scoped to the caller's tenant.
+  // The initiate endpoint generates blobNames as "{tenantId}/{albumId}/{mediaId}.{ext}".
+  // Reject any blobName that doesn't start with the authenticated tenant prefix.
+  if (!blobName.startsWith(`${tenantId}/`)) {
+    logWarn("admin.upload.chunk.PUT.blob_scope_violation", {
+      email, tenantId, blobName,
+      hint: "blobName does not match the caller's tenant prefix",
+    });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const chunkIndex = parseInt(chunkIndexStr, 10);
   if (isNaN(chunkIndex) || chunkIndex < 0) {
     return NextResponse.json({ error: "Invalid chunkIndex" }, { status: 400 });
