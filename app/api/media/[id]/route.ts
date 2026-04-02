@@ -5,6 +5,7 @@ import { writeAuditLog } from "@/lib/audit/logger";
 import { isMediaContributor, isTenantAdmin } from "@/lib/auth/permissions";
 import { buildDefaultMediaTitle, normalizeMediaTags } from "@/lib/media-metadata";
 import { MediaRecord, AuditAction } from "@/types";
+import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -16,16 +17,17 @@ interface MediaMetadataPatchBody {
   tags?: string[] | string;
 }
 
-export async function GET(
+async function handleGet(
   request: NextRequest,
-  { params }: Params
+  context?: unknown
 ): Promise<NextResponse> {
-  const { id } = await params;
+  const { id } = await (context as Params).params;
   const email = request.headers.get("x-session-email") ?? "unknown";
   const ip = request.headers.get("x-client-ip") ?? "unknown";
   const tenantId = request.headers.get("x-active-tenant-id") ?? "";
 
   if (!tenantId) {
+    logWarn("media.item.GET.no_active_tenant", { email });
     return NextResponse.json({ error: "No active tenant" }, { status: 403 });
   }
 
@@ -94,26 +96,35 @@ export async function GET(
       expiresAt: fullRes.expiresAt,
     });
   } catch (err) {
-    console.error("[media/id] GET error:", err);
+    logError("media.item.GET.failed", { mediaId: id, tenantId, error: err });
     return NextResponse.json({ error: "Failed to load media" }, { status: 500 });
   }
 }
 
-export async function PATCH(
+async function handlePatch(
   request: NextRequest,
-  { params }: Params
+  context?: unknown
 ): Promise<NextResponse> {
-  const { id } = await params;
+  const { id } = await (context as Params).params;
   const email = request.headers.get("x-session-email");
-  if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!email) {
+    logWarn("media.item.PATCH.unauthorized", { reason: "no email header" });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const tenantId = request.headers.get("x-active-tenant-id") ?? "";
-  if (!tenantId) return NextResponse.json({ error: "No active tenant" }, { status: 403 });
+  if (!tenantId) {
+    logWarn("media.item.PATCH.no_active_tenant", { email });
+    return NextResponse.json({ error: "No active tenant" }, { status: 403 });
+  }
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
   const isAdmin = await isTenantAdmin(email, tenantId);
-  if (!isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!isAdmin) {
+    logWarn("media.item.PATCH.forbidden", { email, tenantId, reason: "not tenant admin" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   let body: MediaMetadataPatchBody;
   try {
@@ -204,26 +215,35 @@ export async function PATCH(
       tags: nextTags,
     });
   } catch (err) {
-    console.error("[media/id] PATCH error:", err);
+    logError("media.item.PATCH.failed", { mediaId: id, tenantId, error: err });
     return NextResponse.json({ error: "Failed to update media" }, { status: 500 });
   }
 }
 
-export async function DELETE(
+async function handleDelete(
   request: NextRequest,
-  { params }: Params
+  context?: unknown
 ): Promise<NextResponse> {
-  const { id } = await params;
+  const { id } = await (context as Params).params;
   const email = request.headers.get("x-session-email");
-  if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!email) {
+    logWarn("media.item.DELETE.unauthorized", { reason: "no email header" });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const tenantId = request.headers.get("x-active-tenant-id") ?? "";
-  if (!tenantId) return NextResponse.json({ error: "No active tenant" }, { status: 403 });
+  if (!tenantId) {
+    logWarn("media.item.DELETE.no_active_tenant", { email });
+    return NextResponse.json({ error: "No active tenant" }, { status: 403 });
+  }
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
   const canContribute = await isMediaContributor(email, tenantId);
-  if (!canContribute) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canContribute) {
+    logWarn("media.item.DELETE.forbidden", { email, tenantId, reason: "not media contributor" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   try {
     const container = await media();
@@ -252,7 +272,11 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[media/id] DELETE error:", err);
+    logError("media.item.DELETE.failed", { mediaId: id, tenantId, error: err });
     return NextResponse.json({ error: "Failed to delete media" }, { status: 500 });
   }
 }
+
+export const GET = withRouteLogging("media.item.GET", handleGet);
+export const PATCH = withRouteLogging("media.item.PATCH", handlePatch);
+export const DELETE = withRouteLogging("media.item.DELETE", handleDelete);

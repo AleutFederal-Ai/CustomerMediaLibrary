@@ -3,23 +3,25 @@ import {
   buildApiHealthSnapshot,
   getApiHealthAuthorization,
 } from "@/lib/api/health-snapshot";
-import { getRequestLogContext, logError, logInfo } from "@/lib/logging/structured";
+import { withRouteLogging, getRequestLogContext, logError, logInfo, logWarn } from "@/lib/logging/structured";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+async function handleGet(request: NextRequest): Promise<NextResponse> {
   const context = getRequestLogContext(request);
   const startedAt = Date.now();
 
   const email = request.headers.get("x-session-email");
   const activeTenantId = request.headers.get("x-active-tenant-id") ?? "";
   if (!email) {
+    logWarn("admin.api-health.GET.forbidden", { email: null, reason: "Missing session email" });
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const authorization = await getApiHealthAuthorization(email, activeTenantId);
 
   if (!authorization.isPlatformAdmin && !authorization.isTenantAdmin) {
+    logWarn("admin.api-health.GET.forbidden", { email, reason: "Not a platform or tenant admin" });
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -53,3 +55,5 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     );
   }
 }
+
+export const GET = withRouteLogging("admin.api-health.GET", handleGet);

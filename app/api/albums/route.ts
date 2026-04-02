@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { listAlbumItemsForTenant } from "@/lib/gallery/albums";
 import { AuditAction } from "@/types";
+import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+async function handleGet(request: NextRequest): Promise<NextResponse> {
   const email = request.headers.get("x-session-email") ?? "unknown";
   const ip = request.headers.get("x-client-ip") ?? "unknown";
   const tenantId = request.headers.get("x-active-tenant-id") ?? "";
 
   if (!tenantId) {
+    logWarn("albums.GET.no_active_tenant", { email });
     return NextResponse.json({ error: "No active tenant" }, { status: 403 });
   }
 
@@ -25,7 +27,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(items);
   } catch (err) {
-    console.error("[albums] GET error:", err);
+    logError("albums.GET.failed", { tenantId, error: err });
     return NextResponse.json({ error: "Failed to load albums" }, { status: 500 });
   }
 }
+
+export const GET = withRouteLogging("albums.GET", handleGet);

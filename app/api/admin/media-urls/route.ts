@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { albums, media } from "@/lib/azure/cosmos";
 import { writeAuditLog } from "@/lib/audit/logger";
-import { isMediaContributor } from "@/lib/auth/permissions";
+import { isMediaContributor, isSuperAdmin } from "@/lib/auth/permissions";
+import { withRouteLogging, logWarn, logInfo } from "@/lib/logging/structured";
 import { AlbumRecord, MediaRecord, AuditAction } from "@/types";
 
 const ALLOWED_URL_PATTERNS = [
@@ -65,17 +66,26 @@ function getPlatformName(url: string): string {
  * POST /api/admin/media-urls
  * Add an external media URL (YouTube, Vimeo, etc.) to an album.
  */
-export async function POST(request: NextRequest): Promise<NextResponse> {
+async function handlePost(request: NextRequest): Promise<NextResponse> {
   const email = request.headers.get("x-session-email");
   if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const tenantId = request.headers.get("x-active-tenant-id") ?? "";
-  if (!tenantId) return NextResponse.json({ error: "No active tenant" }, { status: 403 });
+  if (!tenantId) {
+    logWarn("admin.media-urls.POST.no_tenant", { email });
+    return NextResponse.json({ error: "No active tenant" }, { status: 403 });
+  }
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
-  const canContribute = await isMediaContributor(email, tenantId);
-  if (!canContribute) {
+  // Check contributor OR super-admin access.
+  // Super-admins can operate on any tenant even without an explicit membership row.
+  const [canContribute, superAdmin] = await Promise.all([
+    isMediaContributor(email, tenantId),
+    isSuperAdmin(email),
+  ]);
+  if (!canContribute && !superAdmin) {
+    logWarn("admin.media-urls.POST.forbidden", { email, tenantId });
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -104,74 +114,73 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  try {
-    // Verify the album exists and belongs to this tenant
-    const albumsContainer = await albums();
-    const { resource: album } = await albumsContainer
-      .item(albumId, albumId)
-      .read<AlbumRecord>();
+  // Verify the album exists and belongs to this tenant
+  const albumsContainer = await albums();
+  const { resource: album } = await albumsContainer
+    .item(albumId, albumId)
+    .read<AlbumRecord>();
 
-    if (!album || album.isDeleted || album.tenantId !== tenantId) {
-      return NextResponse.json({ error: "Album not found" }, { status: 404 });
-    }
-
-    const now = new Date().toISOString();
-    const id = uuidv4();
-    const platformName = getPlatformName(url);
-    const displayTitle = title || `${platformName} Video`;
-
-    const record: MediaRecord = {
-      id,
-      albumId,
-      tenantId,
-      fileName: displayTitle,
-      title: displayTitle,
-      description: description || undefined,
-      fileType: "link",
-      mimeType: "text/uri-list",
-      sizeBytes: 0,
-      blobName: "",
-      thumbnailBlobName: "",
-      tags: [platformName.toLowerCase()],
-      uploadedAt: now,
-      uploadedBy: email,
-      isDeleted: false,
-      externalUrl: url,
-    };
-
-    const container = await media();
-    await container.items.create(record);
-
-    await writeAuditLog({
-      userEmail: email,
-      ipAddress: ip,
-      tenantId,
-      action: AuditAction.MEDIA_URL_ADDED,
-      detail: { mediaId: id, albumId, url, platform: platformName },
-    });
-
-    const thumbnailUrl = getThumbnailPlaceholder(url);
-
-    return NextResponse.json(
-      {
-        id: record.id,
-        albumId: record.albumId,
-        tenantId: record.tenantId,
-        fileName: record.fileName,
-        title: record.title,
-        description: record.description,
-        fileType: record.fileType,
-        mimeType: record.mimeType,
-        sizeBytes: record.sizeBytes,
-        thumbnailUrl,
-        tags: record.tags,
-        uploadedAt: record.uploadedAt,
-        externalUrl: record.externalUrl,
-      },
-      { status: 201 }
-    );
-  } catch (err) {
-    console.error("[admin/media-urls] POST error:", err);
-    return NextResponse.json({ error: "Failed to add media URL" }, { status: 500 });
+  if (!album || album.isDeleted || album.tenantId !== tenantId) {
+    return NextResponse.json({ error: "Album not found" }, { status: 404 });
   }
+
+  const now = new Date().toISOString();
+  const id = uuidv4();
+  const platformName = getPlatformName(url);
+  const displayTitle = title || `${platformName} Video`;
+
+  const record: MediaRecord = {
+    id,
+    albumId,
+    tenantId,
+    fileName: displayTitle,
+    title: displayTitle,
+    description: description || undefined,
+    fileType: "link",
+    mimeType: "text/uri-list",
+    sizeBytes: 0,
+    blobName: "",
+    thumbnailBlobName: "",
+    tags: [platformName.toLowerCase()],
+    uploadedAt: now,
+    uploadedBy: email,
+    isDeleted: false,
+    externalUrl: url,
+  };
+
+  const container = await media();
+  await container.items.create(record);
+
+  await writeAuditLog({
+    userEmail: email,
+    ipAddress: ip,
+    tenantId,
+    action: AuditAction.MEDIA_URL_ADDED,
+    detail: { mediaId: id, albumId, url, platform: platformName },
+  });
+
+  const thumbnailUrl = getThumbnailPlaceholder(url);
+
+  logInfo("admin.media-urls.POST.created", { email, tenantId, mediaId: id, albumId, platform: platformName });
+
+  return NextResponse.json(
+    {
+      id: record.id,
+      albumId: record.albumId,
+      tenantId: record.tenantId,
+      fileName: record.fileName,
+      title: record.title,
+      description: record.description,
+      fileType: record.fileType,
+      mimeType: record.mimeType,
+      sizeBytes: record.sizeBytes,
+      thumbnailUrl,
+      tags: record.tags,
+      uploadedAt: record.uploadedAt,
+      externalUrl: record.externalUrl,
+    },
+    { status: 201 }
+  );
 }
+
+export const POST = withRouteLogging("admin.media-urls.POST", handlePost);

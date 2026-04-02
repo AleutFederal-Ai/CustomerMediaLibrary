@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auditLogs } from "@/lib/azure/cosmos";
 import { isSuperAdmin } from "@/lib/auth/permissions";
 import { AuditLogRecord } from "@/types";
+import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 
 async function requireAdmin(request: NextRequest): Promise<boolean> {
   const email = request.headers.get("x-session-email");
@@ -10,8 +11,10 @@ async function requireAdmin(request: NextRequest): Promise<boolean> {
 }
 
 // GET /api/admin/audit?from=<ISO>&to=<ISO>&action=<action>&email=<email>&ip=<ip>&cursor=<token>&format=json|csv
-export async function GET(request: NextRequest): Promise<NextResponse> {
+async function handleGet(request: NextRequest): Promise<NextResponse> {
   if (!(await requireAdmin(request))) {
+    const email = request.headers.get("x-session-email");
+    logWarn("admin.audit.GET.forbidden", { email, reason: "Not a super admin" });
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -88,13 +91,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       continuationToken: page.continuationToken ?? null,
     });
   } catch (err) {
-    console.error("[admin/audit] GET error:", err);
+    logError("admin.audit.GET.error", { error: err });
     return NextResponse.json(
       { error: "Failed to load audit logs" },
       { status: 500 }
     );
   }
 }
+
+export const GET = withRouteLogging("admin.audit.GET", handleGet);
 
 function buildCsv(records: AuditLogRecord[]): string {
   const header = "timestamp,userEmail,ipAddress,action,tenantId,detail\r\n";

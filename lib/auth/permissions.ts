@@ -1,5 +1,6 @@
 import { canAccessAdmin } from "@/lib/auth/admin";
 import { memberships } from "@/lib/azure/cosmos";
+import { logDebug, logWarn, logError } from "@/lib/logging/structured";
 import { MembershipRecord } from "@/types";
 
 /**
@@ -7,7 +8,9 @@ import { MembershipRecord } from "@/types";
  * Checks Cosmos DB isPlatformAdmin flag first, then Entra ID group membership.
  */
 export async function isSuperAdmin(email: string): Promise<boolean> {
-  return canAccessAdmin(email);
+  const result = await canAccessAdmin(email);
+  logDebug("auth.isSuperAdmin", { email, result });
+  return result;
 }
 
 /**
@@ -21,7 +24,10 @@ export async function isTenantAdmin(
   tenantId: string
 ): Promise<boolean> {
   // Super admins can manage any tenant
-  if (await isSuperAdmin(email)) return true;
+  if (await isSuperAdmin(email)) {
+    logDebug("auth.isTenantAdmin.super_admin", { email, tenantId, result: true });
+    return true;
+  }
 
   try {
     const container = await memberships();
@@ -35,9 +41,16 @@ export async function isTenantAdmin(
         ],
       })
       .fetchAll();
-    return resources.length > 0;
-  } catch {
-    // Fail closed on error — deny access
+    const result = resources.length > 0;
+    logDebug("auth.isTenantAdmin.membership", { email, tenantId, result, matchCount: resources.length });
+    return result;
+  } catch (err) {
+    logError("auth.isTenantAdmin.error", {
+      email,
+      tenantId,
+      error: err,
+      hint: "Membership query failed — denying access (fail closed)",
+    });
     return false;
   }
 }
@@ -66,7 +79,10 @@ export async function isMediaContributor(
   tenantId: string
 ): Promise<boolean> {
   // Admins can also contribute
-  if (await isTenantAdmin(email, tenantId)) return true;
+  if (await isTenantAdmin(email, tenantId)) {
+    logDebug("auth.isMediaContributor.admin_pass", { email, tenantId });
+    return true;
+  }
 
   try {
     const container = await memberships();
@@ -80,8 +96,23 @@ export async function isMediaContributor(
         ],
       })
       .fetchAll();
-    return resources.length > 0;
-  } catch {
+    const result = resources.length > 0;
+    logDebug("auth.isMediaContributor.membership", { email, tenantId, result, matchCount: resources.length });
+    if (!result) {
+      logWarn("auth.isMediaContributor.denied", {
+        email,
+        tenantId,
+        hint: "User is not a super-admin, tenant admin, or contributor for this tenant",
+      });
+    }
+    return result;
+  } catch (err) {
+    logError("auth.isMediaContributor.error", {
+      email,
+      tenantId,
+      error: err,
+      hint: "Membership query failed — denying access (fail closed)",
+    });
     return false;
   }
 }

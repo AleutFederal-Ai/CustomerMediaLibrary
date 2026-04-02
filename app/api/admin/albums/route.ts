@@ -5,6 +5,7 @@ import { deleteBlob } from "@/lib/azure/blob";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { isTenantAdmin } from "@/lib/auth/permissions";
 import { AlbumRecord, MediaRecord, AuditAction } from "@/types";
+import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 
 /** Returns { email, tenantId } if the caller can manage the target tenant, null otherwise. */
 async function requireTenantAdmin(
@@ -23,9 +24,13 @@ async function requireTenantAdmin(
 }
 
 // GET /api/admin/albums — list albums for the active (or specified) tenant
-export async function GET(request: NextRequest): Promise<NextResponse> {
+async function handleGet(request: NextRequest): Promise<NextResponse> {
   const caller = await requireTenantAdmin(request);
-  if (!caller) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!caller) {
+    const email = request.headers.get("x-session-email");
+    logWarn("admin.albums.GET.forbidden", { email, reason: "Not a tenant admin or missing tenant" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   try {
     const container = await albums();
@@ -38,15 +43,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(resources);
   } catch (err) {
-    console.error("[admin/albums] GET error:", err);
+    logError("admin.albums.GET.error", { tenantId: caller.tenantId, error: err });
     return NextResponse.json({ error: "Failed to load albums" }, { status: 500 });
   }
 }
 
 // POST /api/admin/albums — create album
-export async function POST(request: NextRequest): Promise<NextResponse> {
+async function handlePost(request: NextRequest): Promise<NextResponse> {
   const caller = await requireTenantAdmin(request);
-  if (!caller) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!caller) {
+    const email = request.headers.get("x-session-email");
+    logWarn("admin.albums.POST.forbidden", { email, reason: "Not a tenant admin or missing tenant" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
@@ -88,15 +97,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(created, { status: 201 });
   } catch (err) {
-    console.error("[admin/albums] POST error:", err);
+    logError("admin.albums.POST.error", { tenantId: caller.tenantId, albumName: name, error: err });
     return NextResponse.json({ error: "Failed to create album" }, { status: 500 });
   }
 }
 
 // PATCH /api/admin/albums?id=<id> — update album
-export async function PATCH(request: NextRequest): Promise<NextResponse> {
+async function handlePatch(request: NextRequest): Promise<NextResponse> {
   const caller = await requireTenantAdmin(request);
-  if (!caller) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!caller) {
+    const email = request.headers.get("x-session-email");
+    logWarn("admin.albums.PATCH.forbidden", { email, reason: "Not a tenant admin or missing tenant" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
   const id = request.nextUrl.searchParams.get("id");
@@ -175,15 +188,19 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(result);
   } catch (err) {
-    console.error("[admin/albums] PATCH error:", err);
+    logError("admin.albums.PATCH.error", { tenantId: caller.tenantId, albumId: id, error: err });
     return NextResponse.json({ error: "Failed to update album" }, { status: 500 });
   }
 }
 
 // DELETE /api/admin/albums?id=<id> — soft delete album and its media
-export async function DELETE(request: NextRequest): Promise<NextResponse> {
+async function handleDelete(request: NextRequest): Promise<NextResponse> {
   const caller = await requireTenantAdmin(request);
-  if (!caller) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!caller) {
+    const email = request.headers.get("x-session-email");
+    logWarn("admin.albums.DELETE.forbidden", { email, reason: "Not a tenant admin or missing tenant" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
   const id = request.nextUrl.searchParams.get("id");
@@ -234,7 +251,12 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[admin/albums] DELETE error:", err);
+    logError("admin.albums.DELETE.error", { tenantId: caller.tenantId, albumId: id, error: err });
     return NextResponse.json({ error: "Failed to delete album" }, { status: 500 });
   }
 }
+
+export const GET = withRouteLogging("admin.albums.GET", handleGet);
+export const POST = withRouteLogging("admin.albums.POST", handlePost);
+export const PATCH = withRouteLogging("admin.albums.PATCH", handlePatch);
+export const DELETE = withRouteLogging("admin.albums.DELETE", handleDelete);

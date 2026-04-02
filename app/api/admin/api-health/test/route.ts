@@ -3,7 +3,7 @@ import { canAccessAdmin } from "@/lib/auth/admin";
 import { isTenantAdmin } from "@/lib/auth/permissions";
 import { runManualApiProbe } from "@/lib/api/probe";
 import { ApiManualProbeResponse } from "@/types";
-import { getRequestLogContext, logError, logInfo, logWarn } from "@/lib/logging/structured";
+import { withRouteLogging, getRequestLogContext, logError, logInfo, logWarn } from "@/lib/logging/structured";
 
 const ALLOWED_METHODS = new Set(["GET", "POST", "PATCH", "DELETE"]);
 const BLOCKED_PATHS = new Set([
@@ -11,13 +11,14 @@ const BLOCKED_PATHS = new Set([
   "/api/admin/api-health/test",
 ]);
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+async function handlePost(request: NextRequest): Promise<NextResponse> {
   const context = getRequestLogContext(request);
   const startedAt = Date.now();
   const email = request.headers.get("x-session-email");
   const activeTenantId = request.headers.get("x-active-tenant-id") ?? "";
 
   if (!email) {
+    logWarn("admin.api-health.test.POST.forbidden", { email: null, reason: "Missing session email" });
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -27,6 +28,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   ]);
 
   if (!isPlatformAdmin && !isTenantAdm) {
+    logWarn("admin.api-health.test.POST.forbidden", { email, reason: "Not a platform or tenant admin" });
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -120,3 +122,5 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 }
+
+export const POST = withRouteLogging("admin.api-health.test.POST", handlePost);

@@ -6,6 +6,7 @@ import { sanitizeNextPath } from "@/lib/auth/redirect";
 import { getTenantById } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { AuditAction } from "@/types";
+import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 
 async function resolveTenantSwitch(
   request: NextRequest
@@ -25,6 +26,7 @@ async function resolveTenantSwitch(
   const tenantIdsHeader = request.headers.get("x-tenant-ids") ?? "";
 
   if (!sessionId) {
+    logWarn("sessions.current.unauthorized", { email, reason: "no session id" });
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -51,6 +53,7 @@ async function resolveTenantSwitch(
   if (!tenantIds.includes(targetTenantId)) {
     const isPlatformAdmin = await canAccessAdmin(email);
     if (!isPlatformAdmin) {
+      logWarn("sessions.current.forbidden", { email, targetTenantId, reason: "not a member of tenant" });
       return NextResponse.json(
         { error: "Not a member of that tenant" },
         { status: 403 }
@@ -108,7 +111,7 @@ async function performTenantSwitch(
  * Switches the active tenant for the current session.
  * The tenantId must be in the user's existing tenant membership list.
  */
-export async function PATCH(request: NextRequest): Promise<NextResponse> {
+async function handlePatch(request: NextRequest): Promise<NextResponse> {
   const resolved = await resolveTenantSwitch(request);
   if (resolved instanceof NextResponse) {
     return resolved;
@@ -123,6 +126,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
   );
 
   if (!switched) {
+    logError("sessions.current.PATCH.switch_failed", { email: resolved.email, targetTenantId: resolved.targetTenantId });
     return NextResponse.json({ error: "Failed to switch tenant" }, { status: 500 });
   }
 
@@ -133,7 +137,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
  * GET /api/sessions/current?tenantId=<id>&next=/t/<slug>
  * Switches the active tenant and redirects to the provided safe local path.
  */
-export async function GET(request: NextRequest): Promise<NextResponse> {
+async function handleGet(request: NextRequest): Promise<NextResponse> {
   const resolved = await resolveTenantSwitch(request);
   const publicBaseUrl = getPublicBaseUrl(request);
   const fallbackUrl = new URL("/select-tenant", publicBaseUrl);
@@ -154,6 +158,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   );
 
   if (!switched) {
+    logError("sessions.current.GET.switch_failed", { email: resolved.email, targetTenantId: resolved.targetTenantId });
     return NextResponse.redirect(fallbackUrl);
   }
 
@@ -161,3 +166,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     sanitizeNextPath(request.nextUrl.searchParams.get("next")) ?? "/select-tenant";
   return NextResponse.redirect(new URL(safeNextPath, publicBaseUrl));
 }
+
+export const PATCH = withRouteLogging("sessions.current.PATCH", handlePatch);
+export const GET = withRouteLogging("sessions.current.GET", handleGet);

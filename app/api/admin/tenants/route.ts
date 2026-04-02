@@ -4,6 +4,7 @@ import { tenants } from "@/lib/azure/cosmos";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { isSuperAdmin } from "@/lib/auth/permissions";
 import { TenantRecord, AuditAction } from "@/types";
+import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 
 const SLUG_RE = /^[a-z0-9][a-z0-9\-]{0,62}[a-z0-9]$/;
 
@@ -14,9 +15,13 @@ async function requireSuperAdmin(request: NextRequest): Promise<string | null> {
 }
 
 // GET /api/admin/tenants — list all tenants
-export async function GET(request: NextRequest): Promise<NextResponse> {
+async function handleGet(request: NextRequest): Promise<NextResponse> {
   const email = await requireSuperAdmin(request);
-  if (!email) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!email) {
+    const reqEmail = request.headers.get("x-session-email");
+    logWarn("admin.tenants.GET.forbidden", { email: reqEmail, reason: "Not a super admin" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   try {
     const container = await tenants();
@@ -28,15 +33,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(resources);
   } catch (err) {
-    console.error("[admin/tenants] GET error:", err);
+    logError("admin.tenants.GET.error", { error: err });
     return NextResponse.json({ error: "Failed to load tenants" }, { status: 500 });
   }
 }
 
 // POST /api/admin/tenants — create a new tenant
-export async function POST(request: NextRequest): Promise<NextResponse> {
+async function handlePost(request: NextRequest): Promise<NextResponse> {
   const email = await requireSuperAdmin(request);
-  if (!email) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!email) {
+    const reqEmail = request.headers.get("x-session-email");
+    logWarn("admin.tenants.POST.forbidden", { email: reqEmail, reason: "Not a super admin" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
@@ -103,15 +112,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(created, { status: 201 });
   } catch (err) {
-    console.error("[admin/tenants] POST error:", err);
+    logError("admin.tenants.POST.error", { error: err });
     return NextResponse.json({ error: "Failed to create tenant" }, { status: 500 });
   }
 }
 
 // PATCH /api/admin/tenants?id=<id> — update tenant name
-export async function PATCH(request: NextRequest): Promise<NextResponse> {
+async function handlePatch(request: NextRequest): Promise<NextResponse> {
   const email = await requireSuperAdmin(request);
-  if (!email) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!email) {
+    const reqEmail = request.headers.get("x-session-email");
+    logWarn("admin.tenants.PATCH.forbidden", { email: reqEmail, reason: "Not a super admin" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
   const id = request.nextUrl.searchParams.get("id");
@@ -156,15 +169,19 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(result);
   } catch (err) {
-    console.error("[admin/tenants] PATCH error:", err);
+    logError("admin.tenants.PATCH.error", { tenantId: id, error: err });
     return NextResponse.json({ error: "Failed to update tenant" }, { status: 500 });
   }
 }
 
 // DELETE /api/admin/tenants?id=<id> — deactivate (soft delete) a tenant
-export async function DELETE(request: NextRequest): Promise<NextResponse> {
+async function handleDelete(request: NextRequest): Promise<NextResponse> {
   const email = await requireSuperAdmin(request);
-  if (!email) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!email) {
+    const reqEmail = request.headers.get("x-session-email");
+    logWarn("admin.tenants.DELETE.forbidden", { email: reqEmail, reason: "Not a super admin" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
   const id = request.nextUrl.searchParams.get("id");
@@ -189,7 +206,12 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[admin/tenants] DELETE error:", err);
+    logError("admin.tenants.DELETE.error", { tenantId: id, error: err });
     return NextResponse.json({ error: "Failed to deactivate tenant" }, { status: 500 });
   }
 }
+
+export const GET = withRouteLogging("admin.tenants.GET", handleGet);
+export const POST = withRouteLogging("admin.tenants.POST", handlePost);
+export const PATCH = withRouteLogging("admin.tenants.PATCH", handlePatch);
+export const DELETE = withRouteLogging("admin.tenants.DELETE", handleDelete);

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantById } from "@/lib/auth/tenant";
 import { TenantPublicItem } from "@/types";
+import { withRouteLogging } from "@/lib/logging/structured";
 
 /**
  * GET /api/tenants/current
  * Returns the active tenant's display info for the current session.
  * Used by the gallery and admin headers to show tenant branding.
  */
-export async function GET(request: NextRequest): Promise<NextResponse> {
+async function handleGet(request: NextRequest): Promise<NextResponse> {
   const activeTenantId = request.headers.get("x-active-tenant-id") ?? "";
 
   if (!activeTenantId) {
@@ -31,3 +32,5 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   return NextResponse.json(item);
 }
+
+export const GET = withRouteLogging("tenants.current.GET", handleGet);

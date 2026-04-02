@@ -3,17 +3,19 @@ import { media } from "@/lib/azure/cosmos";
 import { getBlobClient } from "@/lib/azure/blob";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { MediaRecord, AuditAction } from "@/types";
+import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 
 /**
  * GET /api/media/download?id=<mediaId>&albumId=<albumId>
  * Server-side single file download — never exposes blob URL to client.
  */
-export async function GET(request: NextRequest): Promise<NextResponse> {
+async function handleGet(request: NextRequest): Promise<NextResponse> {
   const email = request.headers.get("x-session-email") ?? "unknown";
   const ip = request.headers.get("x-client-ip") ?? "unknown";
   const tenantId = request.headers.get("x-active-tenant-id") ?? "";
 
   if (!tenantId) {
+    logWarn("media.download.GET.no_active_tenant", { email });
     return NextResponse.json({ error: "No active tenant" }, { status: 403 });
   }
 
@@ -46,6 +48,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const downloadResponse = await blobClient.download();
 
     if (!downloadResponse.readableStreamBody) {
+      logError("media.download.GET.no_stream", { mediaId: id, blobName: record.blobName });
       return NextResponse.json(
         { error: "Unable to stream file" },
         { status: 500 }
@@ -81,10 +84,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       },
     });
   } catch (err) {
-    console.error("[media/download] GET error:", err);
+    logError("media.download.GET.failed", { mediaId: id, tenantId, error: err });
     return NextResponse.json(
       { error: "Download failed" },
       { status: 500 }
     );
   }
 }
+
+export const GET = withRouteLogging("media.download.GET", handleGet);

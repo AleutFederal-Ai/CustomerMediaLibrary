@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { canAccessAdmin } from "@/lib/auth/admin";
 import { tenants as tenantsContainer } from "@/lib/azure/cosmos";
 import { TenantRecord, TenantListItem } from "@/types";
+import { withRouteLogging, logError } from "@/lib/logging/structured";
 
 /**
  * GET /api/tenants
  * Returns the list of tenants the authenticated user belongs to.
  * The user's tenant IDs come from the session (set at login by getUserTenantIds).
  */
-export async function GET(request: NextRequest): Promise<NextResponse> {
+async function handleGet(request: NextRequest): Promise<NextResponse> {
   const email = request.headers.get("x-session-email") ?? "";
   const tenantIdsHeader = request.headers.get("x-tenant-ids") ?? "";
   const tenantIds = tenantIdsHeader
@@ -51,7 +52,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(items);
   } catch (err) {
-    console.error("[tenants] GET error:", err);
+    logError("tenants.GET.failed", { email, error: err });
     return NextResponse.json({ error: "Failed to load tenants" }, { status: 500 });
   }
 }
+
+export const GET = withRouteLogging("tenants.GET", handleGet);

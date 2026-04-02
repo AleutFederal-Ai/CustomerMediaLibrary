@@ -6,7 +6,7 @@ import {
 } from "@/lib/auth/session";
 import { isSuperAdmin } from "@/lib/auth/permissions";
 import { writeAuditLog } from "@/lib/audit/logger";
-import { logInfo, logWarn, logError } from "@/lib/logging/structured";
+import { withRouteLogging, logInfo, logWarn, logError } from "@/lib/logging/structured";
 import { MembershipRecord, UserRecord, AuditAction } from "@/types";
 
 async function requirePlatformAdmin(request: NextRequest): Promise<string | null> {
@@ -15,9 +15,11 @@ async function requirePlatformAdmin(request: NextRequest): Promise<string | null
   return (await isSuperAdmin(email)) ? email : null;
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+async function handlePost(request: NextRequest): Promise<NextResponse> {
   const actorEmail = await requirePlatformAdmin(request);
   if (!actorEmail) {
+    const email = request.headers.get("x-session-email");
+    logWarn("admin.users.impersonate.POST.forbidden", { email, reason: "Not a platform admin" });
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -132,7 +134,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 }
 
-export async function DELETE(request: NextRequest): Promise<NextResponse> {
+async function handleDelete(request: NextRequest): Promise<NextResponse> {
   const sessionId = request.headers.get("x-session-id") ?? "";
   const impersonatorEmail = request.headers.get("x-impersonator-email")?.toLowerCase() ?? "";
   const ip = request.headers.get("x-client-ip") ?? "unknown";
@@ -166,3 +168,6 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
 
   return NextResponse.json({ success: true });
 }
+
+export const POST = withRouteLogging("admin.users.impersonate.POST", handlePost);
+export const DELETE = withRouteLogging("admin.users.impersonate.DELETE", handleDelete);

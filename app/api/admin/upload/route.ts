@@ -8,6 +8,7 @@ import { isMediaContributor } from "@/lib/auth/permissions";
 import { resolveUploadedMediaType } from "@/lib/media-upload";
 import { buildDefaultMediaTitle, normalizeMediaTags } from "@/lib/media-metadata";
 import { MediaRecord, AuditAction } from "@/types";
+import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 
 const THUMBNAIL_SIZE = 400;
 
@@ -15,18 +16,27 @@ const THUMBNAIL_SIZE = 400;
  * POST /api/admin/upload
  * multipart/form-data: { file: File, albumId: string, tags?: string (comma-separated) }
  */
-export async function POST(request: NextRequest): Promise<NextResponse> {
+async function handlePost(request: NextRequest): Promise<NextResponse> {
   const email = request.headers.get("x-session-email");
-  if (!email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!email) {
+    logWarn("admin.upload.POST.unauthorized", { reason: "Missing session email" });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const tenantId =
     request.nextUrl.searchParams.get("tenantId") ||
     request.headers.get("x-active-tenant-id") ||
     "";
-  if (!tenantId) return NextResponse.json({ error: "No active tenant" }, { status: 403 });
+  if (!tenantId) {
+    logWarn("admin.upload.POST.forbidden", { email, reason: "No active tenant" });
+    return NextResponse.json({ error: "No active tenant" }, { status: 403 });
+  }
 
   const canContribute = await isMediaContributor(email, tenantId);
-  if (!canContribute) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canContribute) {
+    logWarn("admin.upload.POST.forbidden", { email, tenantId, reason: "Not a media contributor" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
@@ -34,7 +44,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     formData = await request.formData();
   } catch (error) {
-    console.warn("[admin/upload] Unable to parse multipart form data", error);
+    logWarn("admin.upload.POST.form_parse_failed", { email, error });
     return NextResponse.json(
       {
         error:
@@ -159,7 +169,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(record, { status: 201 });
   } catch (err) {
-    console.error("[admin/upload] POST error:", err);
+    logError("admin.upload.POST.error", { email, tenantId, albumId, fileName: file.name, error: err });
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
 }
+
+export const POST = withRouteLogging("admin.upload.POST", handlePost);
