@@ -7,6 +7,7 @@ vi.mock("@/lib/auth/admin", () => ({
 
 vi.mock("@/lib/auth/base-url", () => ({
   getPublicBaseUrl: vi.fn(),
+  isSameOriginRequest: vi.fn(() => true),
 }));
 
 vi.mock("@/lib/auth/session", () => ({

@@ -31,3 +31,52 @@ export function getPublicBaseUrl(request: NextRequest): string {
   // Bare local dev fallback — no proxy in the path
   return `${request.nextUrl.protocol}//${request.nextUrl.host}`;
 }
+
+/**
+ * Verify that a request originates from the same site.
+ * Used to protect state-changing GET endpoints against CSRF when the
+ * session cookie uses SameSite=Lax (which sends cookies on cross-site
+ * top-level GET navigations).
+ *
+ * Checks:
+ *   1. Sec-Fetch-Site header (modern browsers) — reject "cross-site"
+ *   2. Referer / Origin header (fallback) — must share the same host
+ *
+ * Returns true if the request is same-origin (safe), false if cross-site.
+ */
+export function isSameOriginRequest(request: NextRequest): boolean {
+  // Sec-Fetch-Site is set by all modern browsers and cannot be spoofed by JS.
+  // Values: "same-origin", "same-site", "cross-site", "none" (direct nav / bookmark)
+  const fetchSite = request.headers.get("sec-fetch-site");
+  if (fetchSite) {
+    // "none" = typed URL / bookmark — safe
+    // "same-origin" / "same-site" = same site — safe
+    // "cross-site" = external link — reject
+    return fetchSite !== "cross-site";
+  }
+
+  // Fallback for older browsers: check Origin or Referer
+  const origin = request.headers.get("origin");
+  const referer = request.headers.get("referer");
+  const expectedHost = new URL(getPublicBaseUrl(request)).host;
+
+  if (origin) {
+    try {
+      return new URL(origin).host === expectedHost;
+    } catch {
+      return false;
+    }
+  }
+
+  if (referer) {
+    try {
+      return new URL(referer).host === expectedHost;
+    } catch {
+      return false;
+    }
+  }
+
+  // No Sec-Fetch-Site, no Origin, no Referer — likely a direct navigation
+  // or very old browser. Allow to avoid breaking legitimate access.
+  return true;
+}

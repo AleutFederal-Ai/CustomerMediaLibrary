@@ -1,11 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revokeSession, SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import { writeAuditLog } from "@/lib/audit/logger";
-import { getPublicBaseUrl } from "@/lib/auth/base-url";
-import { withRouteLogging, logInfo } from "@/lib/logging/structured";
+import { getPublicBaseUrl, isSameOriginRequest } from "@/lib/auth/base-url";
+import { withRouteLogging, logInfo, logWarn } from "@/lib/logging/structured";
 import { AuditAction } from "@/types";
 
 async function handleGet(request: NextRequest): Promise<NextResponse> {
+  // CSRF protection: signout is a state-changing GET endpoint.
+  // With SameSite=Lax, the cookie is sent on cross-site top-level GETs,
+  // so we verify the request originates from the same site.
+  if (!isSameOriginRequest(request)) {
+    logWarn("auth.signout.GET.csrf_blocked", {
+      ip: request.headers.get("x-client-ip") ?? "unknown",
+      secFetchSite: request.headers.get("sec-fetch-site"),
+      referer: request.headers.get("referer"),
+    });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const sessionId = request.headers.get("x-session-id");
   const email = request.headers.get("x-session-email") ?? "unknown";
   const ip = request.headers.get("x-client-ip") ?? "unknown";

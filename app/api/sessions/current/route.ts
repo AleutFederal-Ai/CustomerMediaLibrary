@@ -6,6 +6,7 @@ import { sanitizeNextPath } from "@/lib/auth/redirect";
 import { getTenantById } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { AuditAction } from "@/types";
+import { isSameOriginRequest } from "@/lib/auth/base-url";
 import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 
 async function resolveTenantSwitch(
@@ -138,6 +139,18 @@ async function handlePatch(request: NextRequest): Promise<NextResponse> {
  * Switches the active tenant and redirects to the provided safe local path.
  */
 async function handleGet(request: NextRequest): Promise<NextResponse> {
+  // CSRF protection: this GET endpoint mutates session state (switches tenant).
+  // With SameSite=Lax, the cookie is sent on cross-site top-level GETs,
+  // so we verify the request originates from the same site.
+  if (!isSameOriginRequest(request)) {
+    logWarn("sessions.current.GET.csrf_blocked", {
+      ip: request.headers.get("x-client-ip") ?? "unknown",
+      secFetchSite: request.headers.get("sec-fetch-site"),
+      referer: request.headers.get("referer"),
+    });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const resolved = await resolveTenantSwitch(request);
   const publicBaseUrl = getPublicBaseUrl(request);
   const fallbackUrl = new URL("/select-tenant", publicBaseUrl);
