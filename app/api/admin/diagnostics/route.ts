@@ -57,7 +57,7 @@ async function getRecentAuditSummary(): Promise<RecentAuditSummary> {
 
     // Count entries in last 24h
     const { resources: countResult } = await container.items
-      .query<{ total: number }>({
+      .query<number>({
         query: "SELECT VALUE COUNT(1) FROM c WHERE c.timestamp >= @since",
         parameters: [{ name: "@since", value: since }],
       })
@@ -124,7 +124,7 @@ async function getSessionStats(): Promise<ActiveSessionStats> {
       .fetchAll();
 
     const { resources: userCount } = await container.items
-      .query<{ cnt: number }>({
+      .query<number>({
         query:
           "SELECT VALUE COUNT(1) FROM (SELECT DISTINCT c.email FROM c WHERE c.type = 'session' AND c.expiresAt > @now)",
         parameters: [{ name: "@now", value: now }],

@@ -444,6 +444,15 @@ export const API_ENDPOINTS: ApiEndpointDefinition[] = [
     destructive: true,
   },
   {
+    id: "admin-diagnostics",
+    category: "Admin",
+    method: "GET",
+    pathTemplate: "/api/admin/diagnostics",
+    description: "Comprehensive system diagnostics for automated monitoring.",
+    authScope: "platformAdmin",
+    verificationMode: "automated",
+  },
+  {
     id: "admin-upload",
     category: "Tenant Admin",
     method: "POST",
