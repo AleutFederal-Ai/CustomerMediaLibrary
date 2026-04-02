@@ -24,7 +24,7 @@ These apply to every file, every function, every PR. No exceptions.
 
 - Never hardcode credentials, connection strings, API keys, tokens, or signing secrets
 - Never read secrets from `process.env` directly — load them from Azure Key Vault at runtime using `DefaultAzureCredential`
-- The only environment variables permitted in `.env` or App Service config are non-sensitive pointers: `AZURE_KEY_VAULT_URI`, `AZURE_CLOUD`, `GRAPH_ENDPOINT`, `NODE_ENV`, `APP_BASE_URL`
+- The only environment variables permitted in `.env` or App Service config are non-sensitive pointers: `AZURE_KEY_VAULT_URI`, `AZURE_CLOUD`, `GRAPH_ENDPOINT`, `NODE_ENV`, `APP_BASE_URL`, `LOG_LEVEL`
 - Never commit a `.env` file. The `.gitignore` must exclude it.
 
 ### 2. GCCH Endpoints Only — Never Commercial Azure
@@ -478,6 +478,82 @@ This banner must not be dismissible. Style it in amber/yellow to be clearly visi
 
 ---
 
+## Logging System
+
+### Structured Logging (`lib/logging/structured.ts`)
+
+All application logging uses a centralized structured logger that emits **JSON lines** to stdout/stderr. Azure App Service forwards these to **Log Analytics** (`mymedia-logs`) automatically.
+
+#### Log Levels
+
+Set `LOG_LEVEL` in App Service environment variables. Default: `info`.
+
+| Level | When to use | Output |
+|---|---|---|
+| `debug` | Verbose trace output — permission chains, query results, step-by-step flows | `console.log` |
+| `info` | Standard operations — requests, session events, successful actions | `console.log` |
+| `warn` | Non-critical issues — auth denials, rate limits, missing data | `console.warn` |
+| `error` | Failures — unhandled errors, infra problems, data corruption | `console.error` |
+
+#### Log Functions
+
+```typescript
+import { logDebug, logInfo, logWarn, logError } from "@/lib/logging/structured";
+
+logInfo("event.name", { key: "value", userId: "..." });
+```
+
+Every log line is a JSON object with: `timestamp`, `level`, `event`, `service`, `environment`, plus any context fields.
+
+#### Route Logging (`withRouteLogging`)
+
+Every API route handler is wrapped with `withRouteLogging`, which automatically logs:
+- **Request received** — method, path, user email, tenant ID, IP
+- **Response completed** — status code, duration in milliseconds
+- **Unhandled errors** — caught, logged with full stack, returns 500
+
+```typescript
+import { withRouteLogging } from "@/lib/logging/structured";
+
+async function handleGet(request: NextRequest): Promise<NextResponse> { /* ... */ }
+export const GET = withRouteLogging("routeName.GET", handleGet);
+```
+
+Route name convention: `category.METHOD` (e.g., `admin.albums.GET`, `auth.verify.GET`, `media.item.PATCH`).
+
+#### Permission Logging
+
+When `LOG_LEVEL=debug`, the permission chain (`isSuperAdmin` → `isTenantAdmin` → `isMediaContributor`) logs every step — which check passed or failed and why. This is critical for diagnosing 403 errors.
+
+#### Rules for New Code
+
+- **Never use `console.log`, `console.error`, or `console.warn` directly.** Use `logInfo`, `logError`, `logWarn`.
+- **Always wrap route handlers** with `withRouteLogging`.
+- **Log 4xx responses** with `logWarn` including the reason (email, tenantId, what failed).
+- **Log caught errors** with `logError` including the `error` object for stack traces.
+- **Include context** — always pass `email`, `tenantId`, `requestId` where available.
+
+### Audit Logging (`lib/audit/logger.ts`)
+
+Separate from structured logs. Writes to Cosmos DB `auditlogs` container for compliance. 90-day TTL. Append-only — never expose delete/update paths.
+
+Every sensitive action must call `writeAuditLog()` with: `userEmail`, `ipAddress`, `action` (from `AuditAction` enum), `tenantId`, `detail`.
+
+### Diagnostics Endpoint
+
+`GET /api/admin/diagnostics` — super-admin only. Returns comprehensive system health:
+
+- Infrastructure dependency checks (Cosmos DB, Blob Storage, Key Vault, Graph API) with latency
+- Per-collection Cosmos DB reachability probes (all 8 containers)
+- Active session count and unique user count
+- Last 24h audit log summary with error/failure action breakdown
+- 20 most recent audit entries
+- Runtime configuration snapshot (`LOG_LEVEL`, `NODE_ENV`, cloud settings)
+
+Returns **HTTP 503** when any service is degraded — designed for alerting and automated monitoring integration. See `docs/n8n-monitoring-guide.md` for bot automation.
+
+---
+
 ## What NOT to Build (Out of Scope for v1)
 
 - No SSO / SAML / OIDC login flows
@@ -527,6 +603,7 @@ This banner must not be dismissible. Style it in amber/yellow to be clearly visi
 | `APP_BASE_URL` | `https://mymedia.aleutfederal.us` |
 | `NODE_ENV` | `production` |
 | `WEBSITES_PORT` | `3000` |
+| `LOG_LEVEL` | `info` (set to `debug` for verbose diagnostics) |
 
 ### Key Vault — `mymedia-kv`
 
