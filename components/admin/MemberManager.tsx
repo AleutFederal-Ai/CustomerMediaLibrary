@@ -27,6 +27,13 @@ export default function MemberManager({
   const [error, setError] = useState<string | null>(null);
   const [busyUserEmail, setBusyUserEmail] = useState<string | null>(null);
 
+  // Password set/reset state
+  const [passwordTarget, setPasswordTarget] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     setAdding(true);
@@ -193,6 +200,37 @@ export default function MemberManager({
     }
   }
 
+  async function handleSetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!passwordTarget) return;
+
+    setPasswordSaving(true);
+    setPasswordError(null);
+    setPasswordSuccess(null);
+
+    try {
+      const res = await apiFetch("/api/admin/users/set-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: passwordTarget, password }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setPasswordError(data.error ?? "Failed to set password.");
+        return;
+      }
+
+      setPasswordSuccess(`Password updated for ${passwordTarget}.`);
+      setPassword("");
+      setPasswordTarget(null);
+    } catch {
+      setPasswordError("Network error.");
+    } finally {
+      setPasswordSaving(false);
+    }
+  }
+
   async function handleStopImpersonation() {
     setBusyUserEmail("__stop__");
     try {
@@ -268,6 +306,69 @@ export default function MemberManager({
           {error ? <p className="mt-3 text-sm text-[#ffb7b7]">{error}</p> : null}
         </form>
 
+        {passwordSuccess ? (
+          <div className="rounded-[1.1rem] border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+            {passwordSuccess}
+            <button
+              type="button"
+              onClick={() => setPasswordSuccess(null)}
+              className="ml-3 underline opacity-70 hover:opacity-100"
+            >
+              Dismiss
+            </button>
+          </div>
+        ) : null}
+
+        {passwordTarget ? (
+          <form onSubmit={handleSetPassword} className="surface-card-soft rounded-[1.25rem] p-5">
+            <p className="hero-kicker">Set Password</p>
+            <h3 className="mt-1 text-lg font-semibold tracking-[-0.03em] text-white">
+              {passwordTarget}
+            </h3>
+            <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_auto]">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-white/86">
+                  New password (min 12 characters)
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter new password"
+                  required
+                  minLength={12}
+                  className="ops-input"
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="submit"
+                  disabled={passwordSaving || password.length < 12}
+                  className="ops-button"
+                >
+                  {passwordSaving ? "Saving..." : "Set Password"}
+                </button>
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPasswordTarget(null);
+                    setPassword("");
+                    setPasswordError(null);
+                  }}
+                  className="ops-button-secondary"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+            {passwordError ? (
+              <p className="mt-3 text-sm text-[#ffb7b7]">{passwordError}</p>
+            ) : null}
+          </form>
+        ) : null}
+
         <div className="overflow-x-auto">
           <table className="ops-table text-sm">
             <thead>
@@ -306,14 +407,28 @@ export default function MemberManager({
                         Remove
                       </button>
                       {isPlatformAdmin ? (
-                        <button
-                          type="button"
-                          onClick={() => handleImpersonate(member.userEmail)}
-                          disabled={busyUserEmail === member.userEmail}
-                          className="ops-button-secondary"
-                        >
-                          {busyUserEmail === member.userEmail ? "Starting..." : "Impersonate"}
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPasswordTarget(member.userEmail);
+                              setPassword("");
+                              setPasswordError(null);
+                              setPasswordSuccess(null);
+                            }}
+                            className="ops-button-secondary"
+                          >
+                            Set Password
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleImpersonate(member.userEmail)}
+                            disabled={busyUserEmail === member.userEmail}
+                            className="ops-button-secondary"
+                          >
+                            {busyUserEmail === member.userEmail ? "Starting..." : "Impersonate"}
+                          </button>
+                        </>
                       ) : null}
                     </div>
                   </td>
@@ -381,6 +496,18 @@ export default function MemberManager({
                           className={user.isBlocked ? "ops-button" : "ops-button-danger"}
                         >
                           {user.isBlocked ? "Unblock" : "Block"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPasswordTarget(user.email);
+                            setPassword("");
+                            setPasswordError(null);
+                            setPasswordSuccess(null);
+                          }}
+                          className="ops-button-secondary"
+                        >
+                          Set Password
                         </button>
                         <button
                           type="button"
