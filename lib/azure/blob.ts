@@ -137,3 +137,55 @@ export async function deleteBlob(
     .getBlobClient(blobName);
   await blobClient.deleteIfExists();
 }
+
+// ----------------------------------------------------------------
+// Chunked (block blob) upload helpers
+// ----------------------------------------------------------------
+
+/**
+ * Stage a single block for a block blob. Each block is identified by a
+ * base64-encoded block ID that must be the same length for all blocks
+ * belonging to the same blob.
+ */
+export async function stageBlock(
+  containerName: string,
+  blobName: string,
+  blockId: string,
+  data: Buffer
+): Promise<void> {
+  const client = await getServiceClient();
+  const blockBlobClient = client
+    .getContainerClient(containerName)
+    .getBlockBlobClient(blobName);
+
+  await blockBlobClient.stageBlock(blockId, data, data.length);
+}
+
+/**
+ * Commit a list of previously staged blocks into the final blob.
+ * The blockIds array must be in the order they should be assembled.
+ */
+export async function commitBlockList(
+  containerName: string,
+  blobName: string,
+  blockIds: string[],
+  contentType: string
+): Promise<void> {
+  const client = await getServiceClient();
+  const blockBlobClient = client
+    .getContainerClient(containerName)
+    .getBlockBlobClient(blobName);
+
+  await blockBlobClient.commitBlockList(blockIds, {
+    blobHTTPHeaders: { blobContentType: contentType },
+  });
+}
+
+/**
+ * Generate a zero-padded, base64-encoded block ID from a chunk index.
+ * All block IDs for a single blob must be the same length, so we
+ * zero-pad to 6 digits (supports up to 999,999 blocks).
+ */
+export function encodeBlockId(chunkIndex: number): string {
+  return Buffer.from(String(chunkIndex).padStart(6, "0")).toString("base64");
+}

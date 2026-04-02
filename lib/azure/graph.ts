@@ -124,7 +124,21 @@ export async function isAdminGroupMember(email: string): Promise<boolean> {
   }
 }
 
+/**
+ * Escape a URL for safe embedding in HTML attributes and text content.
+ * Ensures & characters become &amp; so email clients do not mangle
+ * multi-parameter query strings.
+ */
+function htmlEscapeUrl(url: string): string {
+  return url
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 function buildEmailBody(magicLinkUrl: string): string {
+  const safeUrl = htmlEscapeUrl(magicLinkUrl);
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -172,7 +186,7 @@ function buildEmailBody(magicLinkUrl: string): string {
               <table cellpadding="0" cellspacing="0" style="margin-bottom: 28px;">
                 <tr>
                   <td align="center" bgcolor="#1e3a5f" style="border-radius: 8px; background-color: #1e3a5f;">
-                    <a href="${magicLinkUrl}" target="_blank"
+                    <a href="${safeUrl}" target="_blank"
                        style="display: inline-block; padding: 14px 32px; color: #ffffff; font-size: 15px; font-weight: bold; text-decoration: none; border-radius: 8px; mso-padding-alt: 14px 32px;">
                       &#9654;&nbsp; Sign In to Media Gallery
                     </a>
@@ -185,7 +199,7 @@ function buildEmailBody(magicLinkUrl: string): string {
                 If the button above does not work, copy and paste this link into your browser:
               </p>
               <p style="margin: 0 0 24px; font-size: 11px; word-break: break-all; line-height: 1.6;">
-                <a href="${magicLinkUrl}" style="color: #1e3a5f; text-decoration: underline;">${magicLinkUrl}</a>
+                <a href="${safeUrl}" style="color: #1e3a5f; text-decoration: underline;">${safeUrl}</a>
               </p>
 
               <p style="margin: 0 0 28px; font-size: 12px; color: #94a3b8; line-height: 1.6;">

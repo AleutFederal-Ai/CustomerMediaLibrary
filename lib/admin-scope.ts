@@ -47,10 +47,10 @@ export function buildTenantLoginPath(
 
 export function buildGalleryAlbumPath(
   tenantSlug: string | null | undefined,
-  albumId: string
+  albumIdOrSlug: string
 ): string {
   const normalizedSlug = tenantSlug?.trim().toLowerCase();
-  return normalizedSlug ? `/t/${normalizedSlug}/album/${albumId}` : `/album/${albumId}`;
+  return normalizedSlug ? `/t/${normalizedSlug}/album/${albumIdOrSlug}` : `/album/${albumIdOrSlug}`;
 }
 
 export function buildGalleryMediaPath(

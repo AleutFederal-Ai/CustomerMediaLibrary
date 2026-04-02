@@ -79,14 +79,23 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
   // Check contributor OR super-admin access.
-  // Super-admins can operate on any tenant even without an explicit membership row.
-  const [canContribute, superAdmin] = await Promise.all([
-    isMediaContributor(email, tenantId),
-    isSuperAdmin(email),
-  ]);
-  if (!canContribute && !superAdmin) {
-    logWarn("admin.media-urls.POST.forbidden", { email, tenantId });
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  // isMediaContributor already checks isTenantAdmin which checks isSuperAdmin,
+  // so a single call covers all permission tiers.
+  const canContribute = await isMediaContributor(email, tenantId);
+  if (!canContribute) {
+    // Explicit super-admin fallback for cases where the membership query fails
+    // but the user has the isPlatformAdmin flag in Cosmos.
+    const superAdmin = await isSuperAdmin(email);
+    if (!superAdmin) {
+      logWarn("admin.media-urls.POST.forbidden", {
+        email,
+        tenantId,
+        canContribute: false,
+        isSuperAdmin: false,
+        hint: "User is not a contributor, tenant admin, or super admin for this tenant",
+      });
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   }
 
   let body: { albumId?: string; url?: string; title?: string; description?: string };

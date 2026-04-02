@@ -48,7 +48,7 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json(
       {
         error:
-          "Upload payload could not be read. Please retry the upload. Large video files over 500 MB may need to be reduced before uploading.",
+          "Upload payload could not be read. Please retry the upload. Very large files are uploaded in chunks automatically — if this persists, try refreshing the page.",
       },
       { status: 400 }
     );

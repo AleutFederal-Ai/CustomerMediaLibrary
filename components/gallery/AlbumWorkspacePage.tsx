@@ -15,7 +15,7 @@ import UploadForm, { UploadFormHandle } from "@/components/admin/UploadForm";
 import { AccountTenantOption } from "@/components/account/AccountMenu";
 import { AlbumListItem, MediaListItem } from "@/types";
 import { apiFetch } from "@/lib/api-fetch";
-import { buildGalleryWorkspacePath } from "@/lib/admin-scope";
+import { buildGalleryAlbumPath, buildGalleryWorkspacePath } from "@/lib/admin-scope";
 import { AppShell, PageWidth } from "@/components/ui/AppFrame";
 import PlatformHeader from "@/components/ui/PlatformHeader";
 
@@ -81,6 +81,7 @@ export default function AlbumWorkspacePage({
   const [isAdmin, setIsAdmin] = useState(false);
   const [albumName, setAlbumName] = useState(initialAlbumName);
   const [albumDescription, setAlbumDescription] = useState("");
+  const [albumSlug, setAlbumSlug] = useState<string | undefined>();
   const [albumCoverMediaId, setAlbumCoverMediaId] = useState<string | undefined>();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
@@ -93,6 +94,7 @@ export default function AlbumWorkspacePage({
   const [addUrlError, setAddUrlError] = useState("");
   const [pageDropActive, setPageDropActive] = useState(false);
   const [pendingDroppedFiles, setPendingDroppedFiles] = useState<File[]>([]);
+  const [shareCopied, setShareCopied] = useState(false);
 
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const albumWorkspacePath = buildGalleryWorkspacePath(tenantSlug);
@@ -132,6 +134,7 @@ export default function AlbumWorkspacePage({
 
         if (currentAlbum) {
           setAlbumName(currentAlbum.name);
+          setAlbumSlug(currentAlbum.slug);
           setAlbumDescription(currentAlbum.description ?? "");
           setAlbumCoverMediaId(currentAlbum.coverMediaId);
         }
@@ -615,6 +618,21 @@ export default function AlbumWorkspacePage({
                 >
                   All Albums
                 </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const albumIdentifier = albumSlug || albumId;
+                    const path = buildGalleryAlbumPath(tenantSlug, albumIdentifier);
+                    const fullUrl = `${window.location.origin}${path}`;
+                    navigator.clipboard.writeText(fullUrl).then(() => {
+                      setShareCopied(true);
+                      setTimeout(() => setShareCopied(false), 2000);
+                    });
+                  }}
+                  className="ops-button-secondary"
+                >
+                  {shareCopied ? "Link Copied!" : "Share"}
+                </button>
                 <button
                   type="button"
                   onClick={() => setShowFilters((current) => !current)}

@@ -118,6 +118,12 @@ async function handlePatch(request: NextRequest): Promise<NextResponse> {
     return resolved;
   }
 
+  // Skip the switch if the session is already on the target tenant
+  const currentActiveTenantId = request.headers.get("x-active-tenant-id") ?? "";
+  if (currentActiveTenantId === resolved.targetTenantId) {
+    return NextResponse.json({ activeTenantId: resolved.targetTenantId });
+  }
+
   const switched = await performTenantSwitch(
     resolved.sessionId,
     resolved.email,
@@ -151,8 +157,20 @@ async function handleGet(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const resolved = await resolveTenantSwitch(request);
   const publicBaseUrl = getPublicBaseUrl(request);
+  const safeNextPath =
+    sanitizeNextPath(request.nextUrl.searchParams.get("next")) ?? "/select-tenant";
+  const currentActiveTenantId = request.headers.get("x-active-tenant-id") ?? "";
+  const targetTenantId = request.nextUrl.searchParams.get("tenantId")?.trim() ?? "";
+
+  // Skip the switch entirely if the session already has the correct tenant.
+  // This prevents redirect loops where the page keeps sending the user here
+  // even though the session is already on the right tenant.
+  if (targetTenantId && currentActiveTenantId === targetTenantId) {
+    return NextResponse.redirect(new URL(safeNextPath, publicBaseUrl));
+  }
+
+  const resolved = await resolveTenantSwitch(request);
   const fallbackUrl = new URL("/select-tenant", publicBaseUrl);
 
   if (resolved instanceof NextResponse) {
@@ -175,8 +193,6 @@ async function handleGet(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(fallbackUrl);
   }
 
-  const safeNextPath =
-    sanitizeNextPath(request.nextUrl.searchParams.get("next")) ?? "/select-tenant";
   return NextResponse.redirect(new URL(safeNextPath, publicBaseUrl));
 }
 

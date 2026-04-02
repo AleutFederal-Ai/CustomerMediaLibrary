@@ -1,8 +1,8 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { buildGalleryAlbumPath, buildGalleryWorkspacePath } from "@/lib/admin-scope";
-import { getTenantById } from "@/lib/auth/tenant";
-import { getAlbumById } from "@/lib/gallery/albums";
+import { getTenantById, getTenantBySlug } from "@/lib/auth/tenant";
+import { getAlbumById, getAlbumByIdOrSlug } from "@/lib/gallery/albums";
 
 export async function getGalleryAlbumPageContext({
   albumId,
@@ -19,8 +19,19 @@ export async function getGalleryAlbumPageContext({
     redirect("/login");
   }
 
-  const album = await getAlbumById(albumId);
   const normalizedRequestedTenantSlug = requestedTenantSlug?.trim().toLowerCase();
+
+  // Resolve the tenant to get tenantId for slug-based album lookups
+  let resolvedTenantId = activeTenantId;
+  if (normalizedRequestedTenantSlug) {
+    const tenant = await getTenantBySlug(normalizedRequestedTenantSlug);
+    if (tenant) resolvedTenantId = tenant.id;
+  }
+
+  // Try ID first, then slug within the tenant context
+  const album = resolvedTenantId
+    ? await getAlbumByIdOrSlug(albumId, resolvedTenantId)
+    : await getAlbumById(albumId);
 
   if (!album) {
     redirect(buildGalleryWorkspacePath(normalizedRequestedTenantSlug));
@@ -32,7 +43,11 @@ export async function getGalleryAlbumPageContext({
     redirect(buildGalleryWorkspacePath(normalizedRequestedTenantSlug));
   }
 
-  const canonicalPath = buildGalleryAlbumPath(tenant.slug, albumId);
+  // Use the resolved album ID (UUID), not the route param which may be a slug.
+  // Downstream components (search, upload) need the UUID to query Cosmos DB.
+  const resolvedAlbumId = album.id;
+  const canonicalAlbumIdentifier = album.slug || resolvedAlbumId;
+  const canonicalPath = buildGalleryAlbumPath(tenant.slug, canonicalAlbumIdentifier);
 
   if (activeTenantId !== tenant.id) {
     redirect(
@@ -40,6 +55,7 @@ export async function getGalleryAlbumPageContext({
     );
   }
 
+  // Redirect to canonical URL if the tenant slug doesn't match
   if (
     normalizedRequestedTenantSlug &&
     normalizedRequestedTenantSlug !== tenant.slug
@@ -47,8 +63,13 @@ export async function getGalleryAlbumPageContext({
     redirect(canonicalPath);
   }
 
+  // Redirect to slug-based URL if album was accessed by ID and has a slug
+  if (album.slug && albumId !== album.slug && albumId === album.id) {
+    redirect(buildGalleryAlbumPath(tenant.slug, album.slug));
+  }
+
   return {
-    albumId,
+    albumId: resolvedAlbumId,
     albumName: album.name,
     tenantId: tenant.id,
     tenantName: tenant.name,
