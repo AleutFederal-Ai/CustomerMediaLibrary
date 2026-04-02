@@ -4,6 +4,7 @@ import { users, sessions, memberships, tenants } from "@/lib/azure/cosmos";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { isSuperAdmin } from "@/lib/auth/permissions";
 import { UserRecord, UserAdminListItem, AuditAction, MemberRole, MembershipRecord } from "@/types";
+import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 
 const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
 
@@ -33,9 +34,13 @@ function toUserAdminListItem(
 }
 
 // GET /api/admin/users?cursor=<token>&search=<email>
-export async function GET(request: NextRequest): Promise<NextResponse> {
+async function handleGet(request: NextRequest): Promise<NextResponse> {
   const adminEmail = await requireAdmin(request);
-  if (!adminEmail) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!adminEmail) {
+    const email = request.headers.get("x-session-email");
+    logWarn("admin.users.GET.forbidden", { email, reason: "Not a super admin" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const search = request.nextUrl.searchParams.get("search")?.toLowerCase() ?? "";
   const continuationToken = request.nextUrl.searchParams.get("cursor") ?? undefined;
@@ -63,7 +68,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       continuationToken: page.continuationToken ?? null,
     });
   } catch (err) {
-    console.error("[admin/users] GET error:", err);
+    logError("admin.users.GET.error", { error: err });
     return NextResponse.json({ error: "Failed to load users" }, { status: 500 });
   }
 }
@@ -71,9 +76,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 // POST /api/admin/users/block — block a user
 // POST /api/admin/users/unblock — unblock a user
 // Body: { email: string, action: "block" | "unblock" | "create", tenantId?: string, tenantRole?: MemberRole }
-export async function POST(request: NextRequest): Promise<NextResponse> {
+async function handlePost(request: NextRequest): Promise<NextResponse> {
   const adminEmail = await requireAdmin(request);
-  if (!adminEmail) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!adminEmail) {
+    const email = request.headers.get("x-session-email");
+    logWarn("admin.users.POST.forbidden", { email, reason: "Not a super admin" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
@@ -261,16 +270,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[admin/users] POST error:", err);
+    logError("admin.users.POST.error", { error: err });
     return NextResponse.json({ error: "Operation failed" }, { status: 500 });
   }
 }
 
 // PATCH /api/admin/users — update user fields (e.g. promote/demote platform admin)
 // Body: { email: string, isPlatformAdmin?: boolean }
-export async function PATCH(request: NextRequest): Promise<NextResponse> {
+async function handlePatch(request: NextRequest): Promise<NextResponse> {
   const adminEmail = await requireAdmin(request);
-  if (!adminEmail) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!adminEmail) {
+    const email = request.headers.get("x-session-email");
+    logWarn("admin.users.PATCH.forbidden", { email, reason: "Not a super admin" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
@@ -328,7 +341,11 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ success: true, isPlatformAdmin: body.isPlatformAdmin });
   } catch (err) {
-    console.error("[admin/users] PATCH error:", err);
+    logError("admin.users.PATCH.error", { error: err });
     return NextResponse.json({ error: "Operation failed" }, { status: 500 });
   }
 }
+
+export const GET = withRouteLogging("admin.users.GET", handleGet);
+export const POST = withRouteLogging("admin.users.POST", handlePost);
+export const PATCH = withRouteLogging("admin.users.PATCH", handlePatch);

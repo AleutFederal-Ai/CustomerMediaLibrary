@@ -31,9 +31,12 @@ vi.mock("@/lib/audit/logger", () => ({
 }));
 
 vi.mock("@/lib/logging/structured", () => ({
+  logDebug: vi.fn(),
   logInfo: vi.fn(),
   logWarn: vi.fn(),
   logError: vi.fn(),
+  getRequestLogContext: vi.fn(() => ({})),
+  withRouteLogging: (_name: string, handler: Function) => handler,
 }));
 
 import { POST, DELETE } from "@/app/api/admin/users/impersonate/route";

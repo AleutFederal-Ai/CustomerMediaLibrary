@@ -1,5 +1,6 @@
 import { users } from "@/lib/azure/cosmos";
 import { isAdminGroupMember } from "@/lib/azure/graph";
+import { logDebug, logWarn, logError } from "@/lib/logging/structured";
 import { UserRecord } from "@/types";
 
 const DEV_BYPASS_EMAIL = "dev@aleutfederal.com";
@@ -19,6 +20,7 @@ export async function canAccessAdmin(email: string): Promise<boolean> {
   const emailLower = email.toLowerCase();
 
   if (process.env.DOCKER_DEV === "true" && emailLower === DEV_BYPASS_EMAIL) {
+    logDebug("auth.canAccessAdmin.dev_bypass", { email: emailLower });
     return true;
   }
 
@@ -31,11 +33,25 @@ export async function canAccessAdmin(email: string): Promise<boolean> {
         parameters: [{ name: "@email", value: emailLower }],
       })
       .fetchAll();
-    if (resources[0]?.isPlatformAdmin === true) { return true; }
-  } catch {
-    // Fail through to Entra ID check
+    if (resources[0]?.isPlatformAdmin === true) {
+      logDebug("auth.canAccessAdmin.cosmos_flag", { email: emailLower, result: true });
+      return true;
+    }
+    logDebug("auth.canAccessAdmin.cosmos_flag", {
+      email: emailLower,
+      result: false,
+      recordFound: resources.length > 0,
+    });
+  } catch (err) {
+    logError("auth.canAccessAdmin.cosmos_error", {
+      email: emailLower,
+      error: err,
+      hint: "Cosmos DB query for isPlatformAdmin failed — falling through to Entra ID",
+    });
   }
 
   // 2. Fall through to Entra ID group membership
-  return isAdminGroupMember(emailLower);
+  const isEntraMember = await isAdminGroupMember(emailLower);
+  logDebug("auth.canAccessAdmin.entra_check", { email: emailLower, result: isEntraMember });
+  return isEntraMember;
 }

@@ -4,6 +4,7 @@ import { memberships } from "@/lib/azure/cosmos";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { isTenantAdmin } from "@/lib/auth/permissions";
 import { MembershipRecord, AuditAction, MemberRole } from "@/types";
+import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 
 const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
 
@@ -22,9 +23,13 @@ async function requireTenantAdmin(
 }
 
 // GET /api/admin/members?tenantId=<id> — list members of a tenant
-export async function GET(request: NextRequest): Promise<NextResponse> {
+async function handleGet(request: NextRequest): Promise<NextResponse> {
   const caller = await requireTenantAdmin(request);
-  if (!caller) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!caller) {
+    const email = request.headers.get("x-session-email");
+    logWarn("admin.members.GET.forbidden", { email, reason: "Not a tenant admin or missing tenant" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   try {
     const container = await memberships();
@@ -38,16 +43,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(resources);
   } catch (err) {
-    console.error("[admin/members] GET error:", err);
+    logError("admin.members.GET.error", { tenantId: caller.tenantId, error: err });
     return NextResponse.json({ error: "Failed to load members" }, { status: 500 });
   }
 }
 
 // POST /api/admin/members — add an explicit member to a tenant
 // Body: { userEmail: string, role?: "viewer" | "admin" }
-export async function POST(request: NextRequest): Promise<NextResponse> {
+async function handlePost(request: NextRequest): Promise<NextResponse> {
   const caller = await requireTenantAdmin(request);
-  if (!caller) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!caller) {
+    const email = request.headers.get("x-session-email");
+    logWarn("admin.members.POST.forbidden", { email, reason: "Not a tenant admin or missing tenant" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
@@ -130,16 +139,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(record, { status: 201 });
   } catch (err) {
-    console.error("[admin/members] POST error:", err);
+    logError("admin.members.POST.error", { tenantId: caller.tenantId, error: err });
     return NextResponse.json({ error: "Failed to add member" }, { status: 500 });
   }
 }
 
 // PATCH /api/admin/members?tenantId=<id> — change a member's role
 // Body: { email: string, role: MemberRole }
-export async function PATCH(request: NextRequest): Promise<NextResponse> {
+async function handlePatch(request: NextRequest): Promise<NextResponse> {
   const caller = await requireTenantAdmin(request);
-  if (!caller) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!caller) {
+    const email = request.headers.get("x-session-email");
+    logWarn("admin.members.PATCH.forbidden", { email, reason: "Not a tenant admin or missing tenant" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
@@ -199,15 +212,19 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ ...member, role: newRole });
   } catch (err) {
-    console.error("[admin/members] PATCH error:", err);
+    logError("admin.members.PATCH.error", { tenantId: caller.tenantId, error: err });
     return NextResponse.json({ error: "Failed to update member role" }, { status: 500 });
   }
 }
 
 // DELETE /api/admin/members?tenantId=<id>&email=<email> — remove a member
-export async function DELETE(request: NextRequest): Promise<NextResponse> {
+async function handleDelete(request: NextRequest): Promise<NextResponse> {
   const caller = await requireTenantAdmin(request);
-  if (!caller) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!caller) {
+    const email = request.headers.get("x-session-email");
+    logWarn("admin.members.DELETE.forbidden", { email, reason: "Not a tenant admin or missing tenant" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
   const targetEmail = (request.nextUrl.searchParams.get("email") ?? "").toLowerCase().trim();
@@ -247,7 +264,12 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[admin/members] DELETE error:", err);
+    logError("admin.members.DELETE.error", { tenantId: caller.tenantId, error: err });
     return NextResponse.json({ error: "Failed to remove member" }, { status: 500 });
   }
 }
+
+export const GET = withRouteLogging("admin.members.GET", handleGet);
+export const POST = withRouteLogging("admin.members.POST", handlePost);
+export const PATCH = withRouteLogging("admin.members.PATCH", handlePatch);
+export const DELETE = withRouteLogging("admin.members.DELETE", handleDelete);

@@ -80,7 +80,7 @@ async function verifySignedCookie(
 const SESSION_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: true,
-  sameSite: "strict" as const,
+  sameSite: "lax" as const,
   path: "/",
   maxAge: ABSOLUTE_TIMEOUT_HOURS * 60 * 60,
 };
@@ -388,7 +388,7 @@ export async function revokeSession(
   response.cookies.set(COOKIE_NAME, "", {
     httpOnly: true,
     secure: true,
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     maxAge: 0,
   });

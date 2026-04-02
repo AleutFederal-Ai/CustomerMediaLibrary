@@ -4,6 +4,7 @@ import { users } from "@/lib/azure/cosmos";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { getUserRecordByEmail, toUserProfileSummary } from "@/lib/profile";
 import { AuditAction, UserProfileSummary, UserRecord } from "@/types";
+import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 
 const PROFILE_FIELDS = [
   "displayName",
@@ -19,10 +20,11 @@ function sanitizeValue(value: unknown, maxLength: number): string {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+async function handleGet(request: NextRequest): Promise<NextResponse> {
   const email = request.headers.get("x-session-email") ?? "";
 
   if (!email) {
+    logWarn("me.profile.GET.unauthorized", { reason: "no email header" });
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -31,7 +33,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const summary: UserProfileSummary = toUserProfileSummary(email, user);
     return NextResponse.json(summary);
   } catch (error) {
-    console.error("[me/profile] GET error:", error);
+    logError("me.profile.GET.failed", { email, error });
     return NextResponse.json(
       { error: "Failed to load profile" },
       { status: 500 }
@@ -39,11 +41,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 }
 
-export async function PATCH(request: NextRequest): Promise<NextResponse> {
+async function handlePatch(request: NextRequest): Promise<NextResponse> {
   const email = request.headers.get("x-session-email") ?? "";
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
   if (!email) {
+    logWarn("me.profile.PATCH.unauthorized", { reason: "no email header" });
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -136,10 +139,13 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     const updatedUser = await getUserRecordByEmail(email);
     return NextResponse.json(toUserProfileSummary(email, updatedUser));
   } catch (error) {
-    console.error("[me/profile] PATCH error:", error);
+    logError("me.profile.PATCH.failed", { email, error });
     return NextResponse.json(
       { error: "Failed to update profile" },
       { status: 500 }
     );
   }
 }
+
+export const GET = withRouteLogging("me.profile.GET", handleGet);
+export const PATCH = withRouteLogging("me.profile.PATCH", handlePatch);

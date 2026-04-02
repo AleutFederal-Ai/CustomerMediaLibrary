@@ -5,6 +5,7 @@ import { media } from "@/lib/azure/cosmos";
 import { getBlobClient } from "@/lib/azure/blob";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { MediaRecord, AuditAction } from "@/types";
+import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 
 /**
  * POST /api/download/bulk
@@ -12,12 +13,13 @@ import { MediaRecord, AuditAction } from "@/types";
  * Streams a ZIP of the requested files directly from blob storage.
  * Never exposes blob URLs to the client.
  */
-export async function POST(request: NextRequest): Promise<NextResponse> {
+async function handlePost(request: NextRequest): Promise<NextResponse> {
   const email = request.headers.get("x-session-email") ?? "unknown";
   const ip = request.headers.get("x-client-ip") ?? "unknown";
   const tenantId = request.headers.get("x-active-tenant-id") ?? "";
 
   if (!tenantId) {
+    logWarn("download.bulk.POST.no_active_tenant", { email });
     return NextResponse.json({ error: "No active tenant" }, { status: 403 });
   }
 
@@ -88,7 +90,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const archive = archiver("zip", { zlib: { level: 1 } });
 
     archive.on("error", (err) => {
-      console.error("[bulk-download] archiver error:", err);
+      logError("download.bulk.POST.archiver_error", { albumId, error: err });
       passThrough.destroy(err);
     });
 
@@ -109,7 +111,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
       await archive.finalize();
     })().catch((err) => {
-      console.error("[bulk-download] stream error:", err);
+      logError("download.bulk.POST.stream_error", { albumId, error: err });
       passThrough.destroy(err);
     });
 
@@ -136,7 +138,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
   } catch (err) {
-    console.error("[bulk-download] POST error:", err);
+    logError("download.bulk.POST.failed", { albumId, tenantId, error: err });
     return NextResponse.json({ error: "Download failed" }, { status: 500 });
   }
 }
+
+export const POST = withRouteLogging("download.bulk.POST", handlePost);

@@ -3,12 +3,13 @@ import { media } from "@/lib/azure/cosmos";
 import { generateSasUrl } from "@/lib/azure/blob";
 import { buildDefaultMediaTitle } from "@/lib/media-metadata";
 import { MediaRecord, MediaListItem } from "@/types";
+import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 
 /**
  * GET /api/search?q=<query>&albumId=<albumId>&type=image|video&cursor=<token>
  * Server-side search/filter across media items.
  */
-export async function GET(request: NextRequest): Promise<NextResponse> {
+async function handleGet(request: NextRequest): Promise<NextResponse> {
   const { searchParams } = request.nextUrl;
   const q = (searchParams.get("q") ?? "").trim().toLowerCase();
   const albumId = searchParams.get("albumId");
@@ -17,6 +18,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const tenantId = request.headers.get("x-active-tenant-id") ?? "";
 
   if (!tenantId) {
+    logWarn("search.GET.no_active_tenant", { email: request.headers.get("x-session-email") ?? "unknown" });
     return NextResponse.json({ error: "No active tenant" }, { status: 403 });
   }
 
@@ -106,7 +108,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       continuationToken: page.continuationToken ?? null,
     });
   } catch (err) {
-    console.error("[search] GET error:", err);
+    logError("search.GET.failed", { tenantId, q, albumId, error: err });
     return NextResponse.json({ error: "Search failed" }, { status: 500 });
   }
 }
+
+export const GET = withRouteLogging("search.GET", handleGet);

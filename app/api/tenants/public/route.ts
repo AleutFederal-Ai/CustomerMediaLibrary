@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { tenants } from "@/lib/azure/cosmos";
 import { TenantRecord, TenantPublicItem } from "@/types";
+import { withRouteLogging, logError } from "@/lib/logging/structured";
 
 /**
  * GET /api/tenants/public
  * Returns the list of tenants with isPublic=true and isActive=true.
  * No authentication required — used by the pre-login tenant selection UI.
  */
-export async function GET(): Promise<NextResponse> {
+async function handleGet(): Promise<NextResponse> {
   try {
     const container = await tenants();
     const { resources } = await container.items
@@ -28,7 +29,9 @@ export async function GET(): Promise<NextResponse> {
 
     return NextResponse.json(items);
   } catch (err) {
-    console.error("[tenants/public] GET error:", err);
+    logError("tenants.public.GET.failed", { error: err });
     return NextResponse.json({ error: "Failed to load tenants" }, { status: 500 });
   }
 }
+
+export const GET = withRouteLogging("tenants.public.GET", handleGet);

@@ -7,6 +7,7 @@ import { sanitizeNextPath } from "@/lib/auth/redirect";
 import { getTenantById, getTenantBySlug } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { buildTenantLoginPath } from "@/lib/admin-scope";
+import { withRouteLogging, logWarn } from "@/lib/logging/structured";
 import { AuditAction, UserRecord } from "@/types";
 
 function getIp(req: NextRequest): string {
@@ -20,7 +21,7 @@ function getIp(req: NextRequest): string {
 // POST /api/auth/password
 // Body: { email: string; password: string }
 // On success: sets session cookie, returns { ok: true }
-export async function POST(request: NextRequest): Promise<NextResponse> {
+async function handlePost(request: NextRequest): Promise<NextResponse> {
   const ip = getIp(request);
 
   let body: unknown;
@@ -53,109 +54,104 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     { status: 401 }
   );
 
-  try {
-    const container = await users();
-    const { resources } = await container.items
-      .query<UserRecord>({
-        query: "SELECT * FROM c WHERE c.email = @email",
-        parameters: [{ name: "@email", value: email }],
-      })
-      .fetchAll();
+  const container = await users();
+  const { resources } = await container.items
+    .query<UserRecord>({
+      query: "SELECT * FROM c WHERE c.email = @email",
+      parameters: [{ name: "@email", value: email }],
+    })
+    .fetchAll();
 
-    const user = resources[0];
+  const user = resources[0];
 
-    if (!user || !user.passwordHash || user.isBlocked) {
-      await writeAuditLog({
-        userEmail: email,
-        ipAddress: ip,
-        action: AuditAction.PASSWORD_LOGIN_FAILED,
-        detail: {
-          reason: !user
-            ? "user_not_found"
-            : user.isBlocked
-            ? "user_blocked"
-            : "no_password_set",
-        },
-      });
-      return INVALID;
-    }
-
-    const valid = await verifyPassword(password, user.passwordHash);
-    if (!valid) {
-      await writeAuditLog({
-        userEmail: email,
-        ipAddress: ip,
-        action: AuditAction.PASSWORD_LOGIN_FAILED,
-        detail: { reason: "bad_password" },
-      });
-      return INVALID;
-    }
-
+  if (!user || !user.passwordHash || user.isBlocked) {
+    const reason = !user
+      ? "user_not_found"
+      : user.isBlocked
+      ? "user_blocked"
+      : "no_password_set";
+    logWarn("auth.password.POST.login_failed", { email, reason });
     await writeAuditLog({
       userEmail: email,
       ipAddress: ip,
-      action: AuditAction.PASSWORD_LOGIN_SUCCESS,
-      detail: {},
+      action: AuditAction.PASSWORD_LOGIN_FAILED,
+      detail: { reason },
     });
-
-    // Resolve preferred tenant from slug (if provided)
-    let preferredTenantId: string | undefined;
-    let preferredTenantSlug: string | undefined;
-    if (tenantSlug) {
-      const tenant = await getTenantBySlug(tenantSlug);
-      if (tenant) {
-        preferredTenantId = tenant.id;
-        preferredTenantSlug = tenant.slug;
-      }
-    }
-
-    const { tenantIds, activeTenantId, signedCookieValue } =
-      await createSession(email, ip, preferredTenantId);
-
-    await writeAuditLog({
-      userEmail: email,
-      ipAddress: ip,
-      action: AuditAction.SESSION_CREATED,
-      detail: { email, method: "password" },
-    });
-
-    const isPlatformAdmin = await canAccessAdmin(email);
-
-    // Redirect priority:
-    // 0. Safe return path from the original shared link
-    // 1. Explicit platform-admin sign-in entry
-    // 2. Explicitly selected tenant from login
-    // 3. Active tenant resolved on the session
-    // 4. Multi-tenant selection step
-    // 5. Platform admin console
-    let redirectTo: string;
-    if (nextPath) {
-      redirectTo = nextPath;
-    } else if (isPlatformAdminMode) {
-      redirectTo = "/admin";
-    } else if (preferredTenantSlug) {
-      redirectTo = `/t/${preferredTenantSlug}`;
-    } else if (activeTenantId) {
-      const activeTenant = await getTenantById(activeTenantId);
-      redirectTo = activeTenant?.slug ? `/t/${activeTenant.slug}` : "/";
-    } else if (tenantIds.length > 1) {
-      redirectTo = "/select-tenant";
-    } else if (isPlatformAdminMode || isPlatformAdmin) {
-      redirectTo = "/admin";
-    } else {
-      redirectTo = preferredTenantSlug
-        ? buildTenantLoginPath(preferredTenantSlug)
-        : "/select-tenant";
-    }
-
-    const response = NextResponse.json({ ok: true, redirectTo });
-    setSessionCookie(response, signedCookieValue);
-    return response;
-  } catch (err) {
-    console.error("[auth/password] error:", err);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return INVALID;
   }
+
+  const valid = await verifyPassword(password, user.passwordHash);
+  if (!valid) {
+    logWarn("auth.password.POST.login_failed", { email, reason: "bad_password" });
+    await writeAuditLog({
+      userEmail: email,
+      ipAddress: ip,
+      action: AuditAction.PASSWORD_LOGIN_FAILED,
+      detail: { reason: "bad_password" },
+    });
+    return INVALID;
+  }
+
+  await writeAuditLog({
+    userEmail: email,
+    ipAddress: ip,
+    action: AuditAction.PASSWORD_LOGIN_SUCCESS,
+    detail: {},
+  });
+
+  // Resolve preferred tenant from slug (if provided)
+  let preferredTenantId: string | undefined;
+  let preferredTenantSlug: string | undefined;
+  if (tenantSlug) {
+    const tenant = await getTenantBySlug(tenantSlug);
+    if (tenant) {
+      preferredTenantId = tenant.id;
+      preferredTenantSlug = tenant.slug;
+    }
+  }
+
+  const { tenantIds, activeTenantId, signedCookieValue } =
+    await createSession(email, ip, preferredTenantId);
+
+  await writeAuditLog({
+    userEmail: email,
+    ipAddress: ip,
+    action: AuditAction.SESSION_CREATED,
+    detail: { email, method: "password" },
+  });
+
+  const isPlatformAdmin = await canAccessAdmin(email);
+
+  // Redirect priority:
+  // 0. Safe return path from the original shared link
+  // 1. Explicit platform-admin sign-in entry
+  // 2. Explicitly selected tenant from login
+  // 3. Active tenant resolved on the session
+  // 4. Multi-tenant selection step
+  // 5. Platform admin console
+  let redirectTo: string;
+  if (nextPath) {
+    redirectTo = nextPath;
+  } else if (isPlatformAdminMode) {
+    redirectTo = "/admin";
+  } else if (preferredTenantSlug) {
+    redirectTo = `/t/${preferredTenantSlug}`;
+  } else if (activeTenantId) {
+    const activeTenant = await getTenantById(activeTenantId);
+    redirectTo = activeTenant?.slug ? `/t/${activeTenant.slug}` : "/";
+  } else if (tenantIds.length > 1) {
+    redirectTo = "/select-tenant";
+  } else if (isPlatformAdminMode || isPlatformAdmin) {
+    redirectTo = "/admin";
+  } else {
+    redirectTo = preferredTenantSlug
+      ? buildTenantLoginPath(preferredTenantSlug)
+      : "/select-tenant";
+  }
+
+  const response = NextResponse.json({ ok: true, redirectTo });
+  setSessionCookie(response, signedCookieValue);
+  return response;
 }
+
+export const POST = withRouteLogging("auth.password.POST", handlePost);

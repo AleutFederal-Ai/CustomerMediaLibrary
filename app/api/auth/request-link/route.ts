@@ -6,6 +6,7 @@ import { canAccessAdmin } from "@/lib/auth/admin";
 import { getPublicBaseUrl } from "@/lib/auth/base-url";
 import { sanitizeNextPath } from "@/lib/auth/redirect";
 import { getUserTenantIds } from "@/lib/auth/tenant";
+import { withRouteLogging, logWarn, logInfo, logError } from "@/lib/logging/structured";
 import { AuditAction } from "@/types";
 
 // Strict email regex — rejects malformed addresses
@@ -25,7 +26,7 @@ function getIp(request: NextRequest): string {
   );
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+async function handlePost(request: NextRequest): Promise<NextResponse> {
   const ip = getIp(request);
 
   let email = "";
@@ -52,6 +53,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const withinLimit = await checkRateLimit(email, ip);
 
   if (!withinLimit) {
+    logWarn("auth.request-link.POST.rate_limited", { email, ip });
     await writeAuditLog({
       userEmail: email,
       ipAddress: ip,
@@ -80,6 +82,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       : Promise.resolve(false),
   ]);
   if (tenantIds.length === 0 && !isPlatformAdmin) {
+    logInfo("auth.request-link.POST.no_access", { email, tenantSlug });
     return NextResponse.json(GENERIC_RESPONSE, { status: 200 });
   }
 
@@ -92,10 +95,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const magicLinkUrl = `${baseUrl}/api/auth/verify?token=${rawToken}${tenantParam}${modeParam}${nextParam}`;
 
     await sendMagicLinkEmail(email, magicLinkUrl);
+    logInfo("auth.request-link.POST.email_sent", { email });
   } catch (err) {
     // Log but do not expose error details to the caller
-    console.error("[request-link] Failed to send magic link:", err);
+    logError("auth.request-link.POST.send_failed", { email, error: err });
   }
 
   return NextResponse.json(GENERIC_RESPONSE, { status: 200 });
 }
+
+export const POST = withRouteLogging("auth.request-link.POST", handlePost);

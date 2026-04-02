@@ -7,7 +7,7 @@ import { writeAuditLog } from "@/lib/audit/logger";
 import { getPublicBaseUrl } from "@/lib/auth/base-url";
 import { sanitizeNextPath } from "@/lib/auth/redirect";
 import { buildTenantLoginPath } from "@/lib/admin-scope";
-import { logError } from "@/lib/logging/structured";
+import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 import { AuditAction } from "@/types";
 
 function getIp(request: NextRequest): string {
@@ -18,7 +18,7 @@ function getIp(request: NextRequest): string {
   );
 }
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+async function handleGet(request: NextRequest): Promise<NextResponse> {
   const ip = getIp(request);
   const token = request.nextUrl.searchParams.get("token") ?? "";
   const tenantSlug = request.nextUrl.searchParams.get("tenant") ?? "";
@@ -45,12 +45,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       })();
 
   if (!token) {
+    logWarn("auth.verify.GET.missing_token", { ip });
     return NextResponse.redirect(new URL(invalidLoginPath, publicBase));
   }
 
   const email = await validateMagicLinkToken(token, ip);
 
   if (!email) {
+    logWarn("auth.verify.GET.invalid_token", { ip, reason: "token_validation_failed" });
     await writeAuditLog({
       userEmail: "unknown",
       ipAddress: ip,
@@ -123,7 +125,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     setSessionCookie(response, signedCookieValue);
     return response;
   } catch (err) {
-    logError("verify.session_creation_failed", {
+    logError("auth.verify.GET.session_creation_failed", {
       email,
       error: err,
       hint: "Token was valid but session creation failed",
@@ -146,3 +148,5 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(new URL(errorPath, publicBase));
   }
 }
+
+export const GET = withRouteLogging("auth.verify.GET", handleGet);

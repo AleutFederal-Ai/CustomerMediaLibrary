@@ -4,6 +4,7 @@ import { domains } from "@/lib/azure/cosmos";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { isTenantAdmin } from "@/lib/auth/permissions";
 import { DomainRecord, AuditAction } from "@/types";
+import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 
 const DOMAIN_RE = /^[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?)+$/i;
 
@@ -22,9 +23,13 @@ async function requireTenantAdmin(
 }
 
 // GET /api/admin/domains — list domains for the active tenant
-export async function GET(request: NextRequest): Promise<NextResponse> {
+async function handleGet(request: NextRequest): Promise<NextResponse> {
   const caller = await requireTenantAdmin(request);
-  if (!caller) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!caller) {
+    const email = request.headers.get("x-session-email");
+    logWarn("admin.domains.GET.forbidden", { email, reason: "Not a tenant admin or missing tenant" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   try {
     const container = await domains();
@@ -37,15 +42,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(resources);
   } catch (err) {
-    console.error("[admin/domains] GET error:", err);
+    logError("admin.domains.GET.error", { tenantId: caller.tenantId, error: err });
     return NextResponse.json({ error: "Failed to load domains" }, { status: 500 });
   }
 }
 
 // POST /api/admin/domains — add a domain to the active tenant
-export async function POST(request: NextRequest): Promise<NextResponse> {
+async function handlePost(request: NextRequest): Promise<NextResponse> {
   const caller = await requireTenantAdmin(request);
-  if (!caller) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!caller) {
+    const email = request.headers.get("x-session-email");
+    logWarn("admin.domains.POST.forbidden", { email, reason: "Not a tenant admin or missing tenant" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
@@ -126,15 +135,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json(record, { status: 201 });
   } catch (err) {
-    console.error("[admin/domains] POST error:", err);
+    logError("admin.domains.POST.error", { tenantId: caller.tenantId, error: err });
     return NextResponse.json({ error: "Failed to add domain" }, { status: 500 });
   }
 }
 
 // DELETE /api/admin/domains?id=<id> — deactivate a domain
-export async function DELETE(request: NextRequest): Promise<NextResponse> {
+async function handleDelete(request: NextRequest): Promise<NextResponse> {
   const caller = await requireTenantAdmin(request);
-  if (!caller) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!caller) {
+    const email = request.headers.get("x-session-email");
+    logWarn("admin.domains.DELETE.forbidden", { email, reason: "Not a tenant admin or missing tenant" });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
   const id = request.nextUrl.searchParams.get("id");
@@ -171,7 +184,11 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[admin/domains] DELETE error:", err);
+    logError("admin.domains.DELETE.error", { tenantId: caller.tenantId, domainId: id, error: err });
     return NextResponse.json({ error: "Failed to deactivate domain" }, { status: 500 });
   }
 }
+
+export const GET = withRouteLogging("admin.domains.GET", handleGet);
+export const POST = withRouteLogging("admin.domains.POST", handlePost);
+export const DELETE = withRouteLogging("admin.domains.DELETE", handleDelete);

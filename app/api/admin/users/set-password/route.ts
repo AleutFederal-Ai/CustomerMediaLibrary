@@ -4,6 +4,7 @@ import { hashPassword } from "@/lib/auth/password";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { isSuperAdmin } from "@/lib/auth/permissions";
 import { AuditAction, UserRecord } from "@/types";
+import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 
 async function requireAdmin(request: NextRequest): Promise<string | null> {
   const email = request.headers.get("x-session-email");
@@ -16,9 +17,11 @@ async function requireAdmin(request: NextRequest): Promise<string | null> {
 // Body: { email: string; password: string }
 // Allows an admin to assign (or reset) a password for any existing user.
 // The user must already exist (i.e. have logged in at least once via magic link).
-export async function POST(request: NextRequest): Promise<NextResponse> {
+async function handlePost(request: NextRequest): Promise<NextResponse> {
   const adminEmail = await requireAdmin(request);
   if (!adminEmail) {
+    const email = request.headers.get("x-session-email");
+    logWarn("admin.users.set-password.POST.forbidden", { email, reason: "Not a super admin" });
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -83,7 +86,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[admin/users/set-password] error:", err);
+    logError("admin.users.set-password.POST.error", { targetEmail, error: err });
     return NextResponse.json({ error: "Operation failed" }, { status: 500 });
   }
 }
+
+export const POST = withRouteLogging("admin.users.set-password.POST", handlePost);

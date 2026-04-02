@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTenantBySlug } from "@/lib/auth/tenant";
 import { TenantPublicItem } from "@/types";
+import { withRouteLogging } from "@/lib/logging/structured";
 
 /**
  * POST /api/tenants/lookup
@@ -13,7 +14,7 @@ import { TenantPublicItem } from "@/types";
  * Never differentiates between "doesn't exist" and "private" — always 404 for
  * invalid slugs to prevent enumeration of private tenant names.
  */
-export async function POST(request: NextRequest): Promise<NextResponse> {
+async function handlePost(request: NextRequest): Promise<NextResponse> {
   let body: unknown;
   try {
     body = await request.json();
@@ -46,3 +47,5 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   return NextResponse.json(item);
 }
+
+export const POST = withRouteLogging("tenants.lookup.POST", handlePost);

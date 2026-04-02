@@ -4,12 +4,14 @@ import { writeAuditLog } from "@/lib/audit/logger";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { getUserRecordByEmail } from "@/lib/profile";
 import { AuditAction } from "@/types";
+import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+async function handlePost(request: NextRequest): Promise<NextResponse> {
   const email = request.headers.get("x-session-email") ?? "";
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
   if (!email) {
+    logWarn("me.password.POST.unauthorized", { reason: "no email header" });
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -80,10 +82,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("[me/password] POST error:", error);
+    logError("me.password.POST.failed", { email, error });
     return NextResponse.json(
       { error: "Failed to update password" },
       { status: 500 }
     );
   }
 }
+
+export const POST = withRouteLogging("me.password.POST", handlePost);
