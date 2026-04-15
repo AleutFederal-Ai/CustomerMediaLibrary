@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MediaListItem } from "@/types";
 import MediaThumbnail from "./MediaThumbnail";
 
@@ -17,6 +17,12 @@ interface Props {
   updatingCover?: boolean;
   canContribute?: boolean;
   onDelete?: (item: MediaListItem) => void;
+  /**
+   * Swap two media items. Called from both drag-drop and the arrow
+   * buttons on each thumbnail. Provide a no-op or omit to disable
+   * reordering entirely (e.g. while filtered search is active).
+   */
+  onReorder?: (fromId: string, toId: string) => void | Promise<void>;
 }
 
 export default function MediaGrid({
@@ -32,9 +38,62 @@ export default function MediaGrid({
   updatingCover = false,
   canContribute,
   onDelete,
+  onReorder,
 }: Props) {
   const hasBulkActions =
     Boolean(onBulkDownload) || Boolean(onBulkDelete) || Boolean(onMakeAlbumCover);
+  const reorderEnabled = Boolean(canContribute && onReorder);
+  const [dragSourceId, setDragSourceId] = useState<string | null>(null);
+  const [dragTargetId, setDragTargetId] = useState<string | null>(null);
+
+  const handleDragStart = useCallback((id: string) => {
+    setDragSourceId(id);
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    setDragSourceId(null);
+    setDragTargetId(null);
+  }, []);
+
+  const handleDragOver = useCallback(
+    (id: string) => {
+      if (!dragSourceId || dragSourceId === id) return;
+      setDragTargetId(id);
+    },
+    [dragSourceId]
+  );
+
+  const handleDrop = useCallback(
+    (id: string) => {
+      if (!reorderEnabled || !onReorder) return;
+      const fromId = dragSourceId;
+      setDragSourceId(null);
+      setDragTargetId(null);
+      if (!fromId || fromId === id) return;
+      void onReorder(fromId, id);
+    },
+    [dragSourceId, onReorder, reorderEnabled]
+  );
+
+  const handleMoveUp = useCallback(
+    (id: string) => {
+      if (!reorderEnabled || !onReorder) return;
+      const index = items.findIndex((i) => i.id === id);
+      if (index <= 0) return;
+      void onReorder(id, items[index - 1].id);
+    },
+    [items, onReorder, reorderEnabled]
+  );
+
+  const handleMoveDown = useCallback(
+    (id: string) => {
+      if (!reorderEnabled || !onReorder) return;
+      const index = items.findIndex((i) => i.id === id);
+      if (index < 0 || index >= items.length - 1) return;
+      void onReorder(id, items[index + 1].id);
+    },
+    [items, onReorder, reorderEnabled]
+  );
 
   const handleSelect = useCallback((id: string, isSelected: boolean) => {
     onSelectedChange(
@@ -184,7 +243,7 @@ export default function MediaGrid({
       ) : null}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
-        {items.map((item) => (
+        {items.map((item, index) => (
           <MediaThumbnail
             key={item.id}
             item={item}
@@ -194,6 +253,21 @@ export default function MediaGrid({
             onClick={onItemClick}
             canContribute={canContribute}
             onDelete={onDelete}
+            draggable={reorderEnabled}
+            isDragTarget={dragTargetId === item.id}
+            isDragging={dragSourceId === item.id}
+            onDragStart={reorderEnabled ? handleDragStart : undefined}
+            onDragOver={reorderEnabled ? handleDragOver : undefined}
+            onDragEnd={reorderEnabled ? handleDragEnd : undefined}
+            onDrop={reorderEnabled ? handleDrop : undefined}
+            onMoveUp={
+              reorderEnabled && index > 0 ? handleMoveUp : undefined
+            }
+            onMoveDown={
+              reorderEnabled && index < items.length - 1
+                ? handleMoveDown
+                : undefined
+            }
           />
         ))}
       </div>

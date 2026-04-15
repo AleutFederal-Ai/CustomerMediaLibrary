@@ -111,6 +111,7 @@ export default function Lightbox({
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState("");
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   useEffect(() => {
     setTitle(item.title ?? item.fileName);
@@ -119,6 +120,9 @@ export default function Lightbox({
     setSaveMessage("");
     setSaveError("");
     setCopyState("idle");
+    // Reset the loaded flag so the spinner shows again while the newly
+    // selected full-res image is being fetched.
+    setImageLoaded(false);
   }, [item]);
 
   const stopSlideshow = useCallback(() => {
@@ -431,12 +435,27 @@ export default function Lightbox({
                 );
               })()
             ) : item.fileType === "image" ? (
-              <img
-                src={item.sasUrl}
-                alt={item.title ?? item.fileName}
-                className="max-h-full max-w-full rounded-[1.2rem] object-contain"
-                draggable={false}
-              />
+              <div className="relative flex h-full w-full items-center justify-center">
+                <img
+                  key={item.id}
+                  src={item.sasUrl}
+                  alt={item.title ?? item.fileName}
+                  className="max-h-full max-w-full rounded-[1.2rem] object-contain"
+                  draggable={false}
+                  decoding="async"
+                  loading="eager"
+                  onLoad={() => setImageLoaded(true)}
+                  onError={() => setImageLoaded(true)}
+                />
+                {!imageLoaded ? (
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 flex items-center justify-center"
+                  >
+                    <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+                  </div>
+                ) : null}
+              </div>
             ) : (
               <VideoPlayer
                 src={item.sasUrl}

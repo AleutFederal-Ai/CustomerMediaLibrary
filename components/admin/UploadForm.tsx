@@ -11,7 +11,7 @@ import {
   useState,
 } from "react";
 
-const MAX_QUEUE_ITEMS = 20;
+const MAX_QUEUE_ITEMS = 500;
 
 /**
  * Files larger than this threshold are uploaded using the chunked
@@ -102,6 +102,147 @@ function getStatusClass(status: UploadStatus): string {
 
 function createQueueId(file: File): string {
   return `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// ----------------------------------------------------------------
+// Client-side video thumbnail extraction
+// ----------------------------------------------------------------
+
+const VIDEO_THUMBNAIL_SIZE = 400;
+const VIDEO_THUMBNAIL_TIMEOUT_MS = 15000;
+
+/**
+ * Extract a single frame from a video file and return it as a 400x400
+ * cover-fit WebP Blob. Resolves with `null` on any failure — the server
+ * then falls back to its generic placeholder rather than blocking the
+ * upload.
+ */
+async function extractVideoThumbnail(file: File): Promise<Blob | null> {
+  if (typeof document === "undefined") return null;
+
+  const objectUrl = URL.createObjectURL(file);
+  const video = document.createElement("video");
+  video.preload = "metadata";
+  video.muted = true;
+  video.playsInline = true;
+  video.crossOrigin = "anonymous";
+  video.src = objectUrl;
+
+  const cleanup = () => {
+    URL.revokeObjectURL(objectUrl);
+    video.removeAttribute("src");
+    try {
+      video.load();
+    } catch {
+      // no-op
+    }
+  };
+
+  try {
+    const blob = await new Promise<Blob | null>((resolve) => {
+      const timer = window.setTimeout(() => {
+        resolve(null);
+      }, VIDEO_THUMBNAIL_TIMEOUT_MS);
+
+      const handleError = () => {
+        window.clearTimeout(timer);
+        resolve(null);
+      };
+
+      video.addEventListener("error", handleError, { once: true });
+
+      video.addEventListener(
+        "loadeddata",
+        () => {
+          // Seek to the first frame that's likely to have real content —
+          // 10% into the video, capped at 1s to avoid long dark intros
+          // dominating the thumbnail.
+          const seekTo = Number.isFinite(video.duration)
+            ? Math.min(1, Math.max(0, video.duration * 0.1))
+            : 0;
+          try {
+            video.currentTime = seekTo;
+          } catch {
+            handleError();
+          }
+        },
+        { once: true }
+      );
+
+      video.addEventListener(
+        "seeked",
+        () => {
+          try {
+            const canvas = document.createElement("canvas");
+            canvas.width = VIDEO_THUMBNAIL_SIZE;
+            canvas.height = VIDEO_THUMBNAIL_SIZE;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+              window.clearTimeout(timer);
+              resolve(null);
+              return;
+            }
+
+            // Cover-fit: crop to a square centered on the frame.
+            const sw = video.videoWidth;
+            const sh = video.videoHeight;
+            if (!sw || !sh) {
+              window.clearTimeout(timer);
+              resolve(null);
+              return;
+            }
+            const side = Math.min(sw, sh);
+            const sx = (sw - side) / 2;
+            const sy = (sh - side) / 2;
+            ctx.drawImage(
+              video,
+              sx,
+              sy,
+              side,
+              side,
+              0,
+              0,
+              VIDEO_THUMBNAIL_SIZE,
+              VIDEO_THUMBNAIL_SIZE
+            );
+
+            canvas.toBlob(
+              (output) => {
+                window.clearTimeout(timer);
+                resolve(output);
+              },
+              "image/webp",
+              0.8
+            );
+          } catch {
+            window.clearTimeout(timer);
+            resolve(null);
+          }
+        },
+        { once: true }
+      );
+    });
+
+    return blob;
+  } finally {
+    cleanup();
+  }
+}
+
+async function blobToBase64(blob: Blob): Promise<string> {
+  // Avoid FileReader — we want a synchronous-ish base64 encoding that
+  // works in both browser and jsdom without leaking data URL prefixes.
+  const buffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(
+      null,
+      Array.from(bytes.subarray(i, i + chunkSize))
+    );
+  }
+  return btoa(binary);
 }
 
 // ----------------------------------------------------------------
@@ -221,7 +362,8 @@ async function commitChunkedUpload(
   initData: InitiateResponse,
   file: File,
   albumId: string,
-  tags: string
+  tags: string,
+  thumbnailBase64: string | null
 ): Promise<UploadResponseLike> {
   const response = await fetch("/api/admin/upload/commit", {
     method: "POST",
@@ -236,6 +378,7 @@ async function commitChunkedUpload(
       albumId,
       tags,
       totalChunks: initData.totalChunks,
+      thumbnailBase64,
     }),
   });
 
@@ -255,6 +398,7 @@ async function chunkedUploadWithProgress(
   file: File,
   albumId: string,
   tags: string,
+  thumbnailBase64: string | null,
   onProgress: (progress: number) => void
 ): Promise<UploadResponseLike> {
   // Step 1: Initiate
@@ -294,7 +438,13 @@ async function chunkedUploadWithProgress(
   }
 
   // Step 3: Commit
-  const commitResponse = await commitChunkedUpload(initData, file, albumId, tags);
+  const commitResponse = await commitChunkedUpload(
+    initData,
+    file,
+    albumId,
+    tags,
+    thumbnailBase64
+  );
   onProgress(100);
   return commitResponse;
 }
@@ -502,16 +652,33 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
       }));
 
       const useChunked = item.file.size > CHUNKED_THRESHOLD_BYTES;
+      const isVideo = item.file.type.startsWith("video/");
 
       try {
+        // Extract a thumbnail frame from video files in the browser so
+        // the gallery shows a real preview instead of the dark grey
+        // placeholder. Failures fall through silently — the server
+        // handles the absence gracefully.
+        let thumbnailBlob: Blob | null = null;
+        if (isVideo) {
+          thumbnailBlob = await extractVideoThumbnail(item.file);
+        }
+
         let response: UploadResponseLike;
 
         if (useChunked) {
+          // Chunked commits use JSON, so base64-encode the small (<100KB)
+          // WebP thumbnail for transport.
+          const thumbnailBase64 = thumbnailBlob
+            ? await blobToBase64(thumbnailBlob)
+            : null;
+
           // Large file: chunked upload via block blob staging
           response = await chunkedUploadWithProgress(
             item.file,
             albumId,
             tags,
+            thumbnailBase64,
             (progress) => {
               updateQueueItem(item.id, (current) => ({
                 ...current,
@@ -525,6 +692,9 @@ const UploadForm = forwardRef<UploadFormHandle, Props>(function UploadForm({
           form.append("file", item.file);
           form.append("albumId", albumId);
           form.append("tags", tags);
+          if (thumbnailBlob) {
+            form.append("thumbnail", thumbnailBlob, "thumbnail.webp");
+          }
 
           response = await uploadFileWithProgress(form, (progress) => {
             updateQueueItem(item.id, (current) => ({

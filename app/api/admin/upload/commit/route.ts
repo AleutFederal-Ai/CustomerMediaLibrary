@@ -52,6 +52,8 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
     albumId: string;
     tags?: string;
     totalChunks: number;
+    /** Base64-encoded WebP thumbnail extracted in the browser. Optional. */
+    thumbnailBase64?: string | null;
   };
 
   try {
@@ -70,6 +72,7 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
     albumId,
     tags: tagsRaw,
     totalChunks,
+    thumbnailBase64,
   } = body;
 
   if (!uploadId || !blobName || !fileName || !mimeType || !fileType || !albumId || !totalChunks) {
@@ -102,24 +105,54 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
       email, uploadId, blobName, totalChunks,
     });
 
-    // Generate and upload a placeholder thumbnail
-    // For video files we generate a dark placeholder; for images we also
-    // use a placeholder since we don't have the full image in memory
-    // (the original approach of reading the whole file into memory for
-    // sharp is exactly what we're avoiding with chunked upload).
+    // Generate and upload the thumbnail.
+    // - For videos: the client supplies a base64-encoded frame so the
+    //   gallery shows a real preview. We re-encode it through sharp to
+    //   guarantee a valid, size-clamped WebP.
+    // - For images: we don't have the full file in memory at commit time
+    //   (chunked upload streams it straight to blob), so fall back to a
+    //   colored placeholder.
+    // - On any failure, fall back to the dark placeholder rather than
+    //   blocking the upload.
     const thumbnailBlobName = blobName.replace(/\.[^/.]+$/, "_thumb.webp");
-    const thumbnailBuffer = await sharp({
-      create: {
-        width: THUMBNAIL_SIZE,
-        height: THUMBNAIL_SIZE,
-        channels: 3,
-        background: fileType === "video"
-          ? { r: 30, g: 30, b: 30 }
-          : { r: 60, g: 60, b: 80 },
-      },
-    })
-      .webp()
-      .toBuffer();
+    let thumbnailBuffer: Buffer | null = null;
+
+    if (thumbnailBase64 && fileType === "video") {
+      try {
+        const clientBuffer = Buffer.from(thumbnailBase64, "base64");
+        thumbnailBuffer = await sharp(clientBuffer)
+          .resize(THUMBNAIL_SIZE, THUMBNAIL_SIZE, {
+            fit: "cover",
+            position: "centre",
+          })
+          .webp({ quality: 80 })
+          .toBuffer();
+      } catch (err) {
+        logWarn("admin.upload.commit.POST.client_thumbnail_invalid", {
+          email,
+          uploadId,
+          fileName,
+          error: (err as Error)?.message,
+        });
+        thumbnailBuffer = null;
+      }
+    }
+
+    if (!thumbnailBuffer) {
+      thumbnailBuffer = await sharp({
+        create: {
+          width: THUMBNAIL_SIZE,
+          height: THUMBNAIL_SIZE,
+          channels: 3,
+          background:
+            fileType === "video"
+              ? { r: 30, g: 30, b: 30 }
+              : { r: 60, g: 60, b: 80 },
+        },
+      })
+        .webp()
+        .toBuffer();
+    }
 
     await uploadBlob("thumbnails", thumbnailBlobName, thumbnailBuffer, "image/webp");
 
