@@ -4,6 +4,7 @@ import { generateSasUrl } from "@/lib/azure/blob";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { isMediaContributor, isTenantAdmin } from "@/lib/auth/permissions";
 import { buildDefaultMediaTitle, normalizeMediaTags } from "@/lib/media-metadata";
+import { ensureAlbumMediaOrdered } from "@/lib/media-ordering";
 import { MediaRecord, AuditAction } from "@/types";
 import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 
@@ -15,6 +16,8 @@ interface MediaMetadataPatchBody {
   title?: string;
   description?: string;
   tags?: string[] | string;
+  /** New position within the album (drag-and-drop / arrow reorder). */
+  order?: number;
 }
 
 async function handleGet(
@@ -120,12 +123,6 @@ async function handlePatch(
 
   const ip = request.headers.get("x-client-ip") ?? "unknown";
 
-  const isAdmin = await isTenantAdmin(email, tenantId);
-  if (!isAdmin) {
-    logWarn("media.item.PATCH.forbidden", { email, tenantId, reason: "not tenant admin" });
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   let body: MediaMetadataPatchBody;
   try {
     body = (await request.json()) as MediaMetadataPatchBody;
@@ -139,6 +136,40 @@ async function handlePatch(
     body.description === undefined ? undefined : body.description.trim();
   const normalizedTags =
     body.tags === undefined ? undefined : normalizeMediaTags(body.tags);
+  const normalizedOrder =
+    typeof body.order === "number" && Number.isFinite(body.order)
+      ? body.order
+      : undefined;
+
+  // Reorder-only PATCHes (contributors can reorganize their own albums).
+  // Metadata edits (title/description/tags) still require tenant admin.
+  const isReorderOnly =
+    normalizedOrder !== undefined &&
+    normalizedTitle === undefined &&
+    normalizedDescription === undefined &&
+    normalizedTags === undefined;
+
+  if (isReorderOnly) {
+    const canContribute = await isMediaContributor(email, tenantId);
+    if (!canContribute) {
+      logWarn("media.item.PATCH.forbidden", {
+        email,
+        tenantId,
+        reason: "not media contributor (reorder)",
+      });
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  } else {
+    const isAdmin = await isTenantAdmin(email, tenantId);
+    if (!isAdmin) {
+      logWarn("media.item.PATCH.forbidden", {
+        email,
+        tenantId,
+        reason: "not tenant admin",
+      });
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
 
   if (normalizedTitle !== undefined && normalizedTitle.length === 0) {
     return NextResponse.json({ error: "title is required" }, { status: 400 });
@@ -152,7 +183,15 @@ async function handlePatch(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const nextTitle = normalizedTitle ?? record.title ?? buildDefaultMediaTitle(record.fileName);
+    // If the caller is reordering an album that still has legacy records
+    // without `order`, backfill the entire album first so every item has
+    // a deterministic position before we write the new value.
+    if (normalizedOrder !== undefined) {
+      await ensureAlbumMediaOrdered(tenantId, record.albumId);
+    }
+
+    const nextTitle =
+      normalizedTitle ?? record.title ?? buildDefaultMediaTitle(record.fileName);
     const nextDescription =
       normalizedDescription !== undefined
         ? normalizedDescription || undefined
@@ -164,31 +203,60 @@ async function handlePatch(
       record.description === undefined ? "add" : "replace";
     const tagsPatchOp: "add" | "replace" =
       record.tags === undefined ? "add" : "replace";
-    const patchOperations = [
-      {
-        op: titlePatchOp,
-        path: "/title",
-        value: nextTitle,
-      },
-      ...(nextDescription === undefined
-        ? record.description === undefined
-          ? []
-          : [{ op: "remove" as const, path: "/description" }]
+
+    const metadataOps =
+      isReorderOnly
+        ? []
         : [
             {
-              op: descriptionPatchOp,
-              path: "/description",
-              value: nextDescription,
+              op: titlePatchOp,
+              path: "/title",
+              value: nextTitle,
             },
-          ]),
-      {
-        op: tagsPatchOp,
-        path: "/tags",
-        value: nextTags,
-      },
-    ];
+            ...(nextDescription === undefined
+              ? record.description === undefined
+                ? []
+                : [{ op: "remove" as const, path: "/description" }]
+              : [
+                  {
+                    op: descriptionPatchOp,
+                    path: "/description",
+                    value: nextDescription,
+                  },
+                ]),
+            {
+              op: tagsPatchOp,
+              path: "/tags",
+              value: nextTags,
+            },
+          ];
 
-    await container.item(id, id).patch(patchOperations);
+    // Re-read after backfill so we see the freshly-assigned `order` and
+    // pick the right patch op (add vs replace).
+    const freshRecord =
+      normalizedOrder !== undefined
+        ? (await container.item(id, id).read<MediaRecord>()).resource ?? record
+        : record;
+
+    const orderOps =
+      normalizedOrder === undefined
+        ? []
+        : [
+            {
+              op:
+                typeof freshRecord.order === "number"
+                  ? ("replace" as const)
+                  : ("add" as const),
+              path: "/order",
+              value: normalizedOrder,
+            },
+          ];
+
+    const patchOperations = [...metadataOps, ...orderOps];
+
+    if (patchOperations.length > 0) {
+      await container.item(id, id).patch(patchOperations);
+    }
 
     await writeAuditLog({
       userEmail: email,
@@ -198,8 +266,9 @@ async function handlePatch(
       detail: {
         mediaId: id,
         albumId: record.albumId,
-        title: nextTitle,
-        tags: nextTags,
+        ...(isReorderOnly
+          ? { order: normalizedOrder }
+          : { title: nextTitle, tags: nextTags, order: normalizedOrder }),
       },
     });
 
@@ -213,6 +282,7 @@ async function handlePatch(
       mimeType: record.mimeType,
       sizeBytes: record.sizeBytes,
       tags: nextTags,
+      order: normalizedOrder ?? freshRecord.order,
     });
   } catch (err) {
     logError("media.item.PATCH.failed", { mediaId: id, tenantId, error: err });

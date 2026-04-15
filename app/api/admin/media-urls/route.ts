@@ -4,47 +4,12 @@ import { albums, media } from "@/lib/azure/cosmos";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { isMediaContributor, isSuperAdmin } from "@/lib/auth/permissions";
 import { withRouteLogging, logWarn, logInfo } from "@/lib/logging/structured";
+import {
+  extractYouTubeId,
+  isAllowedUrl,
+  sanitizeSubmittedUrl,
+} from "@/lib/media-url-allowlist";
 import { AlbumRecord, MediaRecord, AuditAction } from "@/types";
-
-const ALLOWED_URL_PATTERNS = [
-  /^https:\/\/(www\.)?youtube\.com\/watch\?v=[\w-]+/,
-  /^https:\/\/youtu\.be\/[\w-]+/,
-  /^https:\/\/(www\.)?youtube\.com\/embed\/[\w-]+/,
-  /^https:\/\/(www\.)?youtube\.com\/shorts\/[\w-]+/,
-  /^https:\/\/(www\.)?vimeo\.com\/\d+/,
-  /^https:\/\/player\.vimeo\.com\/video\/\d+/,
-  /^https:\/\/(www\.)?dailymotion\.com\/video\/[\w-]+/,
-  /^https:\/\/(www\.)?rumble\.com\/[\w-]+/,
-];
-
-function isAllowedUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "https:") return false;
-    return ALLOWED_URL_PATTERNS.some((pattern) => pattern.test(url));
-  } catch {
-    return false;
-  }
-}
-
-function extractYouTubeId(url: string): string | null {
-  const patterns = [
-    /youtube\.com\/watch\?v=([\w-]+)/,
-    /youtu\.be\/([\w-]+)/,
-    /youtube\.com\/embed\/([\w-]+)/,
-    /youtube\.com\/shorts\/([\w-]+)/,
-  ];
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match?.[1]) return match[1];
-  }
-  return null;
-}
-
-function extractVimeoId(url: string): string | null {
-  const match = url.match(/vimeo\.com\/(\d+)/);
-  return match?.[1] ?? null;
-}
 
 function getThumbnailPlaceholder(url: string): string {
   const ytId = extractYouTubeId(url);
@@ -106,7 +71,7 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
   }
 
   const albumId = (body.albumId ?? "").trim();
-  const url = (body.url ?? "").trim();
+  const url = sanitizeSubmittedUrl(body.url ?? "");
   const title = (body.title ?? "").trim();
   const description = (body.description ?? "").trim();
 
@@ -117,8 +82,16 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "url is required" }, { status: 400 });
   }
   if (!isAllowedUrl(url)) {
+    logWarn("admin.media-urls.POST.rejected_url", {
+      email,
+      tenantId,
+      urlPreview: url.slice(0, 200),
+    });
     return NextResponse.json(
-      { error: "Only HTTPS URLs from supported platforms (YouTube, Vimeo, Dailymotion, Rumble) are allowed" },
+      {
+        error:
+          "Only HTTPS URLs from supported platforms (YouTube, Vimeo, Dailymotion, Rumble) are allowed.",
+      },
       { status: 400 }
     );
   }

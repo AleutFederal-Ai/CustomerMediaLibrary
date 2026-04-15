@@ -57,6 +57,7 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
   const file = formData.get("file");
   const albumId = (formData.get("albumId") as string | null)?.trim();
   const tagsRaw = (formData.get("tags") as string | null) ?? "";
+  const clientThumbnail = formData.get("thumbnail");
 
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "file is required" }, { status: 400 });
@@ -113,9 +114,41 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
         })
         .webp({ quality: 80 })
         .toBuffer();
+    } else if (clientThumbnail instanceof Blob && clientThumbnail.size > 0) {
+      // Video: use the frame the browser extracted at upload time. Re-encode
+      // through sharp so we always emit a valid, size-clamped WebP and never
+      // pass a raw client-supplied blob through to storage.
+      try {
+        const clientBuffer = Buffer.from(await clientThumbnail.arrayBuffer());
+        thumbnailBuffer = await sharp(clientBuffer)
+          .resize(THUMBNAIL_SIZE, THUMBNAIL_SIZE, {
+            fit: "cover",
+            position: "centre",
+          })
+          .webp({ quality: 80 })
+          .toBuffer();
+      } catch (err) {
+        logWarn("admin.upload.POST.client_thumbnail_invalid", {
+          email,
+          albumId,
+          fileName: file.name,
+          error: (err as Error)?.message,
+        });
+        thumbnailBuffer = await sharp({
+          create: {
+            width: THUMBNAIL_SIZE,
+            height: THUMBNAIL_SIZE,
+            channels: 3,
+            background: { r: 30, g: 30, b: 30 },
+          },
+        })
+          .webp()
+          .toBuffer();
+      }
     } else {
-      // For video, use a placeholder thumbnail (grey square)
-      // Full video thumbnail generation would require ffmpeg
+      // Video with no client thumbnail (codec unsupported in-browser): fall
+      // back to the solid dark placeholder. Full server-side frame extraction
+      // would require ffmpeg, which isn't installed on GCCH App Service.
       thumbnailBuffer = await sharp({
         create: {
           width: THUMBNAIL_SIZE,

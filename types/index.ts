@@ -132,6 +132,12 @@ export interface MediaRecord {
   deletedBy?: string;
   /** External URL for link-type media (YouTube, Vimeo, etc.) */
   externalUrl?: string;
+  /**
+   * User-controlled position within the album. Lower values render first.
+   * Optional because legacy records don't have one — those sort after the
+   * ordered items, by `uploadedAt DESC`.
+   */
+  order?: number;
 }
 
 export interface AuditLogRecord {
@@ -292,6 +298,8 @@ export interface MediaListItem {
   tags: string[];
   uploadedAt: string;
   externalUrl?: string;
+  /** User-controlled position; see MediaRecord.order. */
+  order?: number;
 }
 
 export interface UserProfileSummary {

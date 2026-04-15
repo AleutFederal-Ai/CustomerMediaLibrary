@@ -22,7 +22,7 @@ async function handleGet(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "No active tenant" }, { status: 403 });
   }
 
-  const PAGE_SIZE = 48;
+  const PAGE_SIZE = 400;
 
   try {
     const container = await media();
@@ -54,7 +54,13 @@ async function handleGet(request: NextRequest): Promise<NextResponse> {
       parameters.push({ name: "@q", value: q });
     }
 
-    const queryText = `SELECT * FROM c WHERE ${conditions.join(" AND ")} ORDER BY c.uploadedAt DESC`;
+    // Sort by user-controlled `order` first; fall back to `uploadedAt DESC`
+    // for legacy records that haven't been reordered yet. Items without an
+    // `order` field get a sentinel high value so they sink to the bottom
+    // until a contributor reorders them.
+    const queryText = `SELECT * FROM c WHERE ${conditions.join(
+      " AND "
+    )} ORDER BY (IS_NUMBER(c.order) ? c.order : 9999999) ASC, c.uploadedAt DESC`;
 
     const iterator = container.items.query<MediaRecord>(
       { query: queryText, parameters },
@@ -99,6 +105,7 @@ async function handleGet(request: NextRequest): Promise<NextResponse> {
           tags: record.tags,
           uploadedAt: record.uploadedAt,
           externalUrl: record.externalUrl,
+          order: record.order,
         };
       })
     );

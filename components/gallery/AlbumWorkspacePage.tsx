@@ -66,6 +66,13 @@ export default function AlbumWorkspacePage({
 }: Props) {
   const uploadFormRef = useRef<UploadFormHandle>(null);
   const dragDepthRef = useRef(0);
+  // Cancels the /api/media/:id fetch of the previously-open lightbox item
+  // when the user navigates quickly with the arrow keys or thumbnails.
+  const lightboxAbortRef = useRef<AbortController | null>(null);
+  // Monotonic counter used as a belt-and-suspenders guard so a stale
+  // response that slipped past AbortController can't overwrite the
+  // currently-displayed item.
+  const lightboxLoadSeqRef = useRef(0);
 
   const [items, setItems] = useState<MediaListItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -195,17 +202,57 @@ export default function AlbumWorkspacePage({
       return;
     }
 
+    // Cancel any still-pending fetch from the previous navigation so the
+    // browser drops its in-flight HTTP request immediately and we don't
+    // race on state updates.
+    lightboxAbortRef.current?.abort();
+    const controller = new AbortController();
+    lightboxAbortRef.current = controller;
+    const seq = ++lightboxLoadSeqRef.current;
+
     setLightboxIndex(index);
 
-    const res = await apiFetch(
-      `/api/media/${selectedItem.id}?albumId=${selectedItem.albumId}`
-    );
-    if (!res.ok) {
-      return;
-    }
+    // Provisional render: swap immediately to the thumbnail we already
+    // have in memory so the user sees the correct picture (low-res) while
+    // the SAS URL round-trip is in flight. The full-res image replaces it
+    // as soon as the response returns.
+    setLightboxItem({
+      id: selectedItem.id,
+      albumId: selectedItem.albumId,
+      fileName: selectedItem.fileName,
+      title: selectedItem.title,
+      description: selectedItem.description,
+      fileType: selectedItem.fileType,
+      mimeType: selectedItem.mimeType,
+      sizeBytes: selectedItem.sizeBytes,
+      sasUrl: selectedItem.thumbnailUrl,
+      tags: selectedItem.tags,
+      externalUrl: selectedItem.externalUrl,
+    });
 
-    const data = (await res.json()) as MediaDetail;
-    setLightboxItem(data);
+    try {
+      const res = await apiFetch(
+        `/api/media/${selectedItem.id}?albumId=${selectedItem.albumId}`,
+        { signal: controller.signal }
+      );
+      if (!res.ok || seq !== lightboxLoadSeqRef.current) {
+        return;
+      }
+
+      const data = (await res.json()) as MediaDetail;
+      if (seq !== lightboxLoadSeqRef.current) {
+        // A newer navigation won the race — drop this stale response.
+        return;
+      }
+      setLightboxItem(data);
+    } catch (err) {
+      // AbortError is expected when the user navigates again before the
+      // previous request finished. Anything else is unexpected but we
+      // don't want to crash the lightbox.
+      if ((err as Error | null)?.name !== "AbortError") {
+        throw err;
+      }
+    }
   }
 
   async function openLightbox(item: MediaListItem) {
@@ -417,7 +464,9 @@ export default function AlbumWorkspacePage({
   }
 
   async function handleAddUrl() {
-    const url = addUrlValue.trim();
+    // Strip whitespace and the `<` / `>` wrappers Outlook sometimes adds
+    // when users copy a hyperlink out of an email.
+    const url = addUrlValue.trim().replace(/^<+/, "").replace(/>+$/, "").trim();
     if (!url) return;
 
     setAddUrlSubmitting(true);
@@ -437,7 +486,8 @@ export default function AlbumWorkspacePage({
 
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { error?: string } | null;
-        setAddUrlError(data?.error ?? "Failed to add URL.");
+        const fallback = `Failed to add URL (HTTP ${res.status}). Only YouTube, Vimeo, Dailymotion, and Rumble links over HTTPS are supported.`;
+        setAddUrlError(data?.error ?? fallback);
         return;
       }
 
@@ -462,6 +512,60 @@ export default function AlbumWorkspacePage({
     setShowUploadPanel(true);
     setPendingDroppedFiles(files);
   });
+
+  // Reorder is only sound when we're looking at the unfiltered, unsorted
+  // album. Searching or filtering would reorder within a subset, which
+  // would corrupt the global order.
+  const reorderEnabled =
+    canContribute && !deferredSearchQuery && !typeFilter;
+
+  async function handleReorder(fromId: string, toId: string) {
+    if (!reorderEnabled) return;
+
+    const fromIndex = items.findIndex((item) => item.id === fromId);
+    const toIndex = items.findIndex((item) => item.id === toId);
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
+
+    // Optimistic reorder: move `fromId` into the slot currently occupied
+    // by `toId`. This matches how users expect drag-and-drop to behave —
+    // the dropped item takes the target's position and everything between
+    // shifts one slot.
+    const reordered = [...items];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+
+    // Rebuild a contiguous 0..n-1 `order` for the affected span so the
+    // server state stays in sync with what the user sees.
+    const lo = Math.min(fromIndex, toIndex);
+    const hi = Math.max(fromIndex, toIndex);
+    const updates: Array<{ id: string; order: number }> = [];
+    for (let i = lo; i <= hi; i += 1) {
+      updates.push({ id: reordered[i].id, order: i });
+    }
+
+    const patchedItems = reordered.map((item, index) => {
+      if (index >= lo && index <= hi) {
+        return { ...item, order: index };
+      }
+      return item;
+    });
+    setItems(patchedItems);
+
+    try {
+      await Promise.all(
+        updates.map((update) =>
+          apiFetch(`/api/media/${update.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ order: update.order }),
+          })
+        )
+      );
+    } catch {
+      // On failure, refetch the album so the client shows server state.
+      void fetchItems(true);
+    }
+  }
 
   useEffect(() => {
     if (!canContribute) {
@@ -681,7 +785,11 @@ export default function AlbumWorkspacePage({
             onMakeAlbumCover={() => {
               void handleMakeAlbumCover(lightboxItem.id);
             }}
-            onClose={() => setLightboxItem(null)}
+            onClose={() => {
+              lightboxAbortRef.current?.abort();
+              lightboxAbortRef.current = null;
+              setLightboxItem(null);
+            }}
             onPrev={() => {
               void navigateLightbox(-1);
             }}
@@ -769,6 +877,7 @@ export default function AlbumWorkspacePage({
                     updatingCover={updatingCover}
                     canContribute={canContribute}
                     onDelete={handleDelete}
+                    onReorder={reorderEnabled ? handleReorder : undefined}
                   />
 
                   {cursor && !loading ? (

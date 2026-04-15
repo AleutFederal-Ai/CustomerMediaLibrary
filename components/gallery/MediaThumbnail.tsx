@@ -10,6 +10,16 @@ interface Props {
   onClick?: (item: MediaListItem) => void;
   canContribute?: boolean;
   onDelete?: (item: MediaListItem) => void;
+  // Reorder plumbing — wired from MediaGrid.
+  draggable?: boolean;
+  isDragTarget?: boolean;
+  isDragging?: boolean;
+  onDragStart?: (id: string) => void;
+  onDragOver?: (id: string) => void;
+  onDragEnd?: () => void;
+  onDrop?: (id: string) => void;
+  onMoveUp?: (id: string) => void;
+  onMoveDown?: (id: string) => void;
 }
 
 export default function MediaThumbnail({
@@ -20,6 +30,15 @@ export default function MediaThumbnail({
   onClick,
   canContribute,
   onDelete,
+  draggable = false,
+  isDragTarget = false,
+  isDragging = false,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
+  onDrop,
+  onMoveUp,
+  onMoveDown,
 }: Props) {
   return (
     <div
@@ -27,8 +46,37 @@ export default function MediaThumbnail({
         selected
           ? "border-[rgba(37,99,235,0.42)] shadow-[0_0_0_3px_rgba(37,99,235,0.12)]"
           : ""
-      }`}
+      } ${
+        isDragTarget
+          ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-transparent"
+          : ""
+      } ${isDragging ? "opacity-50" : ""}`}
       onClick={() => onClick?.(item)}
+      title={item.title ?? item.fileName}
+      draggable={draggable}
+      onDragStart={(event) => {
+        if (!draggable) return;
+        event.dataTransfer.effectAllowed = "move";
+        // Needed on Firefox to start the drag.
+        try {
+          event.dataTransfer.setData("text/plain", item.id);
+        } catch {
+          // Some browsers reject setData in test environments — ignore.
+        }
+        onDragStart?.(item.id);
+      }}
+      onDragOver={(event) => {
+        if (!draggable) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        onDragOver?.(item.id);
+      }}
+      onDragEnd={() => onDragEnd?.()}
+      onDrop={(event) => {
+        if (!draggable) return;
+        event.preventDefault();
+        onDrop?.(item.id);
+      }}
     >
       {item.fileType === "link" && !item.thumbnailUrl ? (
         <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
@@ -123,19 +171,54 @@ export default function MediaThumbnail({
         </button>
       ) : null}
 
-      <div className="absolute inset-x-0 bottom-0 translate-y-0 p-3">
-        <div className="rounded-2xl border border-white/70 bg-white/88 px-3 py-2 shadow-sm backdrop-blur">
-          <p className="truncate text-sm font-semibold text-slate-950">
-            {item.title ?? item.fileName}
-          </p>
-          <p className="mt-1 truncate text-xs font-medium text-slate-600">
-            {item.fileName}
-          </p>
-          <p className="mt-1 text-[0.7rem] uppercase tracking-[0.16em] text-slate-500">
-            {item.fileType === "link" ? "External Link" : item.fileType}
-          </p>
+      {onMoveUp || onMoveDown ? (
+        <div
+          className="absolute bottom-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100"
+          onClick={(event) => event.stopPropagation()}
+        >
+          {onMoveUp ? (
+            <button
+              type="button"
+              aria-label="Move earlier"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/95 text-slate-700 shadow-sm backdrop-blur hover:bg-white"
+              onClick={(event) => {
+                event.stopPropagation();
+                onMoveUp(item.id);
+              }}
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+            </button>
+          ) : null}
+          {onMoveDown ? (
+            <button
+              type="button"
+              aria-label="Move later"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/95 text-slate-700 shadow-sm backdrop-blur hover:bg-white"
+              onClick={(event) => {
+                event.stopPropagation();
+                onMoveDown(item.id);
+              }}
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </button>
+          ) : null}
         </div>
-      </div>
+      ) : null}
+
     </div>
   );
 }
