@@ -16,11 +16,11 @@ export async function nextMediaOrder(
   const { resources } = await container.items
     .query<number>({
       query: `
-        SELECT VALUE MAX(c.order) FROM c
+        SELECT VALUE MAX(c["order"]) FROM c
         WHERE c.tenantId = @tenantId
           AND c.albumId = @albumId
           AND c.isDeleted = false
-          AND IS_NUMBER(c.order)
+          AND IS_NUMBER(c["order"])
       `,
       parameters: [
         { name: "@tenantId", value: tenantId },

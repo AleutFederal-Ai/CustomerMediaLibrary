@@ -63,7 +63,7 @@ async function main(): Promise<void> {
   const { resources: all } = await container.items
     .query<MediaDoc>({
       query:
-        "SELECT c.id, c.tenantId, c.albumId, c.uploadedAt, c.order, c.isDeleted FROM c WHERE c.isDeleted = false",
+        'SELECT c.id, c.tenantId, c.albumId, c.uploadedAt, c["order"] AS "order", c.isDeleted FROM c WHERE c.isDeleted = false',
     })
     .fetchAll();
 
