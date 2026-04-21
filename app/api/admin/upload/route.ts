@@ -7,6 +7,7 @@ import { writeAuditLog } from "@/lib/audit/logger";
 import { isMediaContributor } from "@/lib/auth/permissions";
 import { resolveUploadedMediaType } from "@/lib/media-upload";
 import { buildDefaultMediaTitle, normalizeMediaTags } from "@/lib/media-metadata";
+import { nextMediaOrder } from "@/lib/media-ordering";
 import { MediaRecord, AuditAction } from "@/types";
 import { withRouteLogging, logWarn, logError } from "@/lib/logging/structured";
 
@@ -164,6 +165,7 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
     await uploadBlob("thumbnails", thumbnailBlobName, thumbnailBuffer, "image/webp");
 
     const tags = normalizeMediaTags(tagsRaw);
+    const order = await nextMediaOrder(tenantId, albumId);
 
     const now = new Date().toISOString();
     const record: MediaRecord = {
@@ -181,6 +183,7 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
       uploadedAt: now,
       uploadedBy: email,
       isDeleted: false,
+      order,
     };
 
     const container = await media();

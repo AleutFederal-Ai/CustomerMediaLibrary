@@ -10,7 +10,7 @@
  * Run via: npx tsx scripts/setup-prod.ts
  */
 
-import { CosmosClient } from "@azure/cosmos";
+import { CosmosClient, IndexingPolicy } from "@azure/cosmos";
 import {
   DefaultAzureCredential,
   AzureAuthorityHosts,
@@ -35,6 +35,22 @@ const ENSURE_CONTAINERS = [
   { name: "tenants", partitionKey: "/id" },
   { name: "memberships", partitionKey: "/id" },
 ];
+
+// Composite index required so /api/search can use the gallery's primary sort
+// (`ORDER BY c.order ASC, c.uploadedAt DESC`). Without this, Cosmos rejects
+// the multi-field ORDER BY with an indexing-policy error.
+const MEDIA_INDEXING_POLICY: IndexingPolicy = {
+  indexingMode: "consistent",
+  automatic: true,
+  includedPaths: [{ path: "/*" }],
+  excludedPaths: [{ path: '/"_etag"/?' }],
+  compositeIndexes: [
+    [
+      { path: "/order", order: "ascending" },
+      { path: "/uploadedAt", order: "descending" },
+    ],
+  ],
+};
 
 // Default tenant
 const DEFAULT_TENANT_ID = "tenant-aleutfederal";
@@ -78,11 +94,29 @@ async function main() {
   // 1. Ensure missing containers exist
   console.log("--- Ensuring containers ---");
   for (const def of ENSURE_CONTAINERS) {
-    const { container } = await database.containers.createIfNotExists({
+    await database.containers.createIfNotExists({
       id: def.name,
       partitionKey: { paths: [def.partitionKey] },
     });
     console.log(`  Container "${def.name}" (pk: ${def.partitionKey}) — OK`);
+  }
+
+  // 1b. Ensure the media container has the composite index used by /api/search.
+  // createIfNotExists never updates an existing container, so replace the
+  // definition explicitly. Cosmos builds the index in the background; the
+  // operation is safe on a live container and idempotent.
+  console.log("\n--- Ensuring media indexing policy ---");
+  const mediaContainer = database.container("media");
+  const { resource: mediaDef } = await mediaContainer.read();
+  if (mediaDef) {
+    await mediaContainer.replace({
+      id: "media",
+      partitionKey: mediaDef.partitionKey,
+      indexingPolicy: MEDIA_INDEXING_POLICY,
+    });
+    console.log("  media composite index (order ASC, uploadedAt DESC) — applied");
+  } else {
+    console.log('  media container missing — skipping index update');
   }
 
   // 2. Seed default tenant

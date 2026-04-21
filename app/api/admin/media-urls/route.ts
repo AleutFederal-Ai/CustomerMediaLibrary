@@ -4,6 +4,7 @@ import { albums, media } from "@/lib/azure/cosmos";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { isMediaContributor, isSuperAdmin } from "@/lib/auth/permissions";
 import { withRouteLogging, logWarn, logInfo } from "@/lib/logging/structured";
+import { nextMediaOrder } from "@/lib/media-ordering";
 import {
   extractYouTubeId,
   isAllowedUrl,
@@ -110,6 +111,7 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
   const id = uuidv4();
   const platformName = getPlatformName(url);
   const displayTitle = title || `${platformName} Video`;
+  const order = await nextMediaOrder(tenantId, albumId);
 
   const record: MediaRecord = {
     id,
@@ -128,6 +130,7 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
     uploadedBy: email,
     isDeleted: false,
     externalUrl: url,
+    order,
   };
 
   const container = await media();

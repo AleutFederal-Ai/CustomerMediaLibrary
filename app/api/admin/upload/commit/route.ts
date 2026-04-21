@@ -5,6 +5,7 @@ import { commitBlockList, encodeBlockId, uploadBlob } from "@/lib/azure/blob";
 import { writeAuditLog } from "@/lib/audit/logger";
 import { isMediaContributor } from "@/lib/auth/permissions";
 import { buildDefaultMediaTitle, normalizeMediaTags } from "@/lib/media-metadata";
+import { nextMediaOrder } from "@/lib/media-ordering";
 import { MediaRecord, AuditAction } from "@/types";
 import { withRouteLogging, logWarn, logError, logInfo } from "@/lib/logging/structured";
 
@@ -158,6 +159,7 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
 
     // Create Cosmos DB media record
     const tags = normalizeMediaTags(tagsRaw ?? "");
+    const order = await nextMediaOrder(tenantId, albumId);
     const now = new Date().toISOString();
     const record: MediaRecord = {
       id: uploadId,
@@ -174,6 +176,7 @@ async function handlePost(request: NextRequest): Promise<NextResponse> {
       uploadedAt: now,
       uploadedBy: email,
       isDeleted: false,
+      order,
     };
 
     const container = await media();

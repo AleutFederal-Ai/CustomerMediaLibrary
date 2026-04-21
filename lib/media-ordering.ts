@@ -3,6 +3,36 @@ import { MediaRecord } from "@/types";
 import { logInfo, logWarn } from "@/lib/logging/structured";
 
 /**
+ * Return the next `order` value to assign to a new media record in the given
+ * album — one past the current maximum. Returns 0 for empty albums. Ties at
+ * the maximum don't matter; the search route's secondary sort on
+ * `uploadedAt DESC` breaks them deterministically.
+ */
+export async function nextMediaOrder(
+  tenantId: string,
+  albumId: string
+): Promise<number> {
+  const container = await media();
+  const { resources } = await container.items
+    .query<number>({
+      query: `
+        SELECT VALUE MAX(c.order) FROM c
+        WHERE c.tenantId = @tenantId
+          AND c.albumId = @albumId
+          AND c.isDeleted = false
+          AND IS_NUMBER(c.order)
+      `,
+      parameters: [
+        { name: "@tenantId", value: tenantId },
+        { name: "@albumId", value: albumId },
+      ],
+    })
+    .fetchAll();
+  const max = resources[0];
+  return typeof max === "number" ? max + 1 : 0;
+}
+
+/**
  * Lazily assign an `order` value to every non-deleted media item in an
  * album that doesn't already have one. Called the first time a user
  * attempts to reorder an album so legacy media (uploaded before the
