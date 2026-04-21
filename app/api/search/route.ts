@@ -54,13 +54,14 @@ async function handleGet(request: NextRequest): Promise<NextResponse> {
       parameters.push({ name: "@q", value: q });
     }
 
-    // Sort by user-controlled `order` first; fall back to `uploadedAt DESC`
-    // for legacy records that haven't been reordered yet. Items without an
-    // `order` field get a sentinel high value so they sink to the bottom
-    // until a contributor reorders them.
+    // Cosmos can only index property paths, not expressions, and multi-field
+    // ORDER BY requires a composite index (the media container has none).
+    // Fetch with the single-field sort the container already supports, then
+    // apply the user-controlled `order` primary sort in Node. Records with no
+    // `order` value fall through to the secondary `uploadedAt DESC` order.
     const queryText = `SELECT * FROM c WHERE ${conditions.join(
       " AND "
-    )} ORDER BY (IS_NUMBER(c.order) ? c.order : 9999999) ASC, c.uploadedAt DESC`;
+    )} ORDER BY c.uploadedAt DESC`;
 
     const iterator = container.items.query<MediaRecord>(
       { query: queryText, parameters },
@@ -71,7 +72,23 @@ async function handleGet(request: NextRequest): Promise<NextResponse> {
     );
 
     const page = await iterator.fetchNext();
-    const records = page.resources;
+    const records = [...page.resources].sort((a, b) => {
+      const aHasOrder = typeof a.order === "number";
+      const bHasOrder = typeof b.order === "number";
+      if (aHasOrder && bHasOrder) {
+        if (a.order !== b.order) {
+          return (a.order as number) - (b.order as number);
+        }
+      } else if (aHasOrder) {
+        return -1;
+      } else if (bHasOrder) {
+        return 1;
+      }
+      if (a.uploadedAt === b.uploadedAt) {
+        return 0;
+      }
+      return a.uploadedAt < b.uploadedAt ? 1 : -1;
+    });
 
     const items: MediaListItem[] = await Promise.all(
       records.map(async (record) => {
